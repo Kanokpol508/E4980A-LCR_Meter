@@ -1,0 +1,1 @@
+# กล่องปุ่ม START, STOP, โหมด Single/Sweep

@@ -1,0 +1,1 @@
+# กล่องตั้งค่า DC Bias, Deviation, Correction

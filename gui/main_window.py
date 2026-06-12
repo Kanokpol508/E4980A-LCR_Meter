@@ -5,11 +5,12 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                              QGroupBox, QLabel, QComboBox, QPushButton, 
                              QLineEdit, QRadioButton, QCheckBox, QScrollArea, 
                              QGridLayout, QFormLayout, QButtonGroup, QSizePolicy,
-                             QSpinBox, QDoubleSpinBox)
+                             QSpinBox, QDoubleSpinBox, QMessageBox)
 from PyQt6.QtCore import Qt, QLocale
 from PyQt6.QtGui import QIntValidator, QDoubleValidator
 import pyqtgraph as pg
 
+from core.measurement_thread import MeasurementWorker
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -17,21 +18,17 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("LCR Metrology Software (E4980A/AL)")
         self.resize(1280, 720)
 
-        # ========================================================
         # บังคับใช้ Locale เป็นภาษาอังกฤษ (US) 
         # เพื่อป้องกันปัญหาตัวเลขกลายเป็นเลขไทย (๑,๒,๓) ใน QSpinBox
-        # ========================================================
         self.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
 
-        # ========================================================
-        # ตัวแปรสถานะข้อผิดพลาด (Error Flags) สำหรับระบบล็อกปุ่ม
-        # ========================================================
+        # ตัวแปรสถานะข้อผิดพลาด สำหรับระบบล็อกปุ่ม
         self.is_dc_error = False
         self.is_dev_error = False
+        self.is_visa_error = True           # เพิ่มตัวแปรเช็กสถานะการเชื่อมต่อเครื่องมือวัด
+        self.worker = None                  # เตรียมตัวแปรไว้เก็บ QThread
 
-        # ========================================================
-        # ฐานข้อมูลตัวเลือกการวัด (Mapping Property Group -> SCPI)
-        # ========================================================
+        # ฐานข้อมูลตัวเลือกการวัด
         self.meas_options = {
             "Capacitance (ความจุไฟฟ้า)": [
                 ("Cp-D", "CPD"), ("Cp-Q", "CPQ"), ("Cp-G", "CPG"), ("Cp-Rp", "CPRP"),
@@ -67,14 +64,14 @@ class MainWindow(QMainWindow):
         left_main_layout = QVBoxLayout(left_panel_container)
         left_main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # 1. แผงตั้งค่าแบบเลื่อนได้ (Scrollable Input Panel)
-        left_scroll = QScrollArea()
-        left_scroll.setWidgetResizable(True)
-        # ปิดการแสดงผล Scrollbar แนวนอนอย่างเด็ดขาด
-        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # 1. แผงตั้งค่าแบบเลื่อนได้ (เปลี่ยนเป็น self. เพื่อให้ฟังก์ชันอื่นอ้างอิงได้)
+        self.left_scroll = QScrollArea()
+        self.left_scroll.setWidgetResizable(True)
+        self.left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
-        left_content = QWidget()
-        left_layout = QVBoxLayout(left_content)
+        # เปลี่ยนเป็น self.left_content เพื่อสั่ง Enabled/Disabled ทั้งกล่องรวดเดียว
+        self.left_content = QWidget()
+        left_layout = QVBoxLayout(self.left_content)
         
         # --- VISA Resource ---
         group_visa = QGroupBox("VISA Resource")
@@ -168,15 +165,13 @@ class MainWindow(QMainWindow):
 
         # --- 4. Correction ---
         group_corr = QGroupBox("4. การปรับชดเชยค่าสายวัด (Correction)")
-        v_corr = QVBoxLayout()
+        v_corr = QVBoxLayout() 
         v_corr.setSpacing(10)
 
-        # ข้อความคำแนะนำ
         lbl_corr_hint = QLabel("💡 คำแนะนำ:\n• ถ่างปลายสายวัดออกจากกัน ➔ กด OPEN\n• นำปลายสายวัดมาช็อตกัน ➔ กด SHORT")
         lbl_corr_hint.setWordWrap(True)
         v_corr.addWidget(lbl_corr_hint)
 
-        # แถวของปุ่มกด
         h_corr_buttons = QHBoxLayout()
         self.btn_open_corr = QPushButton("OPEN Correction")
         self.btn_short_corr = QPushButton("SHORT Correction")
@@ -346,26 +341,24 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.group_dev)
 
         left_layout.addStretch(1)
-        left_scroll.setWidget(left_content)
+        self.left_scroll.setWidget(self.left_content)
         
         # นำ Scroll area ใส่ใน Container ด้านซ้าย
-        left_main_layout.addWidget(left_scroll, stretch=1)
+        left_main_layout.addWidget(self.left_scroll, stretch=1)
 
 
         # ========================================================
-        # 2. โซนปุ่มควบคุมการรัน (Run Zone) ถูกล็อคตายตัวด้านล่างสุดของฝั่งซ้าย
+        # โซนปุ่มควบคุมการรัน (Run Zone)
         # ========================================================
         v_run_zone = QVBoxLayout()
         v_run_zone.setContentsMargins(0, 10, 0, 0)
         v_run_zone.setSpacing(5)
 
-        # จัด Layout ส่วนปุ่ม Start/Stop แบบตารางเพื่อให้ขนาดเท่ากัน 50:50
         grid_run = QGridLayout()
         grid_run.setColumnStretch(0, 1)
         grid_run.setColumnStretch(1, 1)
         grid_run.setVerticalSpacing(5)
 
-        # ปุ่มสลับโหมด Single / Sweep
         h_run_mode = QHBoxLayout()
         h_run_mode.setSpacing(0)
         self.btn_mode_single = QPushButton("วัดจุดเดียว")
@@ -392,19 +385,26 @@ class MainWindow(QMainWindow):
         self.btn_stop.setObjectName("btnStop")
         self.btn_stop.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.btn_stop.setMinimumHeight(60)
+        self.btn_stop.setEnabled(False) # เริ่มต้นด้วยการปิดปุ่ม STOP ก่อน
         
         grid_run.addWidget(self.btn_start, 1, 0)
         grid_run.addWidget(self.btn_stop, 1, 1)
 
         # ป้ายแจ้งเตือนข้อผิดพลาดใต้ปุ่ม START
+        self.lbl_warn_visa = QLabel("⚠️ กรุณาเลือกเครื่องมือวัด (VISA)")
         self.lbl_warn_dc_start = QLabel("⚠️ ตั้งค่า DC Bias ไม่ถูกต้อง")
         self.lbl_warn_dev_start = QLabel("⚠️ ต้องกรอก Primary Ref ก่อน")
+        
+        self.lbl_warn_visa.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_warn_dc_start.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_warn_dev_start.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.lbl_warn_visa.setVisible(False)
         self.lbl_warn_dc_start.setVisible(False)
         self.lbl_warn_dev_start.setVisible(False)
         
         v_warn = QVBoxLayout()
+        v_warn.addWidget(self.lbl_warn_visa)
         v_warn.addWidget(self.lbl_warn_dc_start)
         v_warn.addWidget(self.lbl_warn_dev_start)
         grid_run.addLayout(v_warn, 2, 0)
@@ -491,6 +491,9 @@ class MainWindow(QMainWindow):
         # [ ผูกคำสั่ง Event เริ่มต้น ]
         # ========================================================
         
+        # VISA Events
+        self.combo_visa.currentTextChanged.connect(self.validate_visa)
+
         # DC Bias Events
         self.widget_dc_inner.setEnabled(False)
         self.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
@@ -505,10 +508,109 @@ class MainWindow(QMainWindow):
 
         # Run Mode Events
         self.btn_mode_single.toggled.connect(self.toggle_run_mode)
+        
+        # ผูกปุ่มเข้ากับระบบ Worker และ UI State
+        self.btn_start.clicked.connect(self.start_measurement)
+        self.btn_stop.clicked.connect(self.stop_measurement)
+
+        # เรียกตรวจสถานะ VISA ครั้งแรกเพื่อล็อกปุ่ม START
+        self.validate_visa()
+
+
+    # ========================================================
+    # ระบบ UI State Locking และ Worker Threads
+    # ========================================================
+    def set_ui_locked(self, locked: bool):
+        """ล็อกหรือปลดล็อก UI ทั้งหมดระหว่างรอเครื่องมือวัดทำงาน"""
+        
+        # 1. ล็อกเนื้อหากล่องซ้ายมือทั้งหมด (Settings ทั้งปวง)
+        self.left_content.setEnabled(not locked)
+        
+        # 2. ล็อกปุ่มเลือกโหมด
+        self.btn_mode_single.setEnabled(not locked)
+        self.btn_mode_sweep.setEnabled(not locked)
+        
+        # 3. จัดการปุ่ม START / STOP
+        self.btn_stop.setEnabled(locked)
+        if locked:
+            self.btn_start.setEnabled(False)
+            self.btn_start.setText("⏳ RUNNING...")
+        else:
+            self.btn_start.setText("START")
+            self.btn_stop.setText("STOP")
+            self.update_start_button_state() # ประเมินสถานะปุ่ม START ใหม่เผื่อมี Error ค้างอยู่
+
+    def start_measurement(self):
+        """ฟังก์ชันทำงานเมื่อกดปุ่ม START"""
+        
+        # รวบรวมข้อมูลหน้าจอส่งไปให้ Worker
+        settings = {
+            'run_mode': 'SWEEP' if self.btn_mode_sweep.isChecked() else 'SINGLE',
+            'visa_resource': self.combo_visa.currentText(),
+            'freq': self.input_freq.value(),
+            'sweep_points': self.input_points.value()
+        }
+        
+        # สร้างลูกน้อง (Thread)
+        self.worker = MeasurementWorker(settings)
+        
+        # ต่อท่อ Signal จากลูกน้องเข้ากับ UI
+        self.worker.data_ready.connect(self.handle_data_ready)
+        self.worker.error_occurred.connect(self.handle_worker_error)
+        self.worker.progress_updated.connect(self.handle_progress_update)
+        self.worker.finished.connect(self.handle_worker_finished)
+        
+        # สั่งล็อก UI ป้องกันคนซนมากดเปลี่ยนค่า
+        self.set_ui_locked(True)
+        
+        # เคลียร์หน้าจอ LCD เพื่อรอผล
+        self.lbl_pri_val.setText("Measuring...")
+        self.lbl_sec_val.setText("Measuring...")
+        
+        # ลุยเลย!
+        self.worker.start()
+
+    def stop_measurement(self):
+        """ฟังก์ชันทำงานเมื่อกดปุ่ม STOP (หยุดฉุกเฉิน)"""
+        if self.worker and self.worker.isRunning():
+            self.worker.stop() # เปลี่ยน Flag is_running = False ทันที
+            self.btn_stop.setText("STOPPING...")
+            self.btn_stop.setEnabled(False) # กันผู้ใช้รัวปุ่ม STOP
+
+    # --- Slot สำหรับรับสัญญาณกลับมาจาก Worker ---
+    def handle_data_ready(self, data):
+        """รับข้อมูลมาอัปเดตหน้าจอ LCD (ในอนาคตจะใช้วาดกราฟตรงนี้ด้วย)"""
+        # ฟอร์แมตเป็นรูป สัญกรณ์วิทยาศาสตร์ (เช่น 1.234e-09)
+        self.lbl_pri_val.setText(f"{data.get('primary', 0.0):.5e}")
+        self.lbl_sec_val.setText(f"{data.get('secondary', 0.0):.5e}")
+
+    def handle_worker_error(self, error_msg):
+        """รับข้อความ Error มาโชว์ Popup เตือนผู้ใช้"""
+        QMessageBox.critical(self, "Hardware Error", error_msg)
+
+    def handle_progress_update(self, percent):
+        """เอาไว้โชว์ % หรือทำ Progress bar"""
+        if self.btn_mode_sweep.isChecked():
+            self.btn_start.setText(f"⏳ SWEEPING... {percent}%")
+
+    def handle_worker_finished(self):
+        """ทำงานเมื่อลูปจบสมบูรณ์ หรือโดนกดปุ่ม STOP ตัดจบ"""
+        self.set_ui_locked(False) # ปลดล็อกหน้าต่างกลับสู่สภาพปกติ
+        self.worker = None
+
 
     # ========================================================
     # ฟังก์ชันเสริมสำหรับจัดการ UI (UI Logic Methods)
     # ========================================================
+    def validate_visa(self):
+        """ตรวจสอบว่ามีการเลือกเครื่องมือวัดในช่อง VISA หรือยัง"""
+        text = self.combo_visa.currentText()
+        if text == "No Device Found" or text.strip() == "":
+            self.is_visa_error = True
+        else:
+            self.is_visa_error = False
+        self.update_start_button_state()
+
     def update_scpi_modes(self):
         """อัปเดตรายการใน Dropdown 'โหมดพารามิเตอร์'"""
         self.combo_scpi_mode.clear()
@@ -521,8 +623,9 @@ class MainWindow(QMainWindow):
 
     def update_start_button_state(self):
         """ระบบ Interlock สำหรับล็อกปุ่ม START และแสดงป้ายเตือน"""
-        is_blocked = self.is_dc_error or self.is_dev_error
+        is_blocked = self.is_dc_error or self.is_dev_error or self.is_visa_error
 
+        self.lbl_warn_visa.setVisible(self.is_visa_error)
         self.lbl_warn_dc_start.setVisible(self.is_dc_error)
         self.lbl_warn_dev_start.setVisible(self.is_dev_error)
 
@@ -545,6 +648,7 @@ class MainWindow(QMainWindow):
         self.radio_lin.setEnabled(is_sweep)
         
         self.update_start_button_state()
+
 
     # ---------------- DC Bias Logic ----------------
     def toggle_dc_bias(self):
@@ -583,7 +687,9 @@ class MainWindow(QMainWindow):
                 self.is_dc_error = True
         else: 
             if not has_opt:
-                if val not in [0.0, 1.5, 2.0]:
+                DISCRETE = [0.0, 1.5, 2.0]
+                TOLERANCE = 1e-9
+                if not any(abs(val - v) < TOLERANCE for v in DISCRETE):
                     warning_msg = "⚠️ เครื่องรุ่นปกติปรับแรงดันได้แค่ 0, 1.5 หรือ 2.0 V เท่านั้น"
                     self.is_dc_error = True
             else:

@@ -3,8 +3,10 @@
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, 
                              QGroupBox, QLabel, QComboBox, QPushButton, 
-                             QLineEdit, QRadioButton, QCheckBox, QScrollArea, QGridLayout, QFormLayout, QButtonGroup, QSizePolicy)
-from PyQt6.QtCore import Qt
+                             QLineEdit, QRadioButton, QCheckBox, QScrollArea, 
+                             QGridLayout, QFormLayout, QButtonGroup, QSizePolicy,
+                             QSpinBox, QDoubleSpinBox)
+from PyQt6.QtCore import Qt, QLocale
 from PyQt6.QtGui import QIntValidator, QDoubleValidator
 import pyqtgraph as pg
 
@@ -14,6 +16,12 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("LCR Metrology Software (E4980A/AL)")
         self.resize(1280, 720)
+
+        # ========================================================
+        # บังคับใช้ Locale เป็นภาษาอังกฤษ (US) 
+        # เพื่อป้องกันปัญหาตัวเลขกลายเป็นเลขไทย (๑,๒,๓) ใน QSpinBox
+        # ========================================================
+        self.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
 
         # ========================================================
         # ตัวแปรสถานะข้อผิดพลาด (Error Flags) สำหรับระบบล็อกปุ่ม
@@ -54,14 +62,16 @@ class MainWindow(QMainWindow):
         # [ ฝั่งซ้าย ] : คอนเทนเนอร์หลักฝั่งซ้าย
         # ========================================================
         left_panel_container = QWidget()
-        left_panel_container.setMinimumWidth(400)
-        left_panel_container.setMaximumWidth(450)
+        left_panel_container.setMinimumWidth(450)
+        left_panel_container.setMaximumWidth(500)
         left_main_layout = QVBoxLayout(left_panel_container)
         left_main_layout.setContentsMargins(0, 0, 0, 0)
 
         # 1. แผงตั้งค่าแบบเลื่อนได้ (Scrollable Input Panel)
         left_scroll = QScrollArea()
         left_scroll.setWidgetResizable(True)
+        # ปิดการแสดงผล Scrollbar แนวนอนอย่างเด็ดขาด
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
         left_content = QWidget()
         left_layout = QVBoxLayout(left_content)
@@ -102,12 +112,22 @@ class MainWindow(QMainWindow):
         grid_signal = QGridLayout()
         grid_signal.setColumnStretch(0, 1)
         grid_signal.setColumnStretch(1, 1)
+        
         grid_signal.addWidget(QLabel("ความถี่ (Hz):"), 0, 0)
-        self.input_freq = QLineEdit("100000")
+        self.input_freq = QDoubleSpinBox()
+        self.input_freq.setRange(20.0, 2000000.0)
+        self.input_freq.setDecimals(1)
+        self.input_freq.setValue(100000.0)
+        self.input_freq.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         grid_signal.addWidget(self.input_freq, 1, 0)
         
         grid_signal.addWidget(QLabel("แรงดัน (Vrms):"), 0, 1)
-        self.input_volt = QLineEdit("1.0")
+        self.input_volt = QDoubleSpinBox()
+        self.input_volt.setRange(0.0, 20.0)
+        self.input_volt.setDecimals(3)
+        self.input_volt.setSingleStep(0.1)
+        self.input_volt.setValue(1.0)
+        self.input_volt.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         grid_signal.addWidget(self.input_volt, 1, 1)
         group_signal.setLayout(grid_signal)
         left_layout.addWidget(group_signal)
@@ -122,8 +142,10 @@ class MainWindow(QMainWindow):
         self.combo_time.addItems(["SHORT", "MEDIUM", "LONG"])
         self.combo_time.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
-        self.input_avg = QLineEdit("1")
-        self.input_avg.setValidator(QIntValidator(1, 256))
+        self.input_avg = QSpinBox()
+        self.input_avg.setRange(1, 256)
+        self.input_avg.setValue(1)
+        self.input_avg.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         self.combo_range = QComboBox()
         self.combo_range.addItems(["AUTO", "HOLD"])
@@ -146,12 +168,23 @@ class MainWindow(QMainWindow):
 
         # --- 4. Correction ---
         group_corr = QGroupBox("4. การปรับชดเชยค่าสายวัด (Correction)")
-        h_corr = QHBoxLayout()
+        v_corr = QVBoxLayout()
+        v_corr.setSpacing(10)
+
+        # ข้อความคำแนะนำ
+        lbl_corr_hint = QLabel("💡 คำแนะนำ:\n• ถ่างปลายสายวัดออกจากกัน ➔ กด OPEN\n• นำปลายสายวัดมาช็อตกัน ➔ กด SHORT")
+        lbl_corr_hint.setWordWrap(True)
+        v_corr.addWidget(lbl_corr_hint)
+
+        # แถวของปุ่มกด
+        h_corr_buttons = QHBoxLayout()
         self.btn_open_corr = QPushButton("OPEN Correction")
         self.btn_short_corr = QPushButton("SHORT Correction")
-        h_corr.addWidget(self.btn_open_corr)
-        h_corr.addWidget(self.btn_short_corr)
-        group_corr.setLayout(h_corr)
+        h_corr_buttons.addWidget(self.btn_open_corr)
+        h_corr_buttons.addWidget(self.btn_short_corr)
+        
+        v_corr.addLayout(h_corr_buttons)
+        group_corr.setLayout(v_corr)
         left_layout.addWidget(group_corr)
 
         # --- 5. Sweep Settings ---
@@ -160,9 +193,23 @@ class MainWindow(QMainWindow):
         grid_sweep.setColumnStretch(0, 1)
         grid_sweep.setColumnStretch(1, 1)
         grid_sweep.setColumnStretch(2, 1)
-        self.input_start_freq = QLineEdit("100")
-        self.input_stop_freq = QLineEdit("1000000")
-        self.input_points = QLineEdit("50")
+        
+        self.input_start_freq = QDoubleSpinBox()
+        self.input_start_freq.setRange(20.0, 2000000.0)
+        self.input_start_freq.setDecimals(1)
+        self.input_start_freq.setValue(100.0)
+        self.input_start_freq.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        
+        self.input_stop_freq = QDoubleSpinBox()
+        self.input_stop_freq.setRange(20.0, 2000000.0)
+        self.input_stop_freq.setDecimals(1)
+        self.input_stop_freq.setValue(1000000.0)
+        self.input_stop_freq.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        
+        self.input_points = QSpinBox()
+        self.input_points.setRange(2, 201)
+        self.input_points.setValue(50)
+        self.input_points.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         grid_sweep.addWidget(QLabel("START Freq"), 0, 0)
         grid_sweep.addWidget(self.input_start_freq, 1, 0)
@@ -226,8 +273,12 @@ class MainWindow(QMainWindow):
         h_level = QHBoxLayout()
         h_level.setSpacing(0)
         
-        self.input_dc_level = QLineEdit("1.5")
-        self.input_dc_level.setValidator(QDoubleValidator())
+        self.input_dc_level = QDoubleSpinBox()
+        self.input_dc_level.setRange(-40.0, 40.0)
+        self.input_dc_level.setDecimals(3)
+        self.input_dc_level.setSingleStep(0.1)
+        self.input_dc_level.setValue(1.5)
+        self.input_dc_level.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         self.lbl_dc_unit = QLabel("V")
         self.lbl_dc_unit.setFixedWidth(40)
@@ -237,7 +288,7 @@ class MainWindow(QMainWindow):
         
         h_level.addWidget(self.input_dc_level)
         h_level.addWidget(self.lbl_dc_unit)
-        h_level.addSpacing(20)                          # เว้นระยะห่างระหว่างช่องตัวเลขกับ Checkbox
+        h_level.addSpacing(20)
         h_level.addWidget(self.chk_opt001)
         
         v_dc_inner.addLayout(h_level)
@@ -299,6 +350,7 @@ class MainWindow(QMainWindow):
         
         # นำ Scroll area ใส่ใน Container ด้านซ้าย
         left_main_layout.addWidget(left_scroll, stretch=1)
+
 
         # ========================================================
         # 2. โซนปุ่มควบคุมการรัน (Run Zone) ถูกล็อคตายตัวด้านล่างสุดของฝั่งซ้าย
@@ -434,6 +486,7 @@ class MainWindow(QMainWindow):
         # นำแผงขวาเข้า Main Layout
         main_layout.addLayout(right_layout)
 
+
         # ========================================================
         # [ ผูกคำสั่ง Event เริ่มต้น ]
         # ========================================================
@@ -443,7 +496,7 @@ class MainWindow(QMainWindow):
         self.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
         self.chk_opt001.stateChanged.connect(self.validate_dc_bias)
         self.btn_dc_v.toggled.connect(self.validate_dc_bias)
-        self.input_dc_level.textChanged.connect(self.validate_dc_bias)
+        self.input_dc_level.valueChanged.connect(self.validate_dc_bias)
 
         # Deviation Events
         self.widget_dev_inner.setEnabled(False)
@@ -493,7 +546,6 @@ class MainWindow(QMainWindow):
         
         self.update_start_button_state()
 
-
     # ---------------- DC Bias Logic ----------------
     def toggle_dc_bias(self):
         is_enabled = self.chk_dc_enable.isChecked()
@@ -518,32 +570,26 @@ class MainWindow(QMainWindow):
         warning_msg = "⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัดก่อนเปิดสวิตช์เสมอ!"
         self.is_dc_error = False
         
-        try:
-            val = float(self.input_dc_level.text())
-        except ValueError:
-            warning_msg = "⚠️ กรุณาป้อนตัวเลขให้ถูกต้อง"
-            self.is_dc_error = True
-            val = None
+        val = self.input_dc_level.value()
             
         has_opt = self.chk_opt001.isChecked()
         
-        if val is not None:
-            if not is_voltage: 
-                if not has_opt:
-                    warning_msg = "⚠️ ไม่รองรับ! ต้องติ๊ก Option 001 ก่อนถึงจะใช้กระแส (Current Bias) ได้"
+        if not is_voltage: 
+            if not has_opt:
+                warning_msg = "⚠️ ไม่รองรับ! ต้องติ๊ก Option 001 ก่อนถึงจะใช้กระแส (Current Bias) ได้"
+                self.is_dc_error = True
+            elif val < -0.1 or val > 0.1:
+                warning_msg = "⚠️ กระแสเกินฮาร์ดแวร์! รองรับสูงสุด -0.1A ถึง +0.1A (100 mA)"
+                self.is_dc_error = True
+        else: 
+            if not has_opt:
+                if val not in [0.0, 1.5, 2.0]:
+                    warning_msg = "⚠️ เครื่องรุ่นปกติปรับแรงดันได้แค่ 0, 1.5 หรือ 2.0 V เท่านั้น"
                     self.is_dc_error = True
-                elif val < -0.1 or val > 0.1:
-                    warning_msg = "⚠️ กระแสเกินฮาร์ดแวร์! รองรับสูงสุด -0.1A ถึง +0.1A (100 mA)"
+            else:
+                if val < -40.0 or val > 40.0:
+                    warning_msg = "⚠️ แรงดันเกินขีดจำกัด! Option 001 รองรับ -40.0 V ถึง +40.0 V"
                     self.is_dc_error = True
-            else: 
-                if not has_opt:
-                    if val not in [0.0, 1.5, 2.0]:
-                        warning_msg = "⚠️ เครื่องรุ่นปกติปรับแรงดันได้แค่ 0, 1.5 หรือ 2.0 V เท่านั้น"
-                        self.is_dc_error = True
-                else:
-                    if val < -40.0 or val > 40.0:
-                        warning_msg = "⚠️ แรงดันเกินขีดจำกัด! Option 001 รองรับ -40.0 V ถึง +40.0 V"
-                        self.is_dc_error = True
             
         self.lbl_dc_warning.setText(warning_msg)
         self.update_start_button_state()

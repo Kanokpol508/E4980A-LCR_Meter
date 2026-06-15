@@ -57,6 +57,44 @@ class E4980A:
             print("ปิดการเชื่อมต่อเรียบร้อยแล้ว")
 
     # ==========================================
+    # ระบบชดเชยค่าสายวัด (Correction) - OPEN / SHORT
+    # ==========================================
+    def perform_correction(self, corr_type: str) -> tuple[bool, str]:
+        """
+        สั่งเครื่องทำ OPEN หรือ SHORT Correction แบบเต็มรูปแบบ
+        (หมายเหตุ: ฟังก์ชันนี้จะค้างรอจนกว่าเครื่องจะทำเสร็จ)
+        """
+        if not self.is_connected:
+            return False, "⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด"
+        
+        try:
+            # 1. การทำ Correction ใช้เวลานาน ต้องเพิ่ม Timeout ของ VISA ชั่วคราว (เช่น 60 วินาที)
+            original_timeout = self.inst.timeout
+            self.inst.timeout = 60000 
+            
+            # 2. เปิดโหมด Correction ให้เป็น ON ก่อน แล้วสั่ง Execute
+            if corr_type.upper() == "OPEN":
+                self.inst.write(":CORR:OPEN:STAT ON")
+                self.inst.write(":CORR:OPEN:EXEC")
+            elif corr_type.upper() == "SHORT":
+                self.inst.write(":CORR:SHOR:STAT ON")
+                self.inst.write(":CORR:SHOR:EXEC")
+            else:
+                return False, "ประเภท Correction ไม่ถูกต้อง"
+            
+            # 3. ส่งคำสั่ง *OPC? เพื่อบังคับให้เครื่องตอบกลับมาเมื่อประมวลผลเสร็จแล้ว
+            self.inst.query("*OPC?")
+            
+            # 4. คืนค่า Timeout กลับสู่โหมดวัดปกติ
+            self.inst.timeout = original_timeout
+            return True, f"ทำ {corr_type.upper()} Correction สำเร็จเรียบร้อย!"
+            
+        except pyvisa.errors.VisaIOError as e:
+            return False, f"หมดเวลารอ (Timeout) เครื่องใช้เวลาประมวลผลนานเกินไป\n{str(e)}"
+        except Exception as e:
+            return False, f"เกิดข้อผิดพลาดในการส่งคำสั่ง: {str(e)}"
+
+    # ==========================================
     # ระบบตั้งค่า (Configuration Methods)
     # ==========================================
     def set_measurement_mode(self, mode: str):
@@ -94,7 +132,7 @@ class E4980A:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         
         try:
-            # ใช้ FETCh? เพื่อดึงข้อมูลที่เครื่องวัดเสร็จแล้ว (ให้ทำงานร่วมกับ *TRG หรือระบบ Trigger อัตโนมัติ)
+            # ใช้ FETCh? เพื่อดึงข้อมูลที่เครื่องวัดเสร็จแล้ว
             raw_data = self.inst.query(":FETCh?")
             parts = raw_data.strip().split(',')
             
@@ -121,8 +159,7 @@ class E4980A:
             return None, None, f"TIMEOUT/IO_ERROR: {str(e)}"
 
 # ======================================================
-# ส่วนทดสอบการทำงานแบบ Manual (รันไฟล์นี้ตรงๆ เพื่อทดสอบ)
-# พิมพ์คำสั่ง py hardware/lcr_meter.py ใน Terminal
+# ส่วนทดสอบการทำงานแบบ Manual
 # ======================================================
 if __name__ == "__main__":
     lcr = E4980A()
@@ -143,11 +180,9 @@ if __name__ == "__main__":
                 lcr.set_frequency(100000)
                 lcr.set_voltage_level(1.0)
                 
-                # รอให้วงจรในเครื่องปรับตัวก่อนวัด
                 time.sleep(0.5) 
                 
                 print("📐 กำลังวัดค่า...")
-                # บังคับ Trigger 1 ครั้ง
                 lcr.trigger()
                 
                 pri, sec, stat = lcr.fetch_measurement()

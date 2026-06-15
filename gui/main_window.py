@@ -1,10 +1,11 @@
 # หน้าต่างหลัก (ประกอบจิ๊กซอว์ทุก panel เข้าด้วยกัน)
 
 
-from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QScrollArea, QMessageBox
+from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QScrollArea, QMessageBox, QProgressDialog
 from PyQt6.QtCore import Qt, QLocale
 
 from core.measurement_thread import MeasurementWorker
+from core.correction_thread import CorrectionWorker
 from hardware.lcr_meter import E4980A
 
 # นำเข้าชิ้นส่วน UI ที่เราแยกไฟล์ไว้ (Panels & Displays)
@@ -27,10 +28,10 @@ class MainWindow(QMainWindow):
         self.is_dev_error = False
         self.is_visa_error = True
         self.worker = None
+        self.corr_worker = None         
+        self.progress_dialog = None     
 
-        # ----------------------------------------------------
         # ตัวแปรสำหรับเก็บข้อมูลวาดกราฟ
-        # ----------------------------------------------------
         self.graph_x_data = []
         self.graph_pri_y = []
         self.graph_sec_y = []
@@ -54,9 +55,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(main_widget)
         main_layout = QHBoxLayout(main_widget)
 
-        # ----------------------------------------------------
-        # โซนฝั่งซ้าย (Left Layout)
-        # ----------------------------------------------------
         left_panel_container = QWidget()
         left_panel_container.setMinimumWidth(450)
         left_panel_container.setMaximumWidth(500)
@@ -87,24 +85,17 @@ class MainWindow(QMainWindow):
         
         main_layout.addWidget(left_panel_container)
 
-        # ----------------------------------------------------
-        # โซนฝั่งขวา (Right Layout)
-        # ----------------------------------------------------
         right_layout = QVBoxLayout()
-        
         self.graph_display = GraphDisplay()
         self.lcd_display = LcdDisplay()
-        
         right_layout.addWidget(self.graph_display, stretch=1)
         right_layout.addWidget(self.lcd_display, stretch=0)
-        
         main_layout.addLayout(right_layout)
 
         # ----------------------------------------------------
         # การผูก Event Signals
         # ----------------------------------------------------
         self.input_panel.combo_prop_group.currentIndexChanged.connect(self.update_scpi_modes)
-        
         self.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
         self.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
@@ -118,22 +109,78 @@ class MainWindow(QMainWindow):
         self.adv_panel.chk_dev_enable.stateChanged.connect(self.toggle_deviation)
         self.adv_panel.input_dev_pri.textChanged.connect(self.validate_deviation)
 
+        # ผูกปุ่ม OPEN / SHORT Correction (แก้ไขชื่อตัวแปรให้ตรงกับ AdvancedPanel)
+        self.adv_panel.btn_open_corr.clicked.connect(lambda: self.start_correction("OPEN"))
+        self.adv_panel.btn_short_corr.clicked.connect(lambda: self.start_correction("SHORT"))
+
         self.ctrl_panel.btn_mode_single.toggled.connect(self.toggle_run_mode)
-        
         self.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         self.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
-        self.ctrl_panel.btn_clear_graph.clicked.connect(self.clear_graph_data)
+        self.ctrl_panel.btn_clear_graph.clicked.connect(self.handle_clear_graph)
 
-        # รันตอนเปิดโปรแกรมครั้งแรก
         self.input_panel.combo_prop_group.addItems(self.meas_options.keys())
         self.update_scpi_modes()
         self.scan_visa_ports()
-        
-        # เก็บสถานะโหมดล่าสุดไว้เทียบตอนสลับโหมดเพื่อป้องกันการลั่นซ้ำ
-        self._last_run_mode = 'SWEEP' if self.ctrl_panel.btn_mode_sweep.isChecked() else 'SINGLE'
 
     # ========================================================
-    # Logic Methods 
+    # ระบบ Correction (OPEN / SHORT)
+    # ========================================================
+    def start_correction(self, corr_type: str):
+        """เริ่มกระบวนการชดเชยสายวัด พร้อมโชว์ Loading"""
+        visa_address = self.conn_panel.combo_visa.currentText()
+        if not visa_address or visa_address == "No Device Found":
+            QMessageBox.warning(self, "เชื่อมต่อล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการชดเชยค่า")
+            return
+
+        # 1. ยืนยันสถานะสายวัดจากผู้ใช้ก่อนสั่งเครื่อง
+        msg = ("กรุณาแยกสายวัดออกจากกัน (ปลดชิ้นงานออก)" if corr_type == "OPEN" 
+               else "กรุณานำสายวัดมาแตะช็อตกัน (ใช้แผ่น Shorting Plate)")
+        
+        reply = QMessageBox.question(
+            self, f"เตรียมความพร้อม {corr_type} Correction", 
+            f"{msg}\n\nคุณพร้อมที่จะเริ่มทำการชดเชยค่าหรือไม่?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # 2. ล็อกหน้าจอระหว่างทำ
+        self.set_ui_locked(True)
+        self.ctrl_panel.btn_stop.setEnabled(False)       # ห้ามกด Stop ระหว่างแก้ Correction
+
+        # 3. โชว์หน้าต่างโหลดแบบไม่สิ้นสุด (0-0)
+        self.progress_dialog = QProgressDialog(
+            f"เครื่องกำลังทำงาน {corr_type} Correction...\n(อาจใช้เวลา 15 - 60 วินาที กรุณาห้ามถอดสาย)", 
+            "กำลังประมวลผล...", 0, 0, self
+        )
+        self.progress_dialog.setWindowTitle(f"{corr_type} Correction")
+        self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        self.progress_dialog.setCancelButton(None)      # เอาปุ่มยกเลิกออก เพราะฮาร์ดแวร์กำลังรอข้อมูล
+        self.progress_dialog.show()
+
+        # 4. โยนงานให้ Worker ตัวใหม่ทำ
+        self.corr_worker = CorrectionWorker(visa_address, corr_type)
+        self.corr_worker.finished_signal.connect(self.handle_correction_finished)
+        self.corr_worker.start()
+
+    def handle_correction_finished(self, success: bool, msg: str):
+        """รับผลลัพธ์จาก Thread ว่าทำ Correction สำเร็จหรือไม่"""
+        if self.progress_dialog:
+            self.progress_dialog.close()
+            self.progress_dialog = None
+            
+        self.set_ui_locked(False)           # ปลดล็อกหน้าจอ
+        self.corr_worker = None
+
+        if success:
+            QMessageBox.information(self, "Correction สำเร็จ", f"✅ {msg}")
+        else:
+            QMessageBox.critical(self, "Correction ล้มเหลว", f"❌ {msg}")
+
+
+    # ========================================================
+    # Logic Methods (ระบบอื่นๆ)
     # ========================================================
     def scan_visa_ports(self):
         self.conn_panel.combo_visa.clear()
@@ -157,18 +204,21 @@ class MainWindow(QMainWindow):
             self.ctrl_panel.btn_start.setText("START")
             self.ctrl_panel.btn_stop.setText("STOP")
             self.update_start_button_state()
-            self.update_session_lock()                      # ตรวจสอบระบบล็อคสะสมจุดข้อมูลทุกครั้งที่วัดเสร็จ
+            self.update_session_lock()
 
-    # ----------------------------------------------------
-    # ฟังก์ชันเปลี่ยนชื่อและแกนกราฟแบบออโต้
-    # ----------------------------------------------------
+    def handle_clear_graph(self):
+        reply = QMessageBox.question(
+            self, 'ยืนยันการล้างข้อมูล', "คุณต้องการล้างข้อมูลและรีเซ็ตกราฟใช่หรือไม่?\n(ข้อมูลที่ยังไม่ถูกบันทึกจะหายไป)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.clear_graph_data()
+
     def setup_graph_labels(self):
         scpi_mode = self.input_panel.combo_scpi_mode.currentData()
-        
         pri_label = "Primary"
         sec_label = "Secondary"
         
-        # 1. เช็ก Primary
         if scpi_mode.startswith("CP"): pri_label = "Capacitance, Cp (F)"
         elif scpi_mode.startswith("CS"): pri_label = "Capacitance, Cs (F)"
         elif scpi_mode.startswith("LP"): pri_label = "Inductance, Lp (H)"
@@ -178,14 +228,12 @@ class MainWindow(QMainWindow):
         elif scpi_mode.startswith("Y") or scpi_mode == "GB": pri_label = "Admittance (S)"
         elif scpi_mode == "VDID": pri_label = "DC Voltage (V)"
         
-        # 2. เช็ก Secondary
         if scpi_mode.endswith("D"): sec_label = "Dissipation Factor, D"
         elif scpi_mode.endswith("Q"): sec_label = "Quality Factor, Q"
         elif scpi_mode.endswith("RS") or scpi_mode.endswith("RP") or scpi_mode.endswith("RD") or scpi_mode == "RX": sec_label = "Resistance (Ω)"
         elif "T" in scpi_mode: sec_label = "Phase Angle, θ (°)"
         elif scpi_mode == "VDID": sec_label = "DC Current (A)"
         
-        # 3. เช็ก Deviation Mode
         if self.adv_panel.chk_dev_enable.isChecked():
             dev_type = self.adv_panel.combo_dev_type.currentText()
             if "PCT" in dev_type or "เปอร์เซ็นต์" in dev_type:
@@ -195,31 +243,21 @@ class MainWindow(QMainWindow):
                 pri_label = f"Δ {pri_label}"
                 sec_label = f"Δ {sec_label}"
 
-        # 4. กำหนดแกน X
         is_sweep = self.ctrl_panel.btn_mode_sweep.isChecked()
         is_log = self.input_panel.radio_log.isChecked() if is_sweep else False
-        
         x_label = "Frequency (Hz)" if is_sweep else "Measurement Count (Points)"
         
-        self.graph_display.set_axis_labels(
-            x_label=x_label, 
-            pri_y_label=pri_label, 
-            sec_y_label=sec_label,
-            is_log_x=is_log,
-            is_single_mode=not is_sweep
-        )
+        self.graph_display.set_axis_labels(x_label=x_label, pri_y_label=pri_label, sec_y_label=sec_label, is_log_x=is_log, is_single_mode=not is_sweep)
 
     def start_measurement(self):
         is_sweep = self.ctrl_panel.btn_mode_sweep.isChecked()
 
-        # ล้างกราฟอัตโนมัติทุกครั้งที่เริ่ม SWEEP รอบใหม่
         if is_sweep:
             self.graph_x_data = []
             self.graph_pri_y = []
             self.graph_sec_y = []
             self.graph_display.clear_plots()
 
-        # ตั้งค่าแกนกราฟล่วงหน้าเฉพาะตอนเริ่มวัดจุดแรกของเซสชัน
         if len(self.graph_x_data) == 0:
             self.setup_graph_labels()
 
@@ -246,10 +284,8 @@ class MainWindow(QMainWindow):
         self.worker.finished.connect(self.handle_worker_finished)
         
         self.set_ui_locked(True)
-        
         self.lcd_display.lbl_pri_val.setText("Measuring...")
         self.lcd_display.lbl_sec_val.setText("Measuring...")
-        
         self.worker.start()
 
     def stop_measurement(self):
@@ -259,11 +295,9 @@ class MainWindow(QMainWindow):
             self.ctrl_panel.btn_stop.setEnabled(False) 
 
     def handle_data_ready(self, data):
-        # โชว์ผลลัพธ์บน LCD
         self.lcd_display.lbl_pri_val.setText(f"{data.get('primary', 0.0):.5e}")
         self.lcd_display.lbl_sec_val.setText(f"{data.get('secondary', 0.0):.5e}")
 
-        # สะสมจุดกราฟ
         is_sweep = self.ctrl_panel.btn_mode_sweep.isChecked()
         if is_sweep:
             self.graph_x_data.append(data.get('freq', 0))
@@ -272,8 +306,6 @@ class MainWindow(QMainWindow):
             
         self.graph_pri_y.append(data.get('primary', 0.0))
         self.graph_sec_y.append(data.get('secondary', 0.0))
-
-        # สั่งวาดเส้นกราฟ 
         self.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
 
     def handle_worker_error(self, error_msg):
@@ -288,7 +320,6 @@ class MainWindow(QMainWindow):
         self.worker = None
 
     def clear_graph_data(self):
-        """ล้างข้อมูลกราฟทั้งหมดและปลดล็อค UI สำหรับรอบใหม่"""
         self.graph_x_data = []
         self.graph_pri_y = []
         self.graph_sec_y = []
@@ -296,30 +327,20 @@ class MainWindow(QMainWindow):
         self.update_session_lock()
 
     def update_session_lock(self):
-        """ล็อคค่าที่ห้ามเปลี่ยนกลางคัน ถ้าระบบกำลังสะสมจุดข้อมูลอยู่ (Interlock System)"""
         has_data = len(self.graph_x_data) > 0
         is_sweep = self.ctrl_panel.btn_mode_sweep.isChecked()
-        
-        # ล็อคเฉพาะตอนที่ "มีข้อมูลสะสมอยู่ในโหมด Single" เท่านั้น
-        # ถ้าเป็นโหมด Sweep เราไม่ล็อค เพราะพอกด START รอบถัดไปมันจะเคลียร์ข้อมูลเก่าทิ้งให้อัตโนมัติ
         should_lock = has_data and not is_sweep
         
-        # 1. ล็อค Measurement Type (SCPI Mode)
         self.input_panel.combo_prop_group.setEnabled(not should_lock)
         self.input_panel.combo_scpi_mode.setEnabled(not should_lock)
-        
-        # 2. ล็อค Run Mode (Single / Sweep)
         self.ctrl_panel.btn_mode_single.setEnabled(not should_lock)
         self.ctrl_panel.btn_mode_sweep.setEnabled(not should_lock)
         
-        # 3. ล็อค Deviation 
         self.adv_panel.chk_dev_enable.setEnabled(not should_lock)
         dev_enabled = self.adv_panel.chk_dev_enable.isChecked() and not should_lock
         self.adv_panel.widget_dev_inner.setEnabled(dev_enabled)
         
-        # 4. ล็อค Sweep Settings (Scale, Freq Range)
         if not should_lock:
-            # ใช้สถานะ Enable/Disable ตามโหมดปัจจุบัน
             self.input_panel.input_start_freq.setEnabled(is_sweep)
             self.input_panel.input_stop_freq.setEnabled(is_sweep)
             self.input_panel.input_points.setEnabled(is_sweep)
@@ -346,7 +367,6 @@ class MainWindow(QMainWindow):
 
     def update_start_button_state(self):
         is_blocked = self.is_dc_error or self.is_dev_error or self.is_visa_error
-
         self.ctrl_panel.lbl_warn_visa.setVisible(self.is_visa_error)
         self.ctrl_panel.lbl_warn_dc_start.setVisible(self.is_dc_error)
         self.ctrl_panel.lbl_warn_dev_start.setVisible(self.is_dev_error)
@@ -360,51 +380,36 @@ class MainWindow(QMainWindow):
 
     def toggle_run_mode(self):
         is_sweep = self.ctrl_panel.btn_mode_sweep.isChecked()
-        new_mode = 'SWEEP' if is_sweep else 'SINGLE'
         
-        # ข้ามการทำงานถ้าเป็นการเรียกซ้ำโดยไม่ได้เปลี่ยนโหมดจริงๆ
-        if hasattr(self, '_last_run_mode') and new_mode == self._last_run_mode:
-            pass # แต่ให้ทะลุไปอัปเดต UI เปิด/ปิดช่องกรอกข้อมูลด้านล่างได้
-        else:
-            has_data = len(self.graph_x_data) > 0
+        # หากมีการเปลี่ยนโหมด แล้วพบว่ามีข้อมูลเก่าค้างอยู่บนกราฟ
+        if len(self.graph_x_data) > 0:
+            reply = QMessageBox.question(
+                self, 
+                'ยืนยันการเปลี่ยนโหมด', 
+                "การเปลี่ยนโหมดการวัดจะล้างข้อมูลที่ยังไม่ได้บันทึกทิ้ง\nคุณต้องการดำเนินการต่อและล้างกราฟใช่หรือไม่?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
+                QMessageBox.StandardButton.No
+            )
             
-            # ถามผู้ใช้ก่อนล้างข้อมูลหากเปลี่ยนโหมดกลางคัน (เช่นจาก Sweep -> Single)
-            if has_data:
-                reply = QMessageBox.warning(
-                    self, 
-                    "คำเตือน: ข้อมูลอาจสูญหาย", 
-                    "การสลับโหมดการวัดจะทำให้ข้อมูลบนกราฟปัจจุบันถูกลบทิ้งทั้งหมด\n\nคุณต้องการดำเนินการเปลี่ยนโหมดและล้างกราฟหรือไม่?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No
-                )
-                
-                if reply == QMessageBox.StandardButton.No:
-                    # ผู้ใช้เปลี่ยนใจ ให้บล็อก Signal ชั่วคราวและคืนค่าปุ่มกลับสถานะเดิม
-                    self.ctrl_panel.btn_mode_single.blockSignals(True)
-                    self.ctrl_panel.btn_mode_sweep.blockSignals(True)
-                    
-                    if self._last_run_mode == 'SWEEP':
-                        self.ctrl_panel.btn_mode_sweep.setChecked(True)
-                    else:
-                        self.ctrl_panel.btn_mode_single.setChecked(True)
-                        
-                    self.ctrl_panel.btn_mode_single.blockSignals(False)
-                    self.ctrl_panel.btn_mode_sweep.blockSignals(False)
-                    return # จบการทำงาน ไม่ต้องอัปเดต UI 
-                
-                # ถ้าตอบ Yes ยอมให้ล้างกราฟ
+            if reply == QMessageBox.StandardButton.Yes:
                 self.clear_graph_data()
+            else:
+                # ⚠️ คืนสถานะปุ่มกลับไปเหมือนเดิม โดยบล็อก Signal ไว้เพื่อป้องกันโปรแกรมค้าง (Infinite Loop)
+                self.ctrl_panel.btn_mode_sweep.blockSignals(True)
+                self.ctrl_panel.btn_mode_single.blockSignals(True)
                 
-            # อัปเดตสถานะโหมดล่าสุด
-            self._last_run_mode = new_mode
+                self.ctrl_panel.btn_mode_sweep.setChecked(not is_sweep)
+                self.ctrl_panel.btn_mode_single.setChecked(is_sweep)
+                
+                self.ctrl_panel.btn_mode_sweep.blockSignals(False)
+                self.ctrl_panel.btn_mode_single.blockSignals(False)
+                return # หยุดการทำงานทันที ไม่ไปเปิด/ปิดช่องกรอกความถี่ด้านล่างต่อ
 
-        # อัปเดต UI เปิด/ปิด ช่องกรอกข้อมูล Sweep ตามโหมด
         self.input_panel.input_start_freq.setEnabled(is_sweep)
         self.input_panel.input_stop_freq.setEnabled(is_sweep)
         self.input_panel.input_points.setEnabled(is_sweep)
         self.input_panel.radio_log.setEnabled(is_sweep)
         self.input_panel.radio_lin.setEnabled(is_sweep)
-            
         self.update_start_button_state()
 
     def toggle_dc_bias(self):
@@ -422,10 +427,8 @@ class MainWindow(QMainWindow):
             self.is_dc_error = False
             self.update_start_button_state()
             return
-
         is_voltage = self.adv_panel.btn_dc_v.isChecked()
         self.adv_panel.lbl_dc_unit.setText("V" if is_voltage else "A")
-        
         warning_msg = "⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัดก่อนเปิดสวิตช์เสมอ!"
         self.is_dc_error = False
         val = self.adv_panel.input_dc_level.value()

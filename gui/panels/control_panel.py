@@ -1,4 +1,5 @@
-# กล่องปุ่ม START, STOP, โหมด Single/Sweep
+# กล่องปุ่ม START, STOP, โหมด Single/Sweep , Clear Graph
+
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QHBoxLayout, QPushButton, QButtonGroup, QLabel, QSizePolicy
 from PyQt6.QtCore import Qt
@@ -30,6 +31,10 @@ class ControlPanel(QWidget):
         h_run_mode.addWidget(self.btn_mode_single)
         h_run_mode.addWidget(self.btn_mode_sweep)
         grid_run.addLayout(h_run_mode, 0, 0)
+
+        self.btn_clear_graph = QPushButton("Clear Graph")
+        self.btn_clear_graph.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        grid_run.addWidget(self.btn_clear_graph, 0, 1)
 
         self.btn_start = QPushButton("START")
         self.btn_start.setObjectName("btnStart")

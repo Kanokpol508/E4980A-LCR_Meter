@@ -3,20 +3,22 @@
 
 import sys
 from PyQt6.QtWidgets import QApplication
+
 from gui.main_window import MainWindow
+from core.app_controller import AppController
 
 def main():
-    # สร้างแอปพลิเคชัน PyQt6
+    # 1. สร้างแอปพลิเคชัน PyQt
     app = QApplication(sys.argv)
     
-    # กำหนดสไตล์พื้นฐานให้ดูทันสมัยขึ้น (Fusion Style)
-    app.setStyle("Fusion")
-    
-    # สร้างและแสดงหน้าต่างหลัก
+    # 2. สร้างหน้าต่าง GUI เปล่าๆ ขึ้นมา (View)
     window = MainWindow()
-    window.show()
     
-    # รันลูปของแอปพลิเคชัน
+    # 3. สร้าง Controller แล้วมอบหมายให้เข้าไปควบคุมหน้าต่าง (Controller -> View)
+    controller = AppController(window)
+    
+    # 4. แสดงหน้าจอและรันโปรแกรม
+    window.show()
     sys.exit(app.exec())
 
 if __name__ == "__main__":

@@ -12,6 +12,19 @@ class E4980A:
         self.is_connected = False
         self.OVERLOAD_LIMIT = 9.0e37                # ค่าคงที่สำหรับตรวจสอบสถานะท่วมย่านวัด
 
+    @staticmethod
+    def scan_ports() -> list:
+        """
+        สแกนหาพอร์ต VISA ทั้งหมดที่เชื่อมต่ออยู่ (ใช้ร่วมกับหน้าต่าง GUI)
+        Returns: List ของชื่อพอร์ต (ถ้าไม่เจอจะคืนค่า List ว่าง [])
+        """
+        try:
+            rm = pyvisa.ResourceManager()
+            resources = rm.list_resources()
+            return list(resources)
+        except Exception as e:
+            print(f"VISA Scan Error: {e}")
+            return []
 
     # ==========================================
     # ระบบเชื่อมต่อ (Connection Management)
@@ -43,7 +56,6 @@ class E4980A:
             self.is_connected = False
             print("ปิดการเชื่อมต่อเรียบร้อยแล้ว")
 
-
     # ==========================================
     # ระบบตั้งค่า (Configuration Methods)
     # ==========================================
@@ -53,13 +65,11 @@ class E4980A:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         self.inst.write(f":FUNCtion:IMPedance:TYPE {mode}")
 
-
     def set_frequency(self, freq: float):
         """ตั้งความถี่ทดสอบ (Hz)"""
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         self.inst.write(f":FREQuency:CW {freq}")
-
 
     def set_voltage_level(self, voltage: float):
         """ตั้งแรงดันสัญญาณทดสอบ AC (Vrms)"""
@@ -67,13 +77,11 @@ class E4980A:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         self.inst.write(f":VOLTage:LEVel {voltage}")
 
-
     def trigger(self):
         """บังคับ Trigger 1 ครั้ง"""
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         self.inst.write("*TRG")
-
 
     # ==========================================
     # ระบบอ่านค่า (Measurement Methods)
@@ -112,7 +120,6 @@ class E4980A:
         except pyvisa.errors.VisaIOError as e:
             return None, None, f"TIMEOUT/IO_ERROR: {str(e)}"
 
-
 # ======================================================
 # ส่วนทดสอบการทำงานแบบ Manual (รันไฟล์นี้ตรงๆ เพื่อทดสอบ)
 # พิมพ์คำสั่ง py hardware/lcr_meter.py ใน Terminal
@@ -121,7 +128,7 @@ if __name__ == "__main__":
     lcr = E4980A()
     
     print("🔍 กำลังสแกนหาอุปกรณ์...")
-    resources = lcr.rm.list_resources()
+    resources = E4980A.scan_ports()
     
     if resources:
         address = resources[0] 
@@ -140,7 +147,7 @@ if __name__ == "__main__":
                 time.sleep(0.5) 
                 
                 print("📐 กำลังวัดค่า...")
-                # บังคับ Trigger 1 ครั้ง (จำลองกรณีไม่ได้ตั้งค่า Trigger เป็น Continuous)
+                # บังคับ Trigger 1 ครั้ง
                 lcr.trigger()
                 
                 pri, sec, stat = lcr.fetch_measurement()

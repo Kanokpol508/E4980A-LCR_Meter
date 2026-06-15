@@ -35,7 +35,18 @@ class MeasurementWorker(QThread):
             if not success:
                 raise ConnectionError(f"เชื่อมต่อเครื่องล้มเหลว: {msg}")
 
-            # 2. เริ่มทำการวัด
+            # ========================================================
+            # 2. ตั้งค่าเครื่องมือวัดก่อนเริ่มการวัด (Hardware Setup)
+            # ========================================================
+            scpi_mode = self.settings.get('scpi_mode', 'CPD')
+            volt      = self.settings.get('volt', 1.0)
+            freq      = self.settings.get('freq', 100000.0)
+            
+            lcr.set_measurement_mode(scpi_mode)
+            lcr.set_voltage_level(volt)
+            lcr.set_frequency(freq)
+
+            # 3. เริ่มทำการวัด
             run_mode = self.settings.get('run_mode', 'SINGLE')
 
             if run_mode == 'SINGLE':

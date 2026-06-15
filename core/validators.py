@@ -16,12 +16,12 @@ class E4980AValidator:
         "E4980AL-032":    300_000.0,
     }
 
-    VOLT_MIN = 0.0                  # 0 Vrms
+    VOLT_MIN = 0.0         # 0 Vrms
 
-    AVG_MIN = 1                     # ค่าเฉลี่ยต่ำสุด
-    AVG_MAX = 256                   # ค่าเฉลี่ยสูงสุด
+    AVG_MIN = 1            # ค่าเฉลี่ยต่ำสุด
+    AVG_MAX = 256          # ค่าเฉลี่ยสูงสุด
 
-    SWEEP_POINTS_MAX = 201          # จำนวนจุดสูงสุดในการทำ List Sweep
+    SWEEP_POINTS_MAX = 201 # จำนวนจุดสูงสุดในการทำ List Sweep
 
     @staticmethod
     def validate_frequency(freq_str: str, model: str = "E4980A") -> tuple[bool, str, float]:
@@ -130,9 +130,11 @@ class E4980AValidator:
                     if not (-40.0 <= level <= 40.0):
                         return False, "⚠️ Option 001: แรงดัน Bias ต้องอยู่ระหว่าง -40V ถึง +40V", 0.0
                 else:
-                    if level not in (0.0, 1.5, 2.0):
+                    DISCRETE = [0.0, 1.5, 2.0]
+                    TOLERANCE = 1e-9
+                    if not any(abs(level - v) < TOLERANCE for v in DISCRETE):
                         return False, "⚠️ เครื่องปกติรับได้เฉพาะ 0V, 1.5V, 2.0V เท่านั้น", 0.0
-            else:
+            else:  # Current
                 if not has_opt001:
                     return False, "⚠️ Current Bias ต้องการ Option 001", 0.0
                 if not (-0.1 <= level <= 0.1):

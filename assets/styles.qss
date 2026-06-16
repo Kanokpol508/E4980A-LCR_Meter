@@ -1,1 +1,356 @@
 /* ไฟล์เก็บโค้ดตกแต่งสีและหน้าตา UI (คล้าย CSS ของฝั่ง Web) */
+
+
+/* ==========================================
+   1. สีพื้นหลังของหน้าต่างหลัก (ฝั่งขวา)
+========================================== */
+QWidget {
+    font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+    font-size: 12px;                 
+    color: #ffffff;                                         /* สีตัวอักษรขาว */
+    font-weight: bold;                                      /* บังคับให้ตัวหนังสือทุกส่วนดูหนาขึ้นกว่าปกติ */
+}
+
+QMainWindow, QDialog, QWidget#centralwidget {
+    background-color: #2b1b4d;                              /* สีพื้นหลังกราฟและจอ LCD */
+}
+
+
+
+/* ==========================================
+   2. พื้นหลังฝั่งซ้าย (Input Panel)
+========================================== */
+QWidget#leftPanel {
+    background-color: #2b1b4d;                              /* พื้นหลังหลังกล่อง */
+    border-right: 1px solid #4c307a;                        /* เส้นคั่นบางๆ ระหว่างฝั่งซ้ายและขวา */
+}
+
+/* ทำให้ ScrollArea โปร่งใส เพื่อให้มองทะลุไปเห็นสีของ leftPanel */
+QWidget#leftPanel QScrollArea,
+QWidget#leftPanel QScrollArea > QWidget,
+QWidget#leftPanel QScrollArea > QWidget > QWidget {
+    background-color: transparent;
+    border: none;
+}
+
+/* ทำให้ข้อความและ Layout โปร่งใส จะได้ไม่เกิดกรอบซ้อนทับกัน */
+QLabel, QHBoxLayout, QVBoxLayout, QGridLayout {
+    background-color: transparent;
+}
+
+
+
+/* ==========================================
+   3. กล่องจัดกลุ่ม (บล็อกเมนู)
+========================================== */
+/* เพิ่ม QWidget#leftPanel QGroupBox เพื่อป้องกันไม่ให้คำสั่งโปร่งใสด้านบนมาทับ */
+QGroupBox, QWidget#leftPanel QGroupBox {
+    background-color: #172445;                              /* สีกล่องเมนู */
+    border: 1px solid #2d4578;                              /* ขอบบล็อก */
+    border-top: 2px solid #8b5cf6;                          /* เส้นขอบบน */
+    border-radius: 6px;
+    margin-top: 32px;                                       /* ระยะห่างด้านบนให้ห่างออกไปอีก */
+    margin-bottom: 16px;                                    /* ระยะห่างด้านล่างระหว่างกล่อง */
+    padding: 20px 10px 12px 10px;                           /* พื้นที่ว่างด้านในกล่องให้ดูโปร่งขึ้นนิดนึง */
+}
+
+/* หัวข้อกล่อง (Title) - ปรับขนาดและความหนา */
+QGroupBox::title {
+    color: #ffffff;                                         /* ตัวหนังสือ */
+    font-size: 16px;                                        /* ปรับให้ใหญ่ขึ้น */
+    font-weight: 900;                                       /* ปรับให้หนาที่สุด (Extra Bold) */
+    subcontrol-origin: margin;
+    subcontrol-position: top left; 
+    left: 12px;                      
+    padding: 5px 14px;                                      /* ขยายขอบป้ายออกนิดนึงรับกับฟอนต์ที่ใหญ่ขึ้น */
+    background-color: #0066CC;                              /* พื้นหลังป้ายสีเข้ม ตัดกับบล็อก */
+    border: 1px solid #3b82f6;                              /* ขอบป้าย */
+    border-radius: 4px;              
+}
+
+QGroupBox:disabled {
+    background-color: #0a101f;
+    border-color: #172445;
+    border-top: 1px solid #172445;
+}
+
+QGroupBox:disabled::title {
+    color: #475569;
+    background-color: #2b1b4d;                              /* สีกลืนตอนปิดใช้งาน */
+    border: 1px solid #172445;
+}
+
+QLabel:disabled {
+    color: #475569;
+}
+
+
+
+/* ==========================================
+   4. ช่องป้อนข้อมูล (Inputs)
+========================================== */
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+    background-color: #090e1f;                              /* สีกรมท่ามืด เพื่อให้ดูเป็นช่องยุบลงไป */
+    border: 1px solid #3b82f6;                              /* ขอบช่องสีฟ้าชัดเจน */
+    border-radius: 4px;
+    padding: 6px 10px;                
+    color: #ffffff;                                         /* ตัวหนังสือสี */
+    font-size: 13px;                 
+    font-weight: bold;
+}
+
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
+    border: 2px solid #8b5cf6;                              /* ขอบเปลี่ยนสี ตอนคลิกพิมพ์ */
+    background-color: #0f1836;       
+}
+
+QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QComboBox:disabled {
+    color: #475569;
+    background-color: #0a101f;
+    border: 1px solid #172445;
+}
+
+
+
+/* ==========================================
+   Dropdown List
+========================================== */
+QComboBox {
+    padding-right: 30px;
+}
+QComboBox::drop-down {
+    background-color: #121d38;                              
+    border-left: 1px solid #3b82f6;                         
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+    width: 28px;
+}
+
+/* ซ่อนสีสว่างของ Dropdown ตอนถูกปิดการใช้งาน (Disable) */
+QComboBox::drop-down:disabled {
+    background-color: transparent;                          /* ทำให้โปร่งใสเพื่อกลืนกับพื้นหลัง */
+    border-left: none;                                      /* เอาเส้นคั่นสีสว่างออก */
+}
+
+
+
+/* ==========================================
+   SpinBox: สัญลักษณ์ "+" และ "-"
+========================================== */
+QSpinBox, QDoubleSpinBox {
+    qproperty-buttonSymbols: 1; 
+    padding-right: 10px;             
+}
+
+
+
+/* ==========================================
+   ปุ่มกด และ โหมด (Single/Sweep)
+========================================== */
+QPushButton {
+    background-color: #121d38;                              /* สีปุ่มโทนน้ำเงิน */
+    color: #ffffff;                  
+    border: 1px solid #3b82f6;       
+    border-radius: 4px;
+    padding: 6px 12px;               
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background-color: #2563eb;                              /* เปลี่ยนเป็นสี สว่างตอนชี้เมาส์ */
+    border-color: #60a5fa;
+    color: white;
+}
+
+QPushButton:checked {
+    background-color: #8b5cf6;                              /* สีปุ่มที่ติ๊กเลือก */
+    color: white;
+    border: 1px solid #a855f7;       
+}
+
+QPushButton:disabled {
+    background-color: #2b1b4d;       
+    color: #475569;
+    border: 1px solid #172445;
+}
+
+QPushButton:checked:disabled {
+    background-color: #172445;       
+    color: #64748b;
+    border: 1px solid #2d4578;
+}
+
+
+
+/* ==========================================
+   ปุ่ม START / STOP
+========================================== */
+QPushButton#btnStart {
+    background-color: #10b981;                              /* สีปุ่ม START */
+    color: white;
+    font-size: 16px;
+    border: none;
+    font-weight: bold;
+}
+QPushButton#btnStart:hover {
+    background-color: #059669;       
+}
+QPushButton#btnStart:disabled {
+    background-color: #606671;                              /* สีปุ่ม START ตอนโดนล๊อค */
+    color: #ffffff;
+}
+
+QPushButton#btnStop {
+    background-color: #ef4444;                              /* สีปุ่ม STOP */
+    color: white;
+    font-size: 16px;
+    border: none;
+    font-weight: bold;
+}
+QPushButton#btnStop:hover {
+    background-color: #dc2626;
+}
+
+
+
+/* ==========================================
+   ปุ่มติ๊ก (Checkbox) แบบกล่องสี่เหลี่ยม
+========================================== */
+QCheckBox {
+    spacing: 8px;
+    color: #ffffff;
+    font-weight: bold;
+    background-color: transparent;
+}
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    border: 1px solid #3b82f6;       
+    background-color: #090e1f;
+}
+QCheckBox::indicator:hover {
+    border: 1px solid #8b5cf6;                              
+}
+QCheckBox::indicator:checked {
+    background-color: #10b981;                              
+    border: 2px solid #059669;
+}
+
+QCheckBox:disabled {
+    color: #475569;
+}
+QCheckBox::indicator:disabled {
+    background-color: #0a101f;
+    border: 1px solid #172445;
+}
+QCheckBox::indicator:checked:disabled {
+    background-color: #172445;
+    border: 1px solid #2d4578;
+}
+
+
+
+/* ==========================================
+   ตาราง (Verify Dialog)
+========================================== */
+QTableWidget {
+    background-color: #040814;
+    alternate-background-color: #0a101f; 
+    color: #ffffff;
+    gridline-color: #172445;
+    border: 1px solid #172445;
+}
+QHeaderView::section {
+    background-color: #172445;                              
+    color: #38bdf8;                                         
+    padding: 6px;
+    border: 1px solid #172445;
+    font-weight: bold;
+}
+QTableWidget::item:selected {
+    background-color: #8b5cf6;                              
+    color: white;
+}
+
+
+
+/* ==========================================
+   หน้าจอ LCD (Measurement Result)
+========================================== */
+QGroupBox#lcdGroup {
+    background-color: #000000;                              /* สีพื้นหลัง */
+    border: 1px solid #172445;
+    border-top: 2px solid #38bdf8;                          /* เน้นขอบบน */
+}
+
+QGroupBox#lcdGroup::title {
+    background-color: #0066CC;
+    color: #ffffff;
+    border: 1px solid #3b82f6;
+    font-size: 16px;
+    font-weight: 900;
+}
+
+QLabel#lblPriTitle {
+    color: #00FF33;                                         /* สีคำตอบ (Primary) */
+    font-weight: bold;
+}
+
+QLabel#lblPriVal {
+    color: #00FF33;                                         
+    font-size: 32px;                 
+    font-weight: bold;
+}
+
+QLabel#lblSecTitle {
+    color: #00FF33;                                         /* สีคำตอบ (Secondary) */
+    font-weight: bold;
+}
+
+QLabel#lblSecVal {
+    color: #00FF33;                                         
+    font-size: 32px;                 
+    font-weight: bold;
+}
+
+
+
+/* ==========================================
+   5. แถบเลื่อน (Scrollbar) ให้เข้ากับธีม
+========================================== */
+/* ตัวราง Scrollbar */
+QScrollBar:vertical {
+    background-color: rgba(10, 16, 31, 0.4);                /* รางแบบโปร่งแสงนิดๆ ให้กลืนกับสีพื้นหลัง */
+    width: 10px;                                            /* ขนาดความกว้างแบบมินิมอล */
+    margin: 0px;
+    border-radius: 5px;
+}
+
+/* ตัวจับ Scrollbar (Handle) */
+QScrollBar::handle:vertical {
+    background-color: #FF9900;                              /* สี Scrollbar */
+    min-height: 30px;                                       /* ขนาดความยาวขั้นต่ำของตัวจับ */
+    border-radius: 5px;                                     /* ขอบมน */
+}
+
+/* ตัวจับเมื่อเมาส์ชี้ (Hover) */
+QScrollBar::handle:vertical:hover {
+    background-color: #FF9933;                              /* สี Scrollbar สว่างขึ้นเมื่อชี้ */
+}
+
+/* ตัวจับเมื่อกดคลิกเลื่อน (Pressed) */
+QScrollBar::handle:vertical:pressed {
+    background-color: #FFA500;                              /* สี Scrollbar เมื่อกดคลิกเลื่อน */
+}
+
+/* ซ่อนปุ่มลูกศรชี้ขึ้นและลง (สไตล์ UI สมัยใหม่มักจะซ่อนไว้) */
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+    background: none;
+}
+
+/* ซ่อนพื้นที่ด้านบนและล่างของตัวจับไม่ให้มีสีพื้นหลังซ้อนทับ */
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}

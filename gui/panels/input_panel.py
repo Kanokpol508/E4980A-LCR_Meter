@@ -7,14 +7,8 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QFormLayout,
 from PyQt6.QtCore import Qt
 
 class SmartDoubleSpinBox(QDoubleSpinBox):
-    """
-    คลาสปรับแต่งพิเศษเพื่อซ่อนทศนิยม (.00) ในกรณีที่ผู้ใช้ไม่ได้กรอก
-    แต่ยังคงอนุญาตให้กรอกทศนิยมได้ (เช่น 1000.5)
-    """
     def textFromValue(self, value):
-        # แปลงค่าเป็นข้อความตามจำนวนทศนิยมที่อนุญาตสูงสุด
         text = f"{value:.{self.decimals()}f}"
-        # ถ้ามีจุดทศนิยม ให้ลบเลข 0 ที่อยู่ท้ายสุด และถ้าเหลือแต่จุดก็ลบจุดทิ้งด้วย
         if '.' in text:
             text = text.rstrip('0').rstrip('.')
         return text
@@ -41,7 +35,6 @@ class InputPanel(QWidget):
         group_signal = QGroupBox("2. สัญญาณทดสอบ AC (Test Signal)")
         grid_signal = QGridLayout()
         
-        # ใช้ SmartDoubleSpinBox และตั้งค่า SingleStep เป็น 100 สำหรับความถี่
         self.input_freq = SmartDoubleSpinBox()
         self.input_freq.setRange(20.0, 2000000.0)
         self.input_freq.setDecimals(2)
@@ -98,41 +91,44 @@ class InputPanel(QWidget):
         # --- 4. Sweep Settings ---
         self.group_sweep = QGroupBox("4. การสแกนความถี่ (Sweep Settings)")
         grid_sweep = QGridLayout()
+        grid_sweep.setVerticalSpacing(5)
         
         self.input_start_freq = SmartDoubleSpinBox()
         self.input_start_freq.setRange(20.0, 2000000.0)
         self.input_start_freq.setDecimals(2)
         self.input_start_freq.setSingleStep(100)
         self.input_start_freq.setValue(100.0)
-        self.input_start_freq.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         self.input_stop_freq = SmartDoubleSpinBox()
         self.input_stop_freq.setRange(20.0, 2000000.0)
         self.input_stop_freq.setDecimals(2)
         self.input_stop_freq.setSingleStep(100)
         self.input_stop_freq.setValue(1000000.0)
-        self.input_stop_freq.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
         self.input_points = QSpinBox()
         self.input_points.setRange(2, 201)
         self.input_points.setValue(50)
-        self.input_points.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
+        # แถว 1: Start & Stop
         grid_sweep.addWidget(QLabel("START Freq"), 0, 0)
         grid_sweep.addWidget(self.input_start_freq, 1, 0)
         grid_sweep.addWidget(QLabel("STOP Freq"), 0, 1)
         grid_sweep.addWidget(self.input_stop_freq, 1, 1)
-        grid_sweep.addWidget(QLabel("POINTS"), 0, 2)
-        grid_sweep.addWidget(self.input_points, 1, 2)
         
+        # แถว 2: Points
+        grid_sweep.addWidget(QLabel("POINTS"), 2, 0)
+        grid_sweep.addWidget(self.input_points, 3, 0)
+        
+        # แถว 3: Scale (กวาดพื้นที่ยาว 2 คอลัมน์)
         h_scale = QHBoxLayout()
         h_scale.addWidget(QLabel("สเกล (Scale):"))
-        self.radio_log = QRadioButton("Log (ลอการิทึม)")
-        self.radio_lin = QRadioButton("Linear (เชิงเส้น)")
+        self.radio_log = QRadioButton("Log")
+        self.radio_lin = QRadioButton("Linear")
         self.radio_log.setChecked(True)
         h_scale.addWidget(self.radio_log)
         h_scale.addWidget(self.radio_lin)
         h_scale.addStretch()
-        grid_sweep.addLayout(h_scale, 2, 0, 1, 3)
+        grid_sweep.addLayout(h_scale, 4, 0, 1, 2)
+        
         self.group_sweep.setLayout(grid_sweep)
         layout.addWidget(self.group_sweep)

@@ -380,7 +380,7 @@ class AppController(QObject):
         v.ctrl_panel.lbl_warn_dev_start.setVisible(self.is_dev_error)
 
         if is_blocked:
-            v.ctrl_panel.btn_start.setText("🔒 BLOCKED")
+            v.ctrl_panel.btn_start.setText("🔒 START")
             v.ctrl_panel.btn_start.setEnabled(False)
         else:
             v.ctrl_panel.btn_start.setText("START")

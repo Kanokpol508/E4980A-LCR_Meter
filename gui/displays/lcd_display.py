@@ -1,5 +1,6 @@
 # วาดหน้าจอดำๆ แสดงตัวเลข Primary/Secondary
 
+
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QGroupBox, QLabel, QPushButton, QSizePolicy
 from PyQt6.QtCore import Qt
 
@@ -10,25 +11,31 @@ class LcdDisplay(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         group_lcd = QGroupBox("ผลการวัด (Measurement Result)")
+        group_lcd.setObjectName("lcdGroup")
         group_lcd.setMinimumHeight(160)
         h_lcd = QHBoxLayout()
         
         self.lbl_pri_val = QLabel("---")
+        self.lbl_pri_val.setObjectName("lblPriVal") 
         self.lbl_pri_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_pri_val.setStyleSheet("font-size: 32px; font-weight: bold;")
         self.lbl_pri_val.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         self.lbl_sec_val = QLabel("---")
+        self.lbl_sec_val.setObjectName("lblSecVal")
         self.lbl_sec_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.lbl_sec_val.setStyleSheet("font-size: 32px; font-weight: bold;")
+        # ลบ setStyleSheet เก่าออก
         self.lbl_sec_val.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         v_pri = QVBoxLayout()
-        v_pri.addWidget(QLabel("พารามิเตอร์หลัก (Primary)"))
+        lbl_pri_title = QLabel("พารามิเตอร์หลัก (Primary)")
+        lbl_pri_title.setObjectName("lblPriTitle")              # ID หัวข้อหลัก
+        v_pri.addWidget(lbl_pri_title)
         v_pri.addWidget(self.lbl_pri_val, stretch=1)
         
         v_sec = QVBoxLayout()
-        v_sec.addWidget(QLabel("พารามิเตอร์รอง (Secondary)"))
+        lbl_sec_title = QLabel("พารามิเตอร์รอง (Secondary)")
+        lbl_sec_title.setObjectName("lblSecTitle")              # ID หัวข้อรอง
+        v_sec.addWidget(lbl_sec_title)
         v_sec.addWidget(self.lbl_sec_val, stretch=1)
         
         h_lcd.addLayout(v_pri)

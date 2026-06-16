@@ -11,8 +11,8 @@ class AdvancedPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # --- 4. Correction ---
-        group_corr = QGroupBox("4. การปรับชดเชยค่าสายวัด (Correction)")
+        # --- 5. Correction ---
+        group_corr = QGroupBox("5. การปรับชดเชยค่าสายวัด (Correction)")
         v_corr = QVBoxLayout()
         v_corr.setSpacing(10)
         lbl_corr_hint = QLabel("💡 คำแนะนำ:\n• ถ่างปลายสายวัดออกจากกัน ➔ กด OPEN\n• นำปลายสายวัดมาช็อตกัน ➔ กด SHORT")

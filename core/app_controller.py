@@ -20,6 +20,7 @@ class AppController(QObject):
         
         self.worker = None
         self.corr_worker = None
+        self.verify_worker = None
         self.progress_dialog = None
 
         # ตัวแปรสำหรับเก็บข้อมูลวาดกราฟ
@@ -69,6 +70,9 @@ class AppController(QObject):
         v.adv_panel.btn_open_corr.clicked.connect(lambda: self.start_correction("OPEN"))
         v.adv_panel.btn_short_corr.clicked.connect(lambda: self.start_correction("SHORT"))
 
+
+        v.lcd_display.btn_verify.clicked.connect(self.handle_verify_apply)
+
         v.ctrl_panel.btn_mode_single.toggled.connect(self.toggle_run_mode)
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
@@ -102,6 +106,60 @@ class AppController(QObject):
             v.ctrl_panel.btn_stop.setText("STOP")
             self.update_start_button_state()
             self.update_session_lock()
+
+    def handle_verify_apply(self):
+        """จัดการลอจิกเมื่อผู้ใช้กดปุ่ม Verify & Apply"""
+        v = self.view
+        visa_address = v.conn_panel.combo_visa.currentText()
+        if not visa_address or visa_address == "No Device Found":
+            QMessageBox.warning(v, "ตรวจสอบล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการตรวจสอบการตั้งค่า")
+            return
+
+        # รวบรวมข้อมูล Settings ทั้งหมด รวมถึง DC Bias
+        settings = {
+            'visa_resource': visa_address,
+            'freq': v.input_panel.input_freq.value(),
+            'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
+            'volt': v.input_panel.input_volt.value(),
+            'time_mode': v.input_panel.combo_time.currentText(),
+            'avg': v.input_panel.input_avg.value(),
+            'cable': v.input_panel.combo_cable.currentText(),
+            'imp_range': v.input_panel.combo_range.currentText(),
+            'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
+            'dc_is_voltage': v.adv_panel.btn_dc_v.isChecked(),
+            'dc_bias_level': v.adv_panel.input_dc_level.value(),
+        }
+
+        self.set_ui_locked(True)
+        self.progress_dialog = QProgressDialog(
+            "กำลังส่งค่าและตรวจสอบความถูกต้องจากเครื่อง LCR Meter...\n(Verify & Apply)", 
+            "กำลังประมวลผล...", 0, 0, v
+        )
+        self.progress_dialog.setWindowTitle("System Verification")
+        self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        self.progress_dialog.setCancelButton(None) 
+        self.progress_dialog.show()
+
+        # นำเข้าและสั่งรัน VerifyWorker เบื้องหลัง
+        from core.verify_thread import VerifyWorker
+        self.verify_worker = VerifyWorker(visa_address, settings)
+        self.verify_worker.finished_signal.connect(self.handle_verify_finished)
+        self.verify_worker.start()
+
+
+    def handle_verify_finished(self, success: bool, results: list, error_msg: str):
+        """รับผลลัพธ์จาก VerifyWorker และเปิดหน้าต่างตาราง"""
+        if self.progress_dialog:
+            self.progress_dialog.close()
+            self.progress_dialog = None
+            
+        self.set_ui_locked(False)
+        self.verify_worker = None
+
+        # นำเข้าและเปิดหน้าต่าง Dialog แสดงตารางผลลัพธ์
+        from gui.dialogs.verify_dialog import VerifyDialog
+        dialog = VerifyDialog(results, error_msg, self.view)
+        dialog.exec()
 
     def start_correction(self, corr_type: str):
         v = self.view

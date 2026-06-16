@@ -95,8 +95,8 @@ class InputPanel(QWidget):
         group_hw.setLayout(grid_hw)
         layout.addWidget(group_hw)
 
-        # --- 5. Sweep Settings ---
-        self.group_sweep = QGroupBox("5. การสแกนความถี่ (Sweep Settings)")
+        # --- 4. Sweep Settings ---
+        self.group_sweep = QGroupBox("4. การสแกนความถี่ (Sweep Settings)")
         grid_sweep = QGridLayout()
         
         self.input_start_freq = SmartDoubleSpinBox()

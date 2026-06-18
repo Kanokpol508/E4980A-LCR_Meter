@@ -31,7 +31,7 @@ class CorrectionWorker(QThread):
                 self.finished_signal.emit(False, f"การเชื่อมต่อฮาร์ดแวร์ล้มเหลว:\n{msg}")
                 return
 
-            # 2. สั่งทำ Correction (ฟังก์ชันจะ Block ตัวเองจนกว่าเครื่องจะตอบกลับ *OPC?)
+            # 2. สั่งทำ Correction ผ่านฟังก์ชัน perform_correction ที่เซฟตี้แล้วใน lcr_meter
             succ, result_msg = lcr.perform_correction(self.corr_type)
             
             # 3. ส่งผลลัพธ์กลับไปยังหน้าจอหลัก

@@ -52,9 +52,45 @@ class E4980A:
     def disconnect(self):
         """ตัดการเชื่อมต่อเพื่อคืนทรัพยากรให้ระบบ"""
         if self.inst:
+            try:
+                # ปิด DC Bias ทุกครั้งก่อนตัดการเชื่อมต่อเพื่อความปลอดภัย
+                self.inst.write(":BIAS:STAT OFF")
+            except:
+                pass
             self.inst.close()
             self.is_connected = False
             print("ปิดการเชื่อมต่อเรียบร้อยแล้ว")
+
+    # ==========================================
+    # ระบบความปลอดภัยและจัดการจังหวะเวลา (Timing & Safety)
+    # ==========================================
+    def wait_until_ready(self):
+        """รอจนกว่าเครื่องจะประมวลผลคำสั่งก่อนหน้าเสร็จ 100% ป้องกันคำสั่งชนกัน"""
+        if not self.is_connected:
+            return
+        try:
+            self.inst.query("*OPC?")
+        except pyvisa.errors.VisaIOError:
+            pass
+
+    def apply_dc_bias(self, enable: bool, level: float, is_voltage: bool):
+        """ตั้งค่า DC Bias อย่างปลอดภัย (ปิดก่อน เปลี่ยนค่า แล้วค่อยเปิด) ป้องกัน Spike"""
+        if not self.is_connected:
+            raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
+
+        # ปิดไฟเลี้ยงก่อนเสมอ ป้องกันไฟกระชากเข้าชิ้นงาน
+        self.inst.write(":BIAS:STAT OFF")
+        self.wait_until_ready()
+
+        if enable:
+            if is_voltage:
+                self.inst.write(f":BIAS:VOLTage:LEVel {level}")
+            else:
+                self.inst.write(f":BIAS:CURRent:LEVel {level}")
+            self.wait_until_ready()
+            
+            self.inst.write(":BIAS:STAT ON")
+            self.wait_until_ready()
 
     # ==========================================
     # ระบบชดเชยค่าสายวัด (Correction) - OPEN / SHORT
@@ -66,6 +102,9 @@ class E4980A:
         """
         if not self.is_connected:
             return False, "⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด"
+        
+        # ป้องกัน NameError ใน finally ถ้า get timeout ไม่สำเร็จ
+        original_timeout = 5000 
         
         try:
             # 1. การทำ Correction ใช้เวลานาน ต้องเพิ่ม Timeout ของ VISA ชั่วคราว (เช่น 60 วินาที)
@@ -82,17 +121,22 @@ class E4980A:
             else:
                 return False, "ประเภท Correction ไม่ถูกต้อง"
             
-            # 3. ส่งคำสั่ง *OPC? เพื่อบังคับให้เครื่องตอบกลับมาเมื่อประมวลผลเสร็จแล้ว
-            self.inst.query("*OPC?")
+            # 3. ใช้ wait_until_ready รอสถานะ OPC
+            self.wait_until_ready()
             
-            # 4. คืนค่า Timeout กลับสู่โหมดวัดปกติ
-            self.inst.timeout = original_timeout
             return True, f"ทำ {corr_type.upper()} Correction สำเร็จเรียบร้อย!"
             
         except pyvisa.errors.VisaIOError as e:
             return False, f"หมดเวลารอ (Timeout) เครื่องใช้เวลาประมวลผลนานเกินไป\n{str(e)}"
         except Exception as e:
             return False, f"เกิดข้อผิดพลาดในการส่งคำสั่ง: {str(e)}"
+        finally:
+            # 4. คืนค่า Timeout กลับสู่โหมดวัดปกติ อย่างปลอดภัย
+            if self.is_connected and self.inst:
+                try:
+                    self.inst.timeout = original_timeout
+                except:
+                    pass
 
     # ==========================================
     # ระบบตั้งค่า (Configuration Methods)
@@ -114,6 +158,12 @@ class E4980A:
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         self.inst.write(f":VOLTage:LEVel {voltage}")
+
+    def set_aperture(self, time_mode: str):
+        """ตั้งเวลาการวัด (SHOR, MED, LONG)"""
+        if not self.is_connected:
+            raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
+        self.inst.write(f":APERture {time_mode}")
 
     def trigger(self):
         """บังคับ Trigger 1 ครั้ง"""
@@ -180,7 +230,7 @@ if __name__ == "__main__":
                 lcr.set_frequency(100000)
                 lcr.set_voltage_level(1.0)
                 
-                time.sleep(0.5) 
+                lcr.wait_until_ready()          # ใช้ระบบรอที่ปลอดภัย แทน time.sleep
                 
                 print("📐 กำลังวัดค่า...")
                 lcr.trigger()

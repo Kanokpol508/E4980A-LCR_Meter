@@ -1,5 +1,6 @@
 # กล่องตั้งค่า DC Bias, Deviation, Correction
 
+
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QHBoxLayout, 
                              QPushButton, QLabel, QCheckBox, QButtonGroup, 
                              QDoubleSpinBox, QGridLayout, QLineEdit, QComboBox, QSizePolicy)
@@ -46,7 +47,7 @@ class AdvancedPanel(QWidget):
         v_dc_inner.setSpacing(10)
         
         self.chk_opt001 = QCheckBox("เครื่องมี Option 001 (Power Bias)")
-        self.chk_opt001.setChecked(True)
+        self.chk_opt001.setChecked(False)
         v_dc_inner.addWidget(self.chk_opt001)
         
         h_dc_type = QHBoxLayout()

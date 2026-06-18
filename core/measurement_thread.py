@@ -28,7 +28,7 @@ class MeasurementWorker(QThread):
             if not visa_address or visa_address == "No Device Found":
                 raise ConnectionError("ไม่พบที่อยู่ VISA Resource ที่ถูกต้อง")
 
-            # 1. สร้าง Object และเชื่อมต่อฮาร์ดแวร์
+            # 1. สร้าง Object และเชื่อมต่อฮาร์ดแวร์ (สร้างภายใน Thread ปลอดภัยที่สุด)
             lcr = E4980A()
             success, msg = lcr.connect(visa_address)
             
@@ -41,10 +41,23 @@ class MeasurementWorker(QThread):
             scpi_mode = self.settings.get('scpi_mode', 'CPD')
             volt      = self.settings.get('volt', 1.0)
             freq      = self.settings.get('freq', 100000.0)
+            time_mode = self.settings.get('time_mode', 'MED')
             
             lcr.set_measurement_mode(scpi_mode)
             lcr.set_voltage_level(volt)
             lcr.set_frequency(freq)
+            lcr.set_aperture(time_mode)
+            
+            # --- ตั้งค่า DC Bias (แบบปลอดภัย) ---
+            if 'dc_bias_enabled' in self.settings:
+                lcr.apply_dc_bias(
+                    enable=self.settings.get('dc_bias_enabled', False),
+                    level=self.settings.get('dc_bias_level', 0.0),
+                    is_voltage=self.settings.get('dc_is_voltage', True)
+                )
+
+            # รอให้ค่าที่เซ็ตเข้าไปทั้งหมดประมวลผลเสร็จสิ้น
+            lcr.wait_until_ready()
 
             # 3. เริ่มทำการวัด
             run_mode = self.settings.get('run_mode', 'SINGLE')
@@ -69,17 +82,20 @@ class MeasurementWorker(QThread):
         if not self.is_running:
             return
 
+        lcr.wait_until_ready()                   # เซฟตี้ก่อนกด Trigger
         lcr.trigger() 
         
         pri, sec, stat = lcr.fetch_measurement() 
 
-        if stat == 0 or str(stat).upper() == "SUCCESS":
+        if stat == "SUCCESS":
             real_result = {
                 'freq': self.settings.get('freq', 1000.0),
                 'primary': float(pri),
                 'secondary': float(sec)
             }
             self.data_ready.emit(real_result)
+        elif stat == "OVERLOAD":
+            self.error_occurred.emit("⚠️ ค่าท่วมย่านวัด (OVERLOAD) ชิ้นงานอาจมีปัญหาหรือเลือกย่านผิด")
         else:
             self.error_occurred.emit(f"สถานะการวัดผิดปกติ (Status: {stat})")
 
@@ -110,6 +126,7 @@ class MeasurementWorker(QThread):
                 break 
 
             lcr.set_frequency(current_freq)
+            lcr.wait_until_ready()                      # รอให้เครื่องเปลี่ยนความถี่เสร็จสมบูรณ์ 100% ป้องกันจุดดรอป
             
             lcr.trigger()
             pri, sec, stat = lcr.fetch_measurement()
@@ -117,13 +134,15 @@ class MeasurementWorker(QThread):
             percent = int(((i + 1) / points) * 100)
             self.progress_updated.emit(percent)
 
-            if stat == 0 or str(stat).upper() == "SUCCESS":
+            if stat == "SUCCESS":
                 real_result = {
                     'freq': current_freq,
                     'primary': float(pri), 
                     'secondary': float(sec)
                 }
                 self.data_ready.emit(real_result)
+            elif stat == "OVERLOAD":
+                self.error_occurred.emit(f"⚠️ จุดความถี่ {current_freq:.1f}Hz เกินย่านวัด (OVERLOAD)")
             else:
                 self.error_occurred.emit(f"จุดที่ {current_freq:.1f}Hz วัดล้มเหลว (Status: {stat})")
 

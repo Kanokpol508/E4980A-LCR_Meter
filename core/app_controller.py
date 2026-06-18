@@ -21,6 +21,7 @@ class AppController(QObject):
         self.corr_worker = None
         self.verify_worker = None
         self.progress_dialog = None
+        self.current_corr_type = None               # เอาไว้จำว่ากำลังทำ OPEN หรือ SHORT เพื่อเปลี่ยนสีปุ่ม
 
         # ตัวแปรสำหรับเก็บข้อมูลวาดกราฟ
         self.graph_x_data = []
@@ -114,7 +115,6 @@ class AppController(QObject):
             QMessageBox.warning(v, "ตรวจสอบล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการตรวจสอบการตั้งค่า")
             return
 
-        # รวบรวมข้อมูล Settings ทั้งหมด รวมถึง DC Bias
         settings = {
             'visa_resource': visa_address,
             'freq': v.input_panel.input_freq.value(),
@@ -139,7 +139,6 @@ class AppController(QObject):
         self.progress_dialog.setCancelButton(None) 
         self.progress_dialog.show()
 
-        # นำเข้าและสั่งรัน VerifyWorker เบื้องหลัง
         from core.verify_thread import VerifyWorker
         self.verify_worker = VerifyWorker(visa_address, settings)
         self.verify_worker.finished_signal.connect(self.handle_verify_finished)
@@ -154,7 +153,6 @@ class AppController(QObject):
         self.set_ui_locked(False)
         self.verify_worker = None
 
-        # นำเข้าและเปิดหน้าต่าง Dialog แสดงตารางผลลัพธ์
         from gui.dialogs.verify_dialog import VerifyDialog
         dialog = VerifyDialog(results, error_msg, self.view)
         dialog.exec()
@@ -180,6 +178,9 @@ class AppController(QObject):
 
         self.set_ui_locked(True)
         v.ctrl_panel.btn_stop.setEnabled(False) 
+        
+        # จดจำไว้ว่ากำลังทำ Correction แบบไหน เพื่อเอาไว้เปลี่ยนสีปุ่มตอนเสร็จ
+        self.current_corr_type = corr_type
 
         self.progress_dialog = QProgressDialog(
             f"เครื่องกำลังทำงาน {corr_type} Correction...\n(อาจใช้เวลา 15 - 60 วินาที กรุณาห้ามถอดสาย)", 
@@ -204,8 +205,20 @@ class AppController(QObject):
 
         if success:
             QMessageBox.information(self.view, "Correction สำเร็จ", f"✅ {msg}")
+            
+            # เมื่อสำเร็จ ให้ใช้สไตล์ชีทแบบ Inline บังคับเปลี่ยนสีปุ่มที่กดให้เป็นสีเขียว (10b981) ตัวหนังสือขาว
+            green_style = "background-color: #10b981; color: white; border: none;"
+            
+            if self.current_corr_type == "OPEN":
+                self.view.adv_panel.btn_open_corr.setStyleSheet(green_style)
+                self.view.adv_panel.btn_open_corr.setText("OPEN Correction (OK)")
+            elif self.current_corr_type == "SHORT":
+                self.view.adv_panel.btn_short_corr.setStyleSheet(green_style)
+                self.view.adv_panel.btn_short_corr.setText("SHORT Correction (OK)")
         else:
             QMessageBox.critical(self.view, "Correction ล้มเหลว", f"❌ {msg}")
+            
+        self.current_corr_type = None
 
     def handle_clear_graph(self):
         reply = QMessageBox.question(

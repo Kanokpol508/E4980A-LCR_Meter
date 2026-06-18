@@ -1,6 +1,5 @@
 # ตัวกลางรับ Event จาก GUI ไปสั่ง Hardware และส่งผลกลับมา GUI
 
-
 from PyQt6.QtWidgets import QMessageBox, QProgressDialog
 from PyQt6.QtCore import Qt, QObject
 
@@ -70,13 +69,12 @@ class AppController(QObject):
         v.adv_panel.btn_open_corr.clicked.connect(lambda: self.start_correction("OPEN"))
         v.adv_panel.btn_short_corr.clicked.connect(lambda: self.start_correction("SHORT"))
 
-
-        v.lcd_display.btn_verify.clicked.connect(self.handle_verify_apply)
+        v.ctrl_panel.btn_verify.clicked.connect(self.handle_verify_apply)
+        v.lcd_display.btn_clear.clicked.connect(self.handle_clear_graph)
 
         v.ctrl_panel.btn_mode_single.toggled.connect(self.toggle_run_mode)
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
-        v.ctrl_panel.btn_clear_graph.clicked.connect(self.handle_clear_graph)
 
     # ========================================================
     # Logic Methods 
@@ -95,7 +93,8 @@ class AppController(QObject):
         v.left_content.setEnabled(not locked)
         v.ctrl_panel.btn_mode_single.setEnabled(not locked)
         v.ctrl_panel.btn_mode_sweep.setEnabled(not locked)
-        v.ctrl_panel.btn_clear_graph.setEnabled(not locked) 
+        
+        v.lcd_display.btn_clear.setEnabled(not locked) 
         v.ctrl_panel.btn_stop.setEnabled(locked)
         
         if locked:
@@ -145,7 +144,6 @@ class AppController(QObject):
         self.verify_worker = VerifyWorker(visa_address, settings)
         self.verify_worker.finished_signal.connect(self.handle_verify_finished)
         self.verify_worker.start()
-
 
     def handle_verify_finished(self, success: bool, results: list, error_msg: str):
         """รับผลลัพธ์จาก VerifyWorker และเปิดหน้าต่างตาราง"""

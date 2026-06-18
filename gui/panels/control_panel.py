@@ -1,5 +1,4 @@
-# กล่องปุ่ม START, STOP, โหมด Single/Sweep , Clear Graph
-
+# กล่องปุ่ม โหมด Single/Sweep, Verify & Apply, START, STOP
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QHBoxLayout, QPushButton, QButtonGroup, QLabel, QSizePolicy
 from PyQt6.QtCore import Qt
@@ -30,12 +29,17 @@ class ControlPanel(QWidget):
         
         h_run_mode.addWidget(self.btn_mode_single)
         h_run_mode.addWidget(self.btn_mode_sweep)
+
+        # แถวบน: นำปุ่มโหมด และ Verify & Apply มาวางคู่กัน
         grid_run.addLayout(h_run_mode, 0, 0)
-
-        self.btn_clear_graph = QPushButton("Clear Graph")
-        self.btn_clear_graph.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        grid_run.addWidget(self.btn_clear_graph, 0, 1)
-
+        
+        self.btn_verify = QPushButton("Verify & Apply")  # <--- เพิ่ม Verify & Apply แทนตำแหน่งเดิมของ Clear Graph
+        self.btn_verify.setObjectName("btnVerify")
+        self.btn_verify.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_verify.setMinimumHeight(30)
+        grid_run.addWidget(self.btn_verify, 0, 1)
+        
+        # แถวล่าง: ปุ่ม START และ STOP
         self.btn_start = QPushButton("START")
         self.btn_start.setObjectName("btnStart")
         self.btn_start.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -50,6 +54,7 @@ class ControlPanel(QWidget):
         grid_run.addWidget(self.btn_start, 1, 0)
         grid_run.addWidget(self.btn_stop, 1, 1)
 
+        # Label แจ้งเตือนข้อผิดพลาด
         self.lbl_warn_visa = QLabel("⚠️ กรุณาเลือกเครื่องมือวัด (VISA)")
         self.lbl_warn_dc_start = QLabel("⚠️ ตั้งค่า DC Bias ไม่ถูกต้อง")
         self.lbl_warn_dev_start = QLabel("⚠️ ต้องกรอก Primary Ref ก่อน")
@@ -62,10 +67,11 @@ class ControlPanel(QWidget):
         self.lbl_warn_dc_start.setVisible(False)
         self.lbl_warn_dev_start.setVisible(False)
         
-        v_warn = QVBoxLayout()
-        v_warn.addWidget(self.lbl_warn_visa)
-        v_warn.addWidget(self.lbl_warn_dc_start)
-        v_warn.addWidget(self.lbl_warn_dev_start)
-        grid_run.addLayout(v_warn, 2, 0)
-
+        self.lbl_warn_visa.setStyleSheet("color: #ff4444; font-weight: bold;")
+        self.lbl_warn_dc_start.setStyleSheet("color: #ff4444; font-weight: bold;")
+        self.lbl_warn_dev_start.setStyleSheet("color: #ff4444; font-weight: bold;")
+        
         layout.addLayout(grid_run)
+        layout.addWidget(self.lbl_warn_visa)
+        layout.addWidget(self.lbl_warn_dc_start)
+        layout.addWidget(self.lbl_warn_dev_start)

@@ -1,6 +1,5 @@
 # วาดหน้าจอดำๆ แสดงตัวเลข Primary/Secondary
 
-
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QGroupBox, QLabel, QPushButton, QSizePolicy
 from PyQt6.QtCore import Qt
 
@@ -23,7 +22,6 @@ class LcdDisplay(QWidget):
         self.lbl_sec_val = QLabel("---")
         self.lbl_sec_val.setObjectName("lblSecVal")
         self.lbl_sec_val.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # ลบ setStyleSheet เก่าออก
         self.lbl_sec_val.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         v_pri = QVBoxLayout()
@@ -44,20 +42,21 @@ class LcdDisplay(QWidget):
         
         layout.addWidget(group_lcd, stretch=1)
 
+        # โซนปุ่มจัดการข้อมูลฝั่งขวา
         v_tools = QVBoxLayout()
         v_tools.setContentsMargins(10, 10, 0, 0)
         
         self.btn_save = QPushButton("Save Result")
         self.btn_view = QPushButton("View Save Result")
-        self.btn_verify = QPushButton("Verify & Apply")
+        self.btn_clear = QPushButton("Clear Graph")
         
-        self.btn_save.setMinimumSize(180, 45)
-        self.btn_view.setMinimumSize(180, 45)
-        self.btn_verify.setMinimumSize(180, 45)
+        # ปรับให้ปุ่มขยายตัวเต็มพื้นที่แนวตั้ง
+        self.btn_save.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.btn_view.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.btn_clear.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         
         v_tools.addWidget(self.btn_save)
         v_tools.addWidget(self.btn_view)
-        v_tools.addWidget(self.btn_verify)
-        v_tools.addStretch(1)
+        v_tools.addWidget(self.btn_clear)
         
         layout.addLayout(v_tools)

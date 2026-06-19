@@ -1,6 +1,5 @@
 # Class หลักสำหรับสั่งการ E4980A (แปลงคำสั่งเป็น SCPI)
 
-
 import pyvisa
 import time
 
@@ -10,14 +9,11 @@ class E4980A:
         self.rm = pyvisa.ResourceManager()
         self.inst = None
         self.is_connected = False
-        self.OVERLOAD_LIMIT = 9.0e37                # ค่าคงที่สำหรับตรวจสอบสถานะท่วมย่านวัด
+        self.OVERLOAD_LIMIT = 9.9e37                # ค่าคงที่สำหรับตรวจสอบสถานะท่วมย่านวัด
 
     @staticmethod
     def scan_ports() -> list:
-        """
-        สแกนหาพอร์ต VISA ทั้งหมดที่เชื่อมต่ออยู่ (ใช้ร่วมกับหน้าต่าง GUI)
-        Returns: List ของชื่อพอร์ต (ถ้าไม่เจอจะคืนค่า List ว่าง [])
-        """
+        """สแกนหาพอร์ต VISA ทั้งหมดที่เชื่อมต่ออยู่ (ใช้ร่วมกับหน้าต่าง GUI)"""
         try:
             rm = pyvisa.ResourceManager()
             resources = rm.list_resources()
@@ -35,8 +31,13 @@ class E4980A:
             self.inst = self.rm.open_resource(resource_address)
             self.inst.timeout = 5000                # ตั้งเวลารอ (มิลลิวินาที)
             
-            # เคลียร์ Error ค้างเก่าและดึงชื่อเครื่อง
+            # เคลียร์ Error ค้างเก่า
             self.inst.write("*CLS")
+            
+            # ✅ ป้องกัน Trigger หลุด: ตั้ง Source เป็น BUS และเปิดโหมดรับ Trigger ต่อเนื่อง
+            self.inst.write(":TRIGger:SOURce BUS")
+            self.inst.write(":INITiate:CONTinuous ON")
+            
             idn = self.inst.query("*IDN?")
             
             self.is_connected = True
@@ -55,6 +56,10 @@ class E4980A:
             try:
                 # ปิด DC Bias ทุกครั้งก่อนตัดการเชื่อมต่อเพื่อความปลอดภัย
                 self.inst.write(":BIAS:STAT OFF")
+                
+                # ✅ คืนค่า Trigger กลับสู่สถานะมาตรฐาน (Preset)
+                self.inst.write(":INITiate:CONTinuous OFF")
+                self.inst.write(":TRIGger:SOURce INTernal")
             except:
                 pass
             self.inst.close()
@@ -96,18 +101,15 @@ class E4980A:
     # ระบบชดเชยค่าสายวัด (Correction) - OPEN / SHORT
     # ==========================================
     def perform_correction(self, corr_type: str) -> tuple[bool, str]:
-        """
-        สั่งเครื่องทำ OPEN หรือ SHORT Correction แบบเต็มรูปแบบ
-        (หมายเหตุ: ฟังก์ชันนี้จะค้างรอจนกว่าเครื่องจะทำเสร็จ)
-        """
+        """สั่งเครื่องทำ OPEN หรือ SHORT Correction แบบเต็มรูปแบบ"""
         if not self.is_connected:
             return False, "⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด"
         
-        # ป้องกัน NameError ใน finally ถ้า get timeout ไม่สำเร็จ
+        # ป้องกัน NameError ใน finally
         original_timeout = 5000 
         
         try:
-            # 1. การทำ Correction ใช้เวลานาน ต้องเพิ่ม Timeout ของ VISA ชั่วคราว (เช่น 60 วินาที)
+            # 1. การทำ Correction ใช้เวลานาน ต้องเพิ่ม Timeout
             original_timeout = self.inst.timeout
             self.inst.timeout = 60000 
             
@@ -121,7 +123,7 @@ class E4980A:
             else:
                 return False, "ประเภท Correction ไม่ถูกต้อง"
             
-            # 3. ใช้ wait_until_ready รอสถานะ OPC
+            # 3. ใช้ wait_until_ready รอสถานะ OPC แทนการใส่ ;*OPC? ต่อท้าย
             self.wait_until_ready()
             
             return True, f"ทำ {corr_type.upper()} Correction สำเร็จเรียบร้อย!"
@@ -159,11 +161,16 @@ class E4980A:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         self.inst.write(f":VOLTage:LEVel {voltage}")
 
-    def set_aperture(self, time_mode: str):
-        """ตั้งเวลาการวัด (SHOR, MED, LONG)"""
+    def set_aperture(self, time_mode: str, averaging: int = 1):
+        """ตั้งเวลาการวัดและค่าเฉลี่ย (SHOR, MED, LONG) และ (1-256)"""
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
-        self.inst.write(f":APERture {time_mode}")
+        
+        # ✅ รับประกันว่าค่า Averaging จะต้องอยู่ในช่วง 1 ถึง 256 เท่านั้นตามสเปคเครื่อง
+        avg_factor = max(1, min(256, int(averaging)))
+        
+        # ✅ ผูกคำสั่ง Averaging เข้าไปใน APERture ตามคู่มือเป๊ะๆ
+        self.inst.write(f":APERture {time_mode},{avg_factor}")
 
     def trigger(self):
         """บังคับ Trigger 1 ครั้ง"""
@@ -175,76 +182,39 @@ class E4980A:
     # ระบบอ่านค่า (Measurement Methods)
     # ==========================================
     def fetch_measurement(self):
-        """
-        สั่งทริกเกอร์และอ่านค่าวัด คืนค่าเป็น (primary, secondary, status)
-        """
+        """สั่งทริกเกอร์และอ่านค่าวัด คืนค่าเป็น (primary, secondary, status)"""
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         
         try:
-            # ใช้ FETCh? เพื่อดึงข้อมูลที่เครื่องวัดเสร็จแล้ว
             raw_data = self.inst.query(":FETCh?")
             parts = raw_data.strip().split(',')
             
-            if len(parts) != 3:
+            # รองรับ 3 ค่า (ตอนปิด Comparator) หรือ 4 ค่า (ตอนเปิด Comparator)
+            if len(parts) not in [3, 4]:
                 return None, None, f"PARSE_ERROR: ข้อมูลผิดรูปแบบ ({raw_data})"
                 
             primary = float(parts[0])
             secondary = float(parts[1])
-            status = int(parts[2])
+            status = int(float(parts[2])) 
             
-            # ตรวจสอบ Overload จากค่าตัวเลขที่ท่วมย่านวัด
+            # ตรวจสอบ Status โค้ดตามคู่มือ
+            if status == -1:
+                return None, None, "NO_DATA"
+            elif status == 1:
+                return None, None, "OVERLOAD"
+            elif status == 3:
+                return None, None, "SIGNAL_SOURCE_OVERLOAD"
+            elif status == 4:
+                return None, None, "ALC_FAIL"
+            elif status != 0:
+                return None, None, f"UNKNOWN_ERROR_CODE_{status}"
+            
+            # ดักจับค่า Overload สำรอง (กรณี status เป็น 0 แต่ค่าท่วมไปที่ 9.9e37)
             if primary >= self.OVERLOAD_LIMIT or secondary >= self.OVERLOAD_LIMIT:
                 return None, None, "OVERLOAD"
-            
-            # ตรวจสอบสถานะขัดข้องอื่นๆ จาก Status Code
-            if status == 2:
-                return None, None, "NO_CONTACT"
-            elif status != 0:
-                return None, None, f"HARDWARE_ERROR_{status}"
                 
             return primary, secondary, "SUCCESS"
             
         except pyvisa.errors.VisaIOError as e:
             return None, None, f"TIMEOUT/IO_ERROR: {str(e)}"
-
-# ======================================================
-# ส่วนทดสอบการทำงานแบบ Manual
-# ======================================================
-if __name__ == "__main__":
-    lcr = E4980A()
-    
-    print("🔍 กำลังสแกนหาอุปกรณ์...")
-    resources = E4980A.scan_ports()
-    
-    if resources:
-        address = resources[0] 
-        print(f"🔗 กำลังพยายามเชื่อมต่อกับ: {address}")
-        
-        success, msg = lcr.connect(address)
-        
-        if success:
-            try:
-                print("⚙️ กำลังส่งคำสั่งตั้งค่า: CPD, 100kHz, 1.0V")
-                lcr.set_measurement_mode("CPD")
-                lcr.set_frequency(100000)
-                lcr.set_voltage_level(1.0)
-                
-                lcr.wait_until_ready()          # ใช้ระบบรอที่ปลอดภัย แทน time.sleep
-                
-                print("📐 กำลังวัดค่า...")
-                lcr.trigger()
-                
-                pri, sec, stat = lcr.fetch_measurement()
-                print("-" * 30)
-                print(f"พารามิเตอร์หลัก (Cp): {pri:.5e}" if pri else "พารามิเตอร์หลัก: None")
-                print(f"พารามิเตอร์รอง (D): {sec:.5e}" if sec else "พารามิเตอร์รอง: None")
-                print(f"สถานะ: {stat}")
-                print("-" * 30)
-                
-            except Exception as e:
-                print(f"❌ เกิดข้อผิดพลาดระหว่างทำงาน: {e}")
-            finally:
-                lcr.disconnect()
-    else:
-        print("⚠️ ไม่พบเครื่องมือวัดใดๆ กรุณาตรวจสอบสายเชื่อมต่อ")

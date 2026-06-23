@@ -39,12 +39,13 @@ class MeasurementWorker(QThread):
             volt      = self.settings.get('volt', 1.0)
             freq      = self.settings.get('freq', 100000.0)
             time_mode = self.settings.get('time_mode', 'MED')
+            avg       = self.settings.get('avg', 1)
             
-            # ✅ คืนชีพโค้ดเก่าของคุณ: ใช้ Wrapper Methods สั่งงานอย่างเป็นระเบียบ
             lcr.set_measurement_mode(scpi_mode)
             lcr.set_voltage_level(volt)
-            lcr.set_frequency(freq)            # ✅ คืนชีพ: ป้องกันบั๊กไม่อัปเดตความถี่ในโหมด Single
-            lcr.set_aperture(time_mode)
+            lcr.set_frequency(freq)
+            # ✅ ส่งพารามิเตอร์ avg พ่วงเข้าไปด้วย เพื่อแก้บั๊ก Averaging
+            lcr.set_aperture(time_mode, avg)
             
             # --- ตั้งค่า DC Bias (แบบปลอดภัย) ---
             if 'dc_bias_enabled' in self.settings:
@@ -57,7 +58,14 @@ class MeasurementWorker(QThread):
             # รอให้ค่าที่เซ็ตเข้าไปทั้งหมดประมวลผลเสร็จสิ้น
             lcr.wait_until_ready()
 
+            # ✅ SAFETY-NET: ตรวจสอบว่าเครื่องปฏิเสธการตั้งค่าด้านบนหรือไม่ (ป้องกันค่าท่วมสเปค)
+            err_res = lcr.inst.query(":SYSTem:ERRor?").strip()
+            if '"No error"' not in err_res:
+                raise ValueError(f"เครื่องปฏิเสธการตั้งค่า (ค่าที่ระบุอาจเกินสเปคเครื่อง):\n{err_res}")
+
+            # ========================================================
             # 3. เริ่มทำการวัด
+            # ========================================================
             run_mode = self.settings.get('run_mode', 'SINGLE')
 
             if run_mode == 'SINGLE':

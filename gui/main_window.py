@@ -15,7 +15,7 @@ from gui.displays.lcd_display import LcdDisplay
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("LCR Metrology Software (E4980A/AL)")
+        self.setWindowTitle("E4980A(20Hz-2MHz) Precision LCR Meter Controller")
         self.resize(1280, 720)
         self.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
 

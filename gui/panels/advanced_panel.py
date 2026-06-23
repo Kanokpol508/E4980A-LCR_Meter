@@ -1,7 +1,7 @@
 # กล่องตั้งค่า DC Bias, Deviation, Correction
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QHBoxLayout, 
-                             QPushButton, QLabel, QCheckBox, QButtonGroup, 
+                             QPushButton, QLabel, QCheckBox, 
                              QDoubleSpinBox, QGridLayout, QLineEdit, QComboBox, QSizePolicy)
 from PyQt6.QtCore import Qt
 
@@ -45,27 +45,12 @@ class AdvancedPanel(QWidget):
         v_dc_inner.setContentsMargins(0, 0, 0, 0)
         v_dc_inner.setSpacing(10)
         
-        # ลบ Checkbox Option 001 ออก
-        
-        h_dc_type = QHBoxLayout()
-        h_dc_type.addWidget(QLabel("ชนิดของไฟเลี้ยง:"))
-        
-        # ลบปุ่ม Current ออก และเหลือแค่ปุ่ม Voltage (แต่ล็อกไว้ไม่ให้ผู้ใช้กดสลับ เพื่อรักษา Object ให้โค้ดฝั่ง Controller ไม่พัง)
-        self.btn_dc_v = QPushButton("Voltage (V)")
-        self.btn_dc_v.setCheckable(True)
-        self.btn_dc_v.setChecked(True)
-        self.btn_dc_v.setEnabled(False) 
-        
-        self.dc_type_group = QButtonGroup()
-        self.dc_type_group.addButton(self.btn_dc_v)
-        h_dc_type.addWidget(self.btn_dc_v)
-        v_dc_inner.addLayout(h_dc_type)
+        # ✅ ตัดแถว "ชนิดของไฟเลี้ยง" ออกทั้งหมด ข้ามมาที่ระดับไฟ (Level) เลย
         
         h_dc_level = QHBoxLayout()
         h_dc_level.addWidget(QLabel("ระดับไฟ (Level):"))
         self.input_dc_level = QDoubleSpinBox()
         self.input_dc_level.setDecimals(1)
-        # ปรับ Range ให้เหลือแค่ 0.0 - 2.0 V และปรับ Step ให้สอดคล้องกับค่า Discrete (0, 1.5, 2.0)
         self.input_dc_level.setRange(0.0, 2.0)
         self.input_dc_level.setSingleStep(0.5)
         self.input_dc_level.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)

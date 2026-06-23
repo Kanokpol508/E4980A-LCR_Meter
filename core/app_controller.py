@@ -63,8 +63,7 @@ class AppController(QObject):
 
         v.adv_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
         
-        # ยังคงผูก Event ให้ตรวจเมื่อผู้ใช้เปลี่ยนตัวเลข
-        v.adv_panel.btn_dc_v.toggled.connect(self.validate_dc_bias)
+        # ผูก Event ให้ตรวจเมื่อผู้ใช้เปลี่ยนตัวเลข
         v.adv_panel.input_dc_level.valueChanged.connect(self.validate_dc_bias)
 
         v.adv_panel.chk_dev_enable.stateChanged.connect(self.toggle_deviation)
@@ -133,7 +132,7 @@ class AppController(QObject):
             'cable': v.input_panel.combo_cable.currentText(),
             'imp_range': v.input_panel.combo_range.currentText(),
             'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
-            'dc_is_voltage': v.adv_panel.btn_dc_v.isChecked(),
+            'dc_is_voltage': True, # บังคับเป็น Voltage เสมอ เนื่องจากเป็น Standard E4980A ไม่มี Option 001
             'dc_bias_level': v.adv_panel.input_dc_level.value(),
         }
 
@@ -292,7 +291,7 @@ class AppController(QObject):
             'cable': v.input_panel.combo_cable.currentText(),
             'imp_range': v.input_panel.combo_range.currentText(),
             'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
-            'dc_is_voltage': v.adv_panel.btn_dc_v.isChecked(),
+            'dc_is_voltage': True, # บังคับเป็น Voltage เสมอ เนื่องจากเป็น Standard E4980A ไม่มี Option 001
             'dc_bias_level': v.adv_panel.input_dc_level.value(),
         }
         

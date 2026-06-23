@@ -28,7 +28,6 @@ class AppController(QObject):
         self.graph_pri_y = []
         self.graph_sec_y = []
 
-        # ตัดโหมด LPRD, LSRD, VDID ออกให้ตรงกับสเปคเครื่องที่ไม่มี Option 200/001
         self.meas_options = {
             "Capacitance (ความจุไฟฟ้า)": [
                 ("Cp-D", "CPD"), ("Cp-Q", "CPQ"), ("Cp-G", "CPG"), ("Cp-Rp", "CPRP"),
@@ -48,8 +47,8 @@ class AppController(QObject):
         self.update_scpi_modes()
         self.scan_visa_ports()
         
-        # อัปเดตลิมิตแรงดันตามค่าเริ่มต้นทันที
         self.update_hardware_limits() 
+        self.update_calculated_points()
 
         # ตั้งค่า UI เริ่มต้น
         self.view.adv_panel.widget_dc_inner.setEnabled(False)
@@ -62,8 +61,6 @@ class AppController(QObject):
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
         v.adv_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
-        
-        # ผูก Event ให้ตรวจเมื่อผู้ใช้เปลี่ยนตัวเลข
         v.adv_panel.input_dc_level.valueChanged.connect(self.validate_dc_bias)
 
         v.adv_panel.chk_dev_enable.stateChanged.connect(self.toggle_deviation)
@@ -78,12 +75,29 @@ class AppController(QObject):
         v.ctrl_panel.btn_mode_single.toggled.connect(self.toggle_run_mode)
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
+        
+        v.input_panel.input_start_freq.valueChanged.connect(self.update_calculated_points)
+        v.input_panel.input_stop_freq.valueChanged.connect(self.update_calculated_points)
+        v.input_panel.input_step_freq.valueChanged.connect(self.update_calculated_points)
 
     # ========================================================
     # Logic Methods 
     # ========================================================
+    def update_calculated_points(self):
+        v = self.view
+        start = v.input_panel.input_start_freq.value()
+        stop = v.input_panel.input_stop_freq.value()
+        step = v.input_panel.input_step_freq.value()
+
+        if step <= 0 or stop <= start:
+            v.input_panel.lbl_calculated_points.setText("จำนวนจุดที่ได้: -")
+            return
+
+        n_points = int((stop - start) / step) + 1
+        n_points = max(2, min(201, n_points)) 
+        v.input_panel.lbl_calculated_points.setText(f"จำนวนจุดที่ได้: {n_points} จุด")
+
     def update_hardware_limits(self):
-        """เครื่อง E4980A (ไม่มี Option 001) จ่ายสัญญาณทดสอบได้สูงสุด 2.0 Vrms เสมอ"""
         v = self.view
         v.input_panel.input_volt.setMaximum(2.0)
         v.input_panel.input_volt.setToolTip("เครื่องรุ่นมาตรฐาน (ไม่มี Option 001) จ่ายสัญญาณทดสอบได้สูงสุด 2.0 Vrms")
@@ -130,9 +144,10 @@ class AppController(QObject):
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
-            'imp_range': v.input_panel.combo_range.currentText(),
+            # ✅ ใช้ .currentData() เพื่อดึงตัวเลขย่านวัดส่งไปแทน String
+            'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
-            'dc_is_voltage': True, # บังคับเป็น Voltage เสมอ เนื่องจากเป็น Standard E4980A ไม่มี Option 001
+            'dc_is_voltage': True, 
             'dc_bias_level': v.adv_panel.input_dc_level.value(),
         }
 
@@ -258,10 +273,9 @@ class AppController(QObject):
                 sec_label = f"Δ {sec_label}"
 
         is_sweep = v.ctrl_panel.btn_mode_sweep.isChecked()
-        is_log = v.input_panel.radio_log.isChecked() if is_sweep else False
         x_label = "Frequency (Hz)" if is_sweep else "Measurement Count (Points)"
         
-        v.graph_display.set_axis_labels(x_label=x_label, pri_y_label=pri_label, sec_y_label=sec_label, is_log_x=is_log, is_single_mode=not is_sweep)
+        v.graph_display.set_axis_labels(x_label=x_label, pri_y_label=pri_label, sec_y_label=sec_label, is_log_x=False, is_single_mode=not is_sweep)
 
     def start_measurement(self):
         v = self.view
@@ -282,16 +296,16 @@ class AppController(QObject):
             'freq': v.input_panel.input_freq.value(),
             'start_freq': v.input_panel.input_start_freq.value(),
             'stop_freq': v.input_panel.input_stop_freq.value(),
-            'sweep_points': v.input_panel.input_points.value(),
-            'sweep_scale': 'LOG' if v.input_panel.radio_log.isChecked() else 'LIN',
+            'step_freq': v.input_panel.input_step_freq.value(), 
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
-            'imp_range': v.input_panel.combo_range.currentText(),
+            # ✅ ใช้ .currentData() ดึงตัวเลข Z Range (เช่น 1, 10, 100)
+            'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
-            'dc_is_voltage': True, # บังคับเป็น Voltage เสมอ เนื่องจากเป็น Standard E4980A ไม่มี Option 001
+            'dc_is_voltage': True, 
             'dc_bias_level': v.adv_panel.input_dc_level.value(),
         }
         
@@ -395,15 +409,11 @@ class AppController(QObject):
         if not should_lock:
             v.input_panel.input_start_freq.setEnabled(is_sweep)
             v.input_panel.input_stop_freq.setEnabled(is_sweep)
-            v.input_panel.input_points.setEnabled(is_sweep)
-            v.input_panel.radio_log.setEnabled(is_sweep)
-            v.input_panel.radio_lin.setEnabled(is_sweep)
+            v.input_panel.input_step_freq.setEnabled(is_sweep)
         else:
-            v.input_panel.radio_log.setEnabled(False)
-            v.input_panel.radio_lin.setEnabled(False)
             v.input_panel.input_start_freq.setEnabled(False)
             v.input_panel.input_stop_freq.setEnabled(False)
-            v.input_panel.input_points.setEnabled(False)
+            v.input_panel.input_step_freq.setEnabled(False)
 
     def validate_visa(self):
         text = self.view.conn_panel.combo_visa.currentText()
@@ -459,11 +469,9 @@ class AppController(QObject):
 
         v.input_panel.input_start_freq.setEnabled(is_sweep)
         v.input_panel.input_stop_freq.setEnabled(is_sweep)
-        v.input_panel.input_points.setEnabled(is_sweep)
-        v.input_panel.radio_log.setEnabled(is_sweep)
-        v.input_panel.radio_lin.setEnabled(is_sweep)
+        v.input_panel.input_step_freq.setEnabled(is_sweep)
         
-        self.update_hardware_limits() # อัปเดตลิมิตแรงดันตอนสลับโหมดด้วย
+        self.update_hardware_limits() 
         self.update_start_button_state()
 
     def toggle_dc_bias(self):

@@ -1,8 +1,6 @@
 # **สำคัญมาก** ทำงานเบื้องหลัง (QThread) เพื่อสแกน Sweep โดยไม่ให้ UI ค้าง
 
-import math
 from PyQt6.QtCore import QThread, pyqtSignal
-
 from hardware.lcr_meter import E4980A 
 
 class MeasurementWorker(QThread):
@@ -40,12 +38,18 @@ class MeasurementWorker(QThread):
             freq      = self.settings.get('freq', 100000.0)
             time_mode = self.settings.get('time_mode', 'MED')
             avg       = self.settings.get('avg', 1)
+            imp_range = self.settings.get('imp_range', 'AUTO')
             
             lcr.set_measurement_mode(scpi_mode)
             lcr.set_voltage_level(volt)
             lcr.set_frequency(freq)
-            # ✅ ส่งพารามิเตอร์ avg พ่วงเข้าไปด้วย เพื่อแก้บั๊ก Averaging
             lcr.set_aperture(time_mode, avg)
+
+            # ✅ ตั้งค่า Impedance Range เข้าไปที่ฮาร์ดแวร์โดยตรง (อัปเดตใหม่)
+            if str(imp_range) == 'AUTO':
+                lcr.inst.write(":FUNCtion:IMPedance:RANGe:AUTO ON")
+            else:
+                lcr.inst.write(f":FUNCtion:IMPedance:RANGe {imp_range}")
             
             # --- ตั้งค่า DC Bias (แบบปลอดภัย) ---
             if 'dc_bias_enabled' in self.settings:
@@ -58,7 +62,7 @@ class MeasurementWorker(QThread):
             # รอให้ค่าที่เซ็ตเข้าไปทั้งหมดประมวลผลเสร็จสิ้น
             lcr.wait_until_ready()
 
-            # ✅ SAFETY-NET: ตรวจสอบว่าเครื่องปฏิเสธการตั้งค่าด้านบนหรือไม่ (ป้องกันค่าท่วมสเปค)
+            # SAFETY-NET: ตรวจสอบว่าเครื่องปฏิเสธการตั้งค่าด้านบนหรือไม่
             err_res = lcr.inst.query(":SYSTem:ERRor?").strip()
             if '"No error"' not in err_res:
                 raise ValueError(f"เครื่องปฏิเสธการตั้งค่า (ค่าที่ระบุอาจเกินสเปคเครื่อง):\n{err_res}")
@@ -103,7 +107,7 @@ class MeasurementWorker(QThread):
         if not self.is_running:
             return
 
-        lcr.wait_until_ready() # เซฟตี้ก่อนกด Trigger
+        lcr.wait_until_ready() 
         lcr.trigger() 
         
         pri, sec, stat = lcr.fetch_measurement() 
@@ -121,31 +125,28 @@ class MeasurementWorker(QThread):
         self.progress_updated.emit(100)
 
     def _run_sweep_measurement(self, lcr):
-        """ตรรกะการวัดค่าแบบสแกนความถี่ (List Sweep)"""
+        """ตรรกะการวัดค่าแบบสแกนความถี่ (Linear sweep ด้วย Step size)"""
         start_f = self.settings.get('start_freq', 100.0)
         stop_f = self.settings.get('stop_freq', 1000000.0)
-        points = self.settings.get('sweep_points', 50)
-        scale = self.settings.get('sweep_scale', 'LOG')
+        step_f = self.settings.get('step_freq', 20000.0)
         
-        frequencies = []
-        if points > 1:
-            if scale == 'LOG':
-                log_start = math.log10(start_f)
-                log_stop = math.log10(stop_f)
-                step = (log_stop - log_start) / (points - 1)
-                frequencies = [10**(log_start + i * step) for i in range(points)]
-            else:
-                step = (stop_f - start_f) / (points - 1)
-                frequencies = [start_f + i * step for i in range(points)]
-        else:
-            frequencies = [start_f]
+        if step_f <= 0:
+            step_f = 1.0  
+
+        n_points = int((stop_f - start_f) / step_f) + 1
+        n_points = max(2, min(201, n_points))  
+
+        frequencies = [start_f + i * step_f for i in range(n_points)]
+        frequencies = [min(f, stop_f) for f in frequencies]  
+
+        points = len(frequencies)
 
         for i, current_freq in enumerate(frequencies):
             if not self.is_running:
                 break 
 
             lcr.set_frequency(current_freq)
-            lcr.wait_until_ready()  # รอให้เครื่องเปลี่ยนความถี่เสร็จสมบูรณ์ 100%
+            lcr.wait_until_ready()  
             
             lcr.trigger()
             pri, sec, stat = lcr.fetch_measurement()

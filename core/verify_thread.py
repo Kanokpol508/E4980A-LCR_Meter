@@ -52,7 +52,6 @@ class VerifyWorker(QThread):
             cable_val = s['cable'].replace("m", "").strip()
             inst.write(f":CORRection:LENGth {cable_val}")
 
-            # ✅ ตั้งค่า Impedance Range ใหม่รองรับการตั้งแบบ Manual
             if str(s['imp_range']) == "AUTO":
                 inst.write(":FUNCtion:IMPedance:RANGe:AUTO ON")
             else:
@@ -93,7 +92,7 @@ class VerifyWorker(QThread):
             act_time = act_aper_parts[0]
             act_avg = act_aper_parts[1] if len(act_aper_parts) > 1 else "1"
 
-            # ✅ แก้ไขการตรวจสอบเวลา (Time Mode) ให้รองรับคำว่า SHORT, MEDIUM, LONG อย่างสมบูรณ์
+            # การตรวจสอบเวลา (Time Mode) ให้รองรับคำว่า SHORT, MEDIUM, LONG
             # โดยเช็คว่าคำเต็มจาก GUI ขึ้นต้นด้วย Short-form จากเครื่องหรือไม่ (เช่น "MEDIUM".startswith("MED") -> True)
             add_res("Measurement Time", s['time_mode'], act_time, str(s['time_mode']).upper().startswith(act_time.upper()))
             
@@ -102,7 +101,7 @@ class VerifyWorker(QThread):
             act_cable = inst.query(":CORRection:LENGth?").strip()
             add_res("Cable Length (m)", cable_val, act_cable, self.check_float_match(cable_val, act_cable))
 
-            # ✅ เช็ค Range ตามโหมด AUTO / HOLD แบบใหม่
+            # เช็ค Range ตามโหมด AUTO / HOLD
             if str(s['imp_range']) == "AUTO":
                 act_range_auto = inst.query(":FUNCtion:IMPedance:RANGe:AUTO?").strip()
                 add_res("Range Mode", "AUTO", "AUTO" if act_range_auto == "1" else "HOLD", act_range_auto == "1")

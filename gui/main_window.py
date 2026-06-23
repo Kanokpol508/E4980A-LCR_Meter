@@ -69,6 +69,3 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.lcd_display, stretch=0)
         
         main_layout.addLayout(right_layout)
-
-        # สังเกตว่าโค้ดการผูก Signal/Event หายไปทั้งหมด!
-        # เพราะ Controller จะเป็นคนจัดการให้จากภายนอกแทน

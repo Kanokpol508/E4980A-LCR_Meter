@@ -45,7 +45,6 @@ class MeasurementWorker(QThread):
             lcr.set_frequency(freq)
             lcr.set_aperture(time_mode, avg)
 
-            # ✅ ตั้งค่า Impedance Range เข้าไปที่ฮาร์ดแวร์โดยตรง (อัปเดตใหม่)
             if str(imp_range) == 'AUTO':
                 lcr.inst.write(":FUNCtion:IMPedance:RANGe:AUTO ON")
             else:

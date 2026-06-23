@@ -61,7 +61,7 @@ class AppController(QObject):
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
         v.adv_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
-        v.adv_panel.input_dc_level.valueChanged.connect(self.validate_dc_bias)
+        v.adv_panel.combo_dc_level.currentIndexChanged.connect(self.validate_dc_bias)
 
         v.adv_panel.chk_dev_enable.stateChanged.connect(self.toggle_deviation)
         v.adv_panel.input_dev_pri.textChanged.connect(self.validate_deviation)
@@ -144,11 +144,10 @@ class AppController(QObject):
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
-            # ✅ ใช้ .currentData() เพื่อดึงตัวเลขย่านวัดส่งไปแทน String
             'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
             'dc_is_voltage': True, 
-            'dc_bias_level': v.adv_panel.input_dc_level.value(),
+            'dc_bias_level': v.adv_panel.combo_dc_level.currentData(),
         }
 
         self.set_ui_locked(True)
@@ -302,11 +301,10 @@ class AppController(QObject):
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
-            # ✅ ใช้ .currentData() ดึงตัวเลข Z Range (เช่น 1, 10, 100)
             'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
             'dc_is_voltage': True, 
-            'dc_bias_level': v.adv_panel.input_dc_level.value(),
+            'dc_bias_level': v.adv_panel.combo_dc_level.currentData(),
         }
         
         self.worker = MeasurementWorker(settings)
@@ -491,17 +489,9 @@ class AppController(QObject):
             self.update_start_button_state()
             return
             
-        v.adv_panel.lbl_dc_unit.setText("V")
         warning_msg = "⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัดก่อนเปิดสวิตช์เสมอ!"
         self.is_dc_error = False
-        val = v.adv_panel.input_dc_level.value()
-        
-        DISCRETE = [0.0, 1.5, 2.0]
-        TOLERANCE = 1e-9
-        if not any(abs(val - v_test) < TOLERANCE for v_test in DISCRETE):
-            warning_msg = "⚠️ เครื่องรุ่นนี้ปรับแรงดัน DC Bias ได้แค่ 0, 1.5 หรือ 2.0 V เท่านั้น (ไม่มี Option 001)"
-            self.is_dc_error = True
-            
+                    
         v.adv_panel.lbl_dc_warning.setText(warning_msg)
         self.update_start_button_state()
 

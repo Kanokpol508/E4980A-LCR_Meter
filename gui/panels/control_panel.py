@@ -30,10 +30,9 @@ class ControlPanel(QWidget):
         h_run_mode.addWidget(self.btn_mode_single)
         h_run_mode.addWidget(self.btn_mode_sweep)
 
-        # แถวบน: นำปุ่มโหมด และ Verify & Apply มาวางคู่กัน
         grid_run.addLayout(h_run_mode, 0, 0)
         
-        self.btn_verify = QPushButton("Verify & Apply")  # <--- เพิ่ม Verify & Apply แทนตำแหน่งเดิมของ Clear Graph
+        self.btn_verify = QPushButton("Verify & Apply")
         self.btn_verify.setObjectName("btnVerify")
         self.btn_verify.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_verify.setMinimumHeight(30)

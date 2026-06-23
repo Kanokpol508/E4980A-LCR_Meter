@@ -34,7 +34,7 @@ class E4980A:
             # เคลียร์ Error ค้างเก่า
             self.inst.write("*CLS")
             
-            # ✅ ป้องกัน Trigger หลุด: ตั้ง Source เป็น BUS และเปิดโหมดรับ Trigger ต่อเนื่อง
+            # ป้องกัน Trigger หลุด: ตั้ง Source เป็น BUS และเปิดโหมดรับ Trigger ต่อเนื่อง
             self.inst.write(":TRIGger:SOURce BUS")
             self.inst.write(":INITiate:CONTinuous ON")
             
@@ -57,7 +57,7 @@ class E4980A:
                 # ปิด DC Bias ทุกครั้งก่อนตัดการเชื่อมต่อเพื่อความปลอดภัย
                 self.inst.write(":BIAS:STAT OFF")
                 
-                # ✅ คืนค่า Trigger กลับสู่สถานะมาตรฐาน (Preset)
+                # คืนค่า Trigger กลับสู่สถานะมาตรฐาน (Preset)
                 self.inst.write(":INITiate:CONTinuous OFF")
                 self.inst.write(":TRIGger:SOURce INTernal")
             except:
@@ -166,10 +166,10 @@ class E4980A:
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         
-        # ✅ รับประกันว่าค่า Averaging จะต้องอยู่ในช่วง 1 ถึง 256 เท่านั้นตามสเปคเครื่อง
+        # รับประกันว่าค่า Averaging จะต้องอยู่ในช่วง 1 ถึง 256 เท่านั้นตามสเปคเครื่อง
         avg_factor = max(1, min(256, int(averaging)))
         
-        # ✅ ผูกคำสั่ง Averaging เข้าไปใน APERture ตามคู่มือเป๊ะๆ
+        # ผูกคำสั่ง Averaging เข้าไปใน APERture ตามคู่มือ
         self.inst.write(f":APERture {time_mode},{avg_factor}")
 
     def trigger(self):

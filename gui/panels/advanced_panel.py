@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QHBoxLayout, 
                              QPushButton, QLabel, QCheckBox, 
-                             QDoubleSpinBox, QGridLayout, QLineEdit, QComboBox, QSizePolicy)
+                             QGridLayout, QLineEdit, QComboBox, QSizePolicy)
 from PyQt6.QtCore import Qt
 
 class AdvancedPanel(QWidget):
@@ -21,10 +21,10 @@ class AdvancedPanel(QWidget):
         
         h_corr_buttons = QHBoxLayout()
         self.btn_open_corr = QPushButton("OPEN Correction")
-        self.btn_open_corr.setObjectName("btnOpenCorr")  # เพิ่ม ID เพื่อให้ qss ตกแต่งเป็นสีส้ม
+        self.btn_open_corr.setObjectName("btnOpenCorr")  
         
         self.btn_short_corr = QPushButton("SHORT Correction")
-        self.btn_short_corr.setObjectName("btnShortCorr") # เพิ่ม ID เพื่อให้ qss ตกแต่งเป็นสีส้ม
+        self.btn_short_corr.setObjectName("btnShortCorr") 
         
         h_corr_buttons.addWidget(self.btn_open_corr)
         h_corr_buttons.addWidget(self.btn_short_corr)
@@ -32,7 +32,7 @@ class AdvancedPanel(QWidget):
         group_corr.setLayout(v_corr)
         
         # --- 6. DC Bias ---
-        group_dc = QGroupBox("6. DC Bias (ไฟเลี้ยงกระแสตรง)")
+        group_dc = QGroupBox("6. ไฟเลี้ยงกระแสตรง (DC Bias)")
         v_dc = QVBoxLayout()
         
         h_dc_enable = QHBoxLayout()
@@ -45,19 +45,15 @@ class AdvancedPanel(QWidget):
         v_dc_inner.setContentsMargins(0, 0, 0, 0)
         v_dc_inner.setSpacing(10)
         
-        # ✅ ตัดแถว "ชนิดของไฟเลี้ยง" ออกทั้งหมด ข้ามมาที่ระดับไฟ (Level) เลย
-        
         h_dc_level = QHBoxLayout()
         h_dc_level.addWidget(QLabel("ระดับไฟ (Level):"))
-        self.input_dc_level = QDoubleSpinBox()
-        self.input_dc_level.setDecimals(1)
-        self.input_dc_level.setRange(0.0, 2.0)
-        self.input_dc_level.setSingleStep(0.5)
-        self.input_dc_level.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.lbl_dc_unit = QLabel("V")
         
-        h_dc_level.addWidget(self.input_dc_level, stretch=1)
-        h_dc_level.addWidget(self.lbl_dc_unit)
+        self.combo_dc_level = QComboBox()
+        self.combo_dc_level.addItem("1.5 V", userData=1.5)
+        self.combo_dc_level.addItem("2.0 V", userData=2.0)
+        self.combo_dc_level.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        
+        h_dc_level.addWidget(self.combo_dc_level, stretch=1)
         v_dc_inner.addLayout(h_dc_level)
         
         self.lbl_dc_warning = QLabel("⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัดก่อนเปิดสวิตช์เสมอ!")
@@ -69,7 +65,7 @@ class AdvancedPanel(QWidget):
         group_dc.setLayout(v_dc)
 
         # --- 7. Deviation (เปรียบเทียบค่า) ---
-        group_dev = QGroupBox("7. Deviation (เปรียบเทียบค่าอ้างอิง)")
+        group_dev = QGroupBox("7. เปรียบเทียบค่าอ้างอิง (Deviation)")
         v_dev = QVBoxLayout()
         
         h_dev_enable = QHBoxLayout()

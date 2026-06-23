@@ -478,7 +478,8 @@ class AppController(QObject):
         if is_enabled:
             self.validate_dc_bias()
         else:
-            self.view.adv_panel.lbl_dc_warning.setText("⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัดก่อนเปิดสวิตช์เสมอ!")
+            # ซ่อนข้อความเตือนเมื่อผู้ใช้ติ๊กปิดฟังก์ชัน DC Bias
+            self.view.adv_panel.lbl_dc_warning.setText("")
             self.is_dc_error = False
             self.update_start_button_state()
 

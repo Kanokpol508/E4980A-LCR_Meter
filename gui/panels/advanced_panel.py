@@ -32,7 +32,7 @@ class AdvancedPanel(QWidget):
         group_corr.setLayout(v_corr)
         
         # --- 6. DC Bias ---
-        group_dc = QGroupBox("6. ไฟเลี้ยงกระแสตรง (DC Bias)")
+        group_dc = QGroupBox("6. DC Bias (ไฟเลี้ยงกระแสตรง)")
         v_dc = QVBoxLayout()
         
         h_dc_enable = QHBoxLayout()
@@ -56,7 +56,8 @@ class AdvancedPanel(QWidget):
         h_dc_level.addWidget(self.combo_dc_level, stretch=1)
         v_dc_inner.addLayout(h_dc_level)
         
-        self.lbl_dc_warning = QLabel("⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัดก่อนเปิดสวิตช์เสมอ!")
+        # เริ่มต้นด้วยข้อความว่างเปล่า จะได้ไม่โชว์ขึ้นมาตอนยังไม่เปิดใช้งาน
+        self.lbl_dc_warning = QLabel("")
         self.lbl_dc_warning.setWordWrap(True)
         self.lbl_dc_warning.setStyleSheet("color: #ff4444; font-weight: bold; font-size: 11px;")
         v_dc_inner.addWidget(self.lbl_dc_warning)
@@ -65,7 +66,7 @@ class AdvancedPanel(QWidget):
         group_dc.setLayout(v_dc)
 
         # --- 7. Deviation (เปรียบเทียบค่า) ---
-        group_dev = QGroupBox("7. เปรียบเทียบค่าอ้างอิง (Deviation)")
+        group_dev = QGroupBox("7. Deviation (เปรียบเทียบค่าอ้างอิง)")
         v_dev = QVBoxLayout()
         
         h_dev_enable = QHBoxLayout()

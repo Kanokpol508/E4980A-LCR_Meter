@@ -1,6 +1,5 @@
 # วาดกราฟด้วย pyqtgraph (วาดแกน Y แยกอิสระ)
 
-
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
 import pyqtgraph as pg
 
@@ -30,7 +29,6 @@ class GraphDisplay(QWidget):
         )
         layout.addWidget(self.plot_primary, stretch=2)
 
-
         # ==========================================
         # 2. กราฟพารามิเตอร์รอง (Secondary Graph)
         # ==========================================
@@ -48,8 +46,8 @@ class GraphDisplay(QWidget):
         )
         layout.addWidget(self.plot_secondary, stretch=2)
 
-    def set_axis_labels(self, x_label: str, pri_y_label: str, sec_y_label: str, is_log_x: bool, is_single_mode: bool):
-        """ตั้งชื่อแกน และปรับรูปแบบสเกล (Log/Linear หรือ จำนวนเต็ม)"""
+    def set_axis_labels(self, x_label: str, pri_y_label: str, sec_y_label: str, is_single_mode: bool):
+        """ตั้งชื่อแกน และปรับรูปแบบสเกล (จำนวนเต็ม หรือ Auto)"""
         
         # ตั้งชื่อแกนพร้อมสไตล์
         self.plot_primary.setLabel('bottom', x_label, **self.label_style)
@@ -57,10 +55,6 @@ class GraphDisplay(QWidget):
         
         self.plot_secondary.setLabel('bottom', x_label, **self.label_style)
         self.plot_secondary.setLabel('left', sec_y_label, **self.label_style)
-
-        # การปรับสเกลแกน X เป็น Logarithmic (ถ้าโหมด Sweep เลือก Log ไว้)
-        self.plot_primary.setLogMode(x=is_log_x, y=False)
-        self.plot_secondary.setLogMode(x=is_log_x, y=False)
 
         # การปรับรูปแบบตัวเลขแกน X
         axis_pri = self.plot_primary.getAxis('bottom')

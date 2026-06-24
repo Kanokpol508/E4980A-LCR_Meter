@@ -32,7 +32,7 @@ class AdvancedPanel(QWidget):
         group_corr.setLayout(v_corr)
         
         # --- 6. DC Bias ---
-        group_dc = QGroupBox("6. DC Bias (ไฟเลี้ยงกระแสตรง)")
+        group_dc = QGroupBox("6. ไฟเลี้ยงกระแสตรง (DC Bias)")
         v_dc = QVBoxLayout()
         
         h_dc_enable = QHBoxLayout()
@@ -66,7 +66,7 @@ class AdvancedPanel(QWidget):
         group_dc.setLayout(v_dc)
 
         # --- 7. Deviation (เปรียบเทียบค่า) ---
-        group_dev = QGroupBox("7. Deviation (เปรียบเทียบค่าอ้างอิง)")
+        group_dev = QGroupBox("7. เปรียบเทียบค่าอ้างอิง (Deviation)")
         v_dev = QVBoxLayout()
         
         h_dev_enable = QHBoxLayout()
@@ -82,11 +82,11 @@ class AdvancedPanel(QWidget):
         grid_dev_refs = QGridLayout()
         grid_dev_refs.addWidget(QLabel("Primary Ref (หลัก) *"), 0, 0)
         self.input_dev_pri = QLineEdit()
-        self.input_dev_pri.setPlaceholderText("เช่น 100E-9")
+        self.input_dev_pri.setPlaceholderText("กรอกค่าอ้างอิงหลัก")
         grid_dev_refs.addWidget(self.input_dev_pri, 1, 0)
         grid_dev_refs.addWidget(QLabel("Secondary Ref (รอง)"), 0, 1)
         self.input_dev_sec = QLineEdit()
-        self.input_dev_sec.setPlaceholderText("เช่น 0.001")
+        self.input_dev_sec.setPlaceholderText("กรอกค่าอ้างอิงรอง")
         grid_dev_refs.addWidget(self.input_dev_sec, 1, 1)
         v_dev_inner.addLayout(grid_dev_refs)
         

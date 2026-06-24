@@ -61,7 +61,6 @@ class AppController(QObject):
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
         v.adv_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
-        # ✅ ผูกสัญญาณใหม่เข้ากับ Dropdown (combo_dc_level)
         v.adv_panel.combo_dc_level.currentIndexChanged.connect(self.validate_dc_bias)
 
         v.adv_panel.chk_dev_enable.stateChanged.connect(self.toggle_deviation)
@@ -148,7 +147,6 @@ class AppController(QObject):
             'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
             'dc_is_voltage': True, 
-            # ✅ ดึงค่าจาก Dropdown ใหม่ (combo_dc_level)
             'dc_bias_level': v.adv_panel.combo_dc_level.currentData(),
         }
 
@@ -306,7 +304,6 @@ class AppController(QObject):
             'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
             'dc_is_voltage': True, 
-            # ✅ ดึงค่าจาก Dropdown ใหม่ (combo_dc_level)
             'dc_bias_level': v.adv_panel.combo_dc_level.currentData(),
         }
         

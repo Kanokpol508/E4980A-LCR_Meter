@@ -1,6 +1,5 @@
 # เป็นหน้าต่าง Popup (Dialog) ที่จะเด้งขึ้นมาโชว์ตาราง "ค่าที่ส่งไป" เทียบกับ "ค่าที่เครื่องอ่านได้" พร้อมแสดงสถานะ ✅ PASS / ❌ FAIL
 
-
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QTableWidget, 
                              QTableWidgetItem, QPushButton, QHBoxLayout, QLabel)
 from PyQt6.QtGui import QColor, QFont
@@ -56,15 +55,16 @@ class VerifyDialog(QDialog):
             param = item.get("param", "")
             expected = str(item.get("expected", ""))
             actual = str(item.get("actual", ""))
-            passed = item.get("passed", False)
+            
+            status_text = item.get("status", "")          
+            passed = "PASS" in status_text                
 
             item_param = QTableWidgetItem(param)
             item_exp = QTableWidgetItem(expected)
             item_act = QTableWidgetItem(actual)
-            
-            status_text = "✅ PASS" if passed else "❌ FAIL"
             item_status = QTableWidgetItem(status_text)
             
+            # เปลี่ยนสีข้อความตามสถานะ
             if passed:
                 item_status.setForeground(QColor("green"))
             else:

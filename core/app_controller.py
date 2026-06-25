@@ -23,10 +23,14 @@ class AppController(QObject):
         self.progress_dialog = None
         self.current_corr_type = None
 
-        # ตัวแปรสำหรับเก็บข้อมูลวาดกราฟ
+        # ตัวแปรสำหรับเก็บข้อมูลวาดกราฟ (อาจถูกดัดแปลงโดย Deviation)
         self.graph_x_data = []
         self.graph_pri_y = []
         self.graph_sec_y = []
+        
+        # ตัวแปรสำหรับเก็บ "ค่าดิบ (Raw Data)" เพื่อนำไปคำนวณสถิติ Type A 
+        self.graph_raw_pri_y = []
+        self.graph_raw_sec_y = []
 
         self.meas_options = {
             "Capacitance (ความจุไฟฟ้า)": [
@@ -284,6 +288,11 @@ class AppController(QObject):
             self.graph_x_data = []
             self.graph_pri_y = []
             self.graph_sec_y = []
+            
+            # เคลียร์ค่าดิบด้วยเมื่อกด Sweep เริ่มใหม่
+            self.graph_raw_pri_y = []
+            self.graph_raw_sec_y = []
+            
             v.graph_display.clear_plots()
 
         if len(self.graph_x_data) == 0:
@@ -330,8 +339,15 @@ class AppController(QObject):
     def handle_data_ready(self, data):
         v = self.view
         
+        # 1. ค่าดิบจากฮาร์ดแวร์ (เพียวๆ)
         raw_pri = data.get('primary', 0.0)
         raw_sec = data.get('secondary', 0.0)
+        
+        # เก็บค่าดิบลง Array ไว้คำนวณ Type A Uncertainty ทันที
+        self.graph_raw_pri_y.append(raw_pri)
+        self.graph_raw_sec_y.append(raw_sec)
+        
+        # 2. ค่าที่จะนำไปแสดงบนกราฟและจอ LCD (อาจถูกปรับด้วย Deviation)
         disp_pri = raw_pri
         disp_sec = raw_sec
         
@@ -369,7 +385,10 @@ class AppController(QObject):
             
         self.graph_pri_y.append(disp_pri)
         self.graph_sec_y.append(disp_sec)
+        
+        # ทั้งกราฟ และ Panel สถิติ (โยน raw เข้าไปคำนวณ)
         v.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
+        v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, not is_sweep)
 
     def handle_worker_error(self, error_msg):
         QMessageBox.critical(self.view, "Hardware Error", error_msg)
@@ -386,6 +405,11 @@ class AppController(QObject):
         self.graph_x_data = []
         self.graph_pri_y = []
         self.graph_sec_y = []
+        
+        # ล้างข้อมูลดิบด้วยเมื่อกด Sweep เริ่มใหม่
+        self.graph_raw_pri_y = []
+        self.graph_raw_sec_y = []
+        
         self.view.graph_display.clear_plots()
         self.update_session_lock()
 
@@ -478,7 +502,6 @@ class AppController(QObject):
         if is_enabled:
             self.validate_dc_bias()
         else:
-            # ซ่อนข้อความเตือนเมื่อผู้ใช้ติ๊กปิดฟังก์ชัน DC Bias
             self.view.adv_panel.lbl_dc_warning.setText("")
             self.is_dc_error = False
             self.update_start_button_state()
@@ -492,7 +515,7 @@ class AppController(QObject):
             
         warning_msg = "⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัดก่อนเปิดสวิตช์เสมอ!"
         self.is_dc_error = False
-                    
+            
         v.adv_panel.lbl_dc_warning.setText(warning_msg)
         self.update_start_button_state()
 

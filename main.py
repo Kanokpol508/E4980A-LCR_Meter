@@ -29,7 +29,7 @@ def main():
     controller = AppController(window)
     
     # 5. แสดงหน้าจอและรันโปรแกรม
-    window.show()
+    window.showMaximized()
     sys.exit(app.exec())
 
 if __name__ == "__main__":

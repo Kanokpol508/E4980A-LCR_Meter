@@ -1,81 +1,163 @@
-# วาดกราฟด้วย pyqtgraph (วาดแกน Y แยกอิสระ)
+# วาดกราฟด้วย pyqtgraph (วาดแกน Y แยกอิสระ) พร้อมแสดงสถิติ
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout
+import math
+import statistics
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox
+from PyQt6.QtCore import Qt
 import pyqtgraph as pg
+
+class StatPanel(QGroupBox):
+    """คอมโพเนนต์ย่อยสำหรับแสดงสถิติข้างกราฟ (Last Value, SD, Type A)"""
+    def __init__(self, title, parent=None):
+        super().__init__(title, parent)
+        self.setFixedWidth(240)  
+        self.setObjectName("statGroup") 
+        
+        layout = QVBoxLayout(self) 
+        layout.setSpacing(2)
+        layout.setContentsMargins(15, 10, 15, 15)
+        
+        # 1. Last Value
+        lbl_title_last = QLabel("Last Value:")
+        lbl_title_last.setObjectName("lblStatTitle")
+        layout.addWidget(lbl_title_last)
+        
+        self.lbl_last = QLabel("-")
+        self.lbl_last.setObjectName("lblStatValue")
+        self.lbl_last.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(self.lbl_last)
+        
+        # 2. SD
+        lbl_title_sd = QLabel("Standard Deviation (SD):")
+        lbl_title_sd.setObjectName("lblStatTitle")
+        layout.addWidget(lbl_title_sd)
+        
+        self.lbl_sd = QLabel("-")
+        self.lbl_sd.setObjectName("lblStatValue")
+        self.lbl_sd.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(self.lbl_sd)
+        
+        # 3. Type A
+        lbl_title_type_a = QLabel("Type A (ppm):")
+        lbl_title_type_a.setObjectName("lblStatTitle")
+        layout.addWidget(lbl_title_type_a)
+        
+        self.lbl_type_a = QLabel("-")
+        self.lbl_type_a.setObjectName("lblStatValue")
+        self.lbl_type_a.setAlignment(Qt.AlignmentFlag.AlignRight)
+        layout.addWidget(self.lbl_type_a)
+        
+        layout.addStretch() 
+
+    def update_stats(self, raw_data: list, is_single_mode: bool):
+        """คำนวณและอัปเดตสถิติจากค่าดิบ"""
+        # 1. ถ้าเป็น Sweep mode หรือยังไม่มีข้อมูล ให้แสดง "-"
+        if not is_single_mode or not raw_data:
+            self.lbl_last.setText("-")
+            self.lbl_sd.setText("-")
+            self.lbl_type_a.setText("-")
+            return
+            
+        # 2. แสดง Last Value
+        self.lbl_last.setText(f"{raw_data[-1]:.5e}")
+        
+        n = len(raw_data)
+        # 3. ต้องมีข้อมูล >= 2 จุดขึ้นไป ถึงจะคำนวณ SD และ Type A ได้
+        if n < 2:
+            self.lbl_sd.setText("-")
+            self.lbl_type_a.setText("-")
+            return
+            
+        # 4. คำนวณ SD และ Type A
+        try:
+            sd = statistics.stdev(raw_data)
+            mean = statistics.mean(raw_data)
+            
+            self.lbl_sd.setText(f"{sd:.5e}")
+            
+            if mean == 0:
+                self.lbl_type_a.setText("N/A")
+                self.lbl_type_a.setToolTip("Mean is 0, cannot calculate ppm")
+            else:
+                # สูตร: UA = (SD / sqrt(n)) / |mean| * 1e6
+                type_a_ppm = (sd / math.sqrt(n)) / abs(mean) * 1e6
+                self.lbl_type_a.setText(f"{type_a_ppm:.2f}")
+                
+        except Exception:
+            self.lbl_sd.setText("Error")
+            self.lbl_type_a.setText("Error")
+
 
 class GraphDisplay(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         
-        # ปรับขนาดฟอนต์ให้ใหญ่ขึ้นเพื่อให้อ่านง่าย
         self.label_style = {'font-size': '12pt', 'font-weight': 'bold'}
         
         # ==========================================
-        # 1. กราฟพารามิเตอร์หลัก (Primary Graph)
+        # 1. กราฟพารามิเตอร์หลัก (Primary) + สถิติ
         # ==========================================
+        h_layout_pri = QHBoxLayout()
+        
         self.plot_primary = pg.PlotWidget(title="Primary Parameter")
         self.plot_primary.showGrid(x=True, y=True, alpha=0.3)
-        
-        # เปิดระบบ Auto-Scale อัตโนมัติ (ซูมพอดีกับข้อมูลเสมอ)
         self.plot_primary.getViewBox().enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
+        self.curve_primary = self.plot_primary.plot(pen=pg.mkPen('c', width=2), symbol='o', symbolSize=6, symbolBrush='c')
         
-        # เส้นกราฟ (ใช้สีฟ้า Cyan ตัดกับพื้นหลังมืด)
-        self.curve_primary = self.plot_primary.plot(
-            pen=pg.mkPen('c', width=2),     
-            symbol='o', symbolSize=6,       
-            symbolBrush='c'
-        )
-        layout.addWidget(self.plot_primary, stretch=2)
+        self.stat_primary = StatPanel("Primary Statistics")
+        
+        h_layout_pri.addWidget(self.plot_primary, stretch=1)
+        h_layout_pri.addWidget(self.stat_primary)
+        main_layout.addLayout(h_layout_pri, stretch=1)
 
         # ==========================================
-        # 2. กราฟพารามิเตอร์รอง (Secondary Graph)
+        # 2. กราฟพารามิเตอร์รอง (Secondary) + สถิติ
         # ==========================================
+        h_layout_sec = QHBoxLayout()
+        
         self.plot_secondary = pg.PlotWidget(title="Secondary Parameter")
         self.plot_secondary.showGrid(x=True, y=True, alpha=0.3)
-        
-        # เปิดระบบ Auto-Scale อัตโนมัติ
         self.plot_secondary.getViewBox().enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
+        self.curve_secondary = self.plot_secondary.plot(pen=pg.mkPen('m', width=2), symbol='o', symbolSize=6, symbolBrush='m')
         
-        # เส้นกราฟ (ใช้สีม่วงแดง Magenta ตัดกับพื้นหลังมืด)
-        self.curve_secondary = self.plot_secondary.plot(
-            pen=pg.mkPen('m', width=2),     
-            symbol='o', symbolSize=6,
-            symbolBrush='m'
-        )
-        layout.addWidget(self.plot_secondary, stretch=2)
+        self.stat_secondary = StatPanel("Secondary Statistics")
+        
+        h_layout_sec.addWidget(self.plot_secondary, stretch=1)
+        h_layout_sec.addWidget(self.stat_secondary)
+        main_layout.addLayout(h_layout_sec, stretch=1)
 
     def set_axis_labels(self, x_label: str, pri_y_label: str, sec_y_label: str, is_single_mode: bool):
-        """ตั้งชื่อแกน และปรับรูปแบบสเกล (จำนวนเต็ม หรือ Auto)"""
-        
-        # ตั้งชื่อแกนพร้อมสไตล์
+        """ตั้งชื่อแกน และปรับรูปแบบสเกล"""
         self.plot_primary.setLabel('bottom', x_label, **self.label_style)
         self.plot_primary.setLabel('left', pri_y_label, **self.label_style)
         
         self.plot_secondary.setLabel('bottom', x_label, **self.label_style)
         self.plot_secondary.setLabel('left', sec_y_label, **self.label_style)
 
-        # การปรับรูปแบบตัวเลขแกน X
         axis_pri = self.plot_primary.getAxis('bottom')
         axis_sec = self.plot_secondary.getAxis('bottom')
         
         if is_single_mode:
-            # โหมดจุดเดียว แกน X เป็น "ครั้งที่" (Measurement Count) บังคับให้โชว์เลขจำนวนเต็ม (1, 2, 3...)
             axis_pri.setTickSpacing(major=1, minor=1)
             axis_sec.setTickSpacing(major=1, minor=1)
         else:
-            # โหมด Sweep ให้ pyqtgraph จัดการความห่างของความถี่ให้เหมาะสมอัตโนมัติ
-            # แก้ไขจาก setTickSpacing() เป็น setTicks(None) เพื่อป้องกันบั๊กในบางเวอร์ชัน
             axis_pri.setTicks(None) 
             axis_sec.setTicks(None)
 
     def update_plots(self, x_data: list, pri_y_data: list, sec_y_data: list):
-        """รับข้อมูลลิสต์มาพล็อตกราฟ และให้ Auto-Scale ทำงาน"""
+        """อัปเดตเส้นกราฟ"""
         self.curve_primary.setData(x_data, pri_y_data)
         self.curve_secondary.setData(x_data, sec_y_data)
 
+    def update_statistics(self, raw_pri_data: list, raw_sec_data: list, is_single_mode: bool):
+        """ส่งค่าดิบไปให้ Panel สถิติคำนวณ"""
+        self.stat_primary.update_stats(raw_pri_data, is_single_mode)
+        self.stat_secondary.update_stats(raw_sec_data, is_single_mode)
+
     def clear_plots(self):
-        """ล้างข้อมูลบนกราฟ (ใช้ก่อนเริ่มการวัดใหม่)"""
+        """ล้างข้อมูลบนกราฟและสถิติ"""
         self.curve_primary.setData([], [])
         self.curve_secondary.setData([], [])
+        self.update_statistics([], [], True)

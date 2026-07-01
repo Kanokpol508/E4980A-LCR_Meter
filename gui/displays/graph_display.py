@@ -51,24 +51,20 @@ class StatPanel(QGroupBox):
 
     def update_stats(self, raw_data: list, is_single_mode: bool):
         """คำนวณและอัปเดตสถิติจากค่าดิบ"""
-        # 1. ถ้าเป็น Sweep mode หรือยังไม่มีข้อมูล ให้แสดง "-"
         if not is_single_mode or not raw_data:
             self.lbl_last.setText("-")
             self.lbl_sd.setText("-")
             self.lbl_type_a.setText("-")
             return
             
-        # 2. แสดง Last Value
         self.lbl_last.setText(f"{raw_data[-1]:.5e}")
         
         n = len(raw_data)
-        # 3. ต้องมีข้อมูล >= 2 จุดขึ้นไป ถึงจะคำนวณ SD และ Type A ได้
         if n < 2:
             self.lbl_sd.setText("-")
             self.lbl_type_a.setText("-")
             return
             
-        # 4. คำนวณ SD และ Type A
         try:
             sd = statistics.stdev(raw_data)
             mean = statistics.mean(raw_data)
@@ -79,7 +75,6 @@ class StatPanel(QGroupBox):
                 self.lbl_type_a.setText("N/A")
                 self.lbl_type_a.setToolTip("Mean is 0, cannot calculate ppm")
             else:
-                # สูตร: UA = (SD / sqrt(n)) / |mean| * 1e6
                 type_a_ppm = (sd / math.sqrt(n)) / abs(mean) * 1e6
                 self.lbl_type_a.setText(f"{type_a_ppm:.2f}")
                 
@@ -94,7 +89,8 @@ class GraphDisplay(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.label_style = {'font-size': '12pt', 'font-weight': 'bold'}
+        # ปรับฟอนต์ให้เล็กลง บางลง และสีซอฟต์ลง เพื่อไม่ให้แย่งความสนใจจากเส้นกราฟ
+        self.label_style = {'color': '#cbd5e1', 'font-size': '10pt', 'font-weight': 'normal'}
         
         # ==========================================
         # 1. กราฟพารามิเตอร์หลัก (Primary) + สถิติ
@@ -105,6 +101,10 @@ class GraphDisplay(QWidget):
         self.plot_primary.showGrid(x=True, y=True, alpha=0.3)
         self.plot_primary.getViewBox().enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
         self.curve_primary = self.plot_primary.plot(pen=pg.mkPen('c', width=2), symbol='o', symbolSize=6, symbolBrush='c')
+        
+        # ใส่ชื่อแกนเริ่มต้น (Default Labels) ทันทีที่เปิดโปรแกรม
+        self.plot_primary.setLabel('left', 'Primary Value', **self.label_style)
+        self.plot_primary.setLabel('bottom', 'Points / Frequency (Hz)', **self.label_style)
         
         self.stat_primary = StatPanel("Primary Statistics")
         
@@ -121,6 +121,10 @@ class GraphDisplay(QWidget):
         self.plot_secondary.showGrid(x=True, y=True, alpha=0.3)
         self.plot_secondary.getViewBox().enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
         self.curve_secondary = self.plot_secondary.plot(pen=pg.mkPen('m', width=2), symbol='o', symbolSize=6, symbolBrush='m')
+        
+        # ใส่ชื่อแกนเริ่มต้น (Default Labels) ทันทีที่เปิดโปรแกรม
+        self.plot_secondary.setLabel('left', 'Secondary Value', **self.label_style)
+        self.plot_secondary.setLabel('bottom', 'Points / Frequency (Hz)', **self.label_style)
         
         self.stat_secondary = StatPanel("Secondary Statistics")
         

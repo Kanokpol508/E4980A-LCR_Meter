@@ -252,20 +252,41 @@ class AppController(QObject):
         scpi_mode = v.input_panel.combo_scpi_mode.currentData()
         pri_label = "Primary"
         sec_label = "Secondary"
-        
-        if scpi_mode.startswith("CP"): pri_label = "Capacitance, Cp (F)"
-        elif scpi_mode.startswith("CS"): pri_label = "Capacitance, Cs (F)"
-        elif scpi_mode.startswith("LP"): pri_label = "Inductance, Lp (H)"
-        elif scpi_mode.startswith("LS"): pri_label = "Inductance, Ls (H)"
-        elif scpi_mode == "RX": pri_label = "Resistance, R (Ω)"
-        elif scpi_mode.startswith("Z"): pri_label = "Impedance, Z (Ω)"
-        elif scpi_mode.startswith("Y") or scpi_mode == "GB": pri_label = "Admittance (S)"
-        
-        if scpi_mode.endswith("D"): sec_label = "Dissipation Factor, D"
-        elif scpi_mode.endswith("Q"): sec_label = "Quality Factor, Q"
-        elif scpi_mode.endswith("RS") or scpi_mode.endswith("RP") or scpi_mode == "RX": sec_label = "Resistance (Ω)"
-        elif "T" in scpi_mode: sec_label = "Phase Angle, θ (°)"
-        
+
+        # --- Primary label ---
+        if scpi_mode.startswith("CP"):
+            pri_label = "Capacitance, Cp (F)"
+        elif scpi_mode.startswith("CS"):
+            pri_label = "Capacitance, Cs (F)"
+        elif scpi_mode.startswith("LP"):
+            pri_label = "Inductance, Lp (H)"
+        elif scpi_mode.startswith("LS"):
+            pri_label = "Inductance, Ls (H)"
+        elif scpi_mode == "RX":
+            pri_label = "Resistance, R (Ω)"
+        elif scpi_mode.startswith("Z"):
+            pri_label = "Impedance, Z (Ω)"
+        elif scpi_mode.startswith("Y") or scpi_mode == "GB":
+            pri_label = "Admittance, Y (S)"
+
+        # --- Secondary label ---
+        # ต้องเช็ค "TD"/"TR" ก่อน "D" เพราะ ZTD/YTD ลงท้ายด้วย D ด้วย
+        if scpi_mode.endswith("TD"):
+            sec_label = "Phase Angle, θd (°)"        # ZTD, YTD
+        elif scpi_mode.endswith("TR"):
+            sec_label = "Phase Angle, θr (rad)"      # ZTR, YTR
+        elif scpi_mode.endswith("D"):
+            sec_label = "Dissipation Factor, D"      # CPD, CSD, LPD, LSD
+        elif scpi_mode.endswith("Q"):
+            sec_label = "Quality Factor, Q"          # CPQ, CSQ, LPQ, LSQ
+        elif scpi_mode.endswith("G"):
+            sec_label = "Conductance, G (S)"         # CPG, LPG
+        elif scpi_mode == "GB":
+            sec_label = "Susceptance, B (S)"         # GB
+        elif scpi_mode.endswith("RS") or scpi_mode.endswith("RP") or scpi_mode == "RX":
+            sec_label = "Resistance (Ω)"             # CSRS, LSRS, CPRP, LPRP, RX
+
+        # --- Deviation mode ปรับชื่อแกนตามประเภท deviation ---
         if v.adv_panel.chk_dev_enable.isChecked():
             dev_type = v.adv_panel.combo_dev_type.currentText()
             if "PCT" in dev_type or "เปอร์เซ็นต์" in dev_type:
@@ -277,8 +298,13 @@ class AppController(QObject):
 
         is_sweep = v.ctrl_panel.btn_mode_sweep.isChecked()
         x_label = "Frequency (Hz)" if is_sweep else "Measurement Count (Points)"
-        
-        v.graph_display.set_axis_labels(x_label=x_label, pri_y_label=pri_label, sec_y_label=sec_label, is_single_mode=not is_sweep)
+
+        v.graph_display.set_axis_labels(
+            x_label=x_label,
+            pri_y_label=pri_label,
+            sec_y_label=sec_label,
+            is_single_mode=not is_sweep
+        )
 
     def start_measurement(self):
         v = self.view
@@ -288,11 +314,8 @@ class AppController(QObject):
             self.graph_x_data = []
             self.graph_pri_y = []
             self.graph_sec_y = []
-            
-            # เคลียร์ค่าดิบด้วยเมื่อกด Sweep เริ่มใหม่
             self.graph_raw_pri_y = []
             self.graph_raw_sec_y = []
-            
             v.graph_display.clear_plots()
 
         if len(self.graph_x_data) == 0:
@@ -339,11 +362,11 @@ class AppController(QObject):
     def handle_data_ready(self, data):
         v = self.view
         
-        # 1. ค่าดิบจากฮาร์ดแวร์ (เพียวๆ)
+        # 1. ค่าดิบจากฮาร์ดแวร์
         raw_pri = data.get('primary', 0.0)
         raw_sec = data.get('secondary', 0.0)
         
-        # เก็บค่าดิบลง Array ไว้คำนวณ Type A Uncertainty ทันที
+        # เก็บค่าดิบลง Array ไว้คำนวณ Type A Uncertainty
         self.graph_raw_pri_y.append(raw_pri)
         self.graph_raw_sec_y.append(raw_sec)
         
@@ -386,7 +409,7 @@ class AppController(QObject):
         self.graph_pri_y.append(disp_pri)
         self.graph_sec_y.append(disp_sec)
         
-        # ทั้งกราฟ และ Panel สถิติ (โยน raw เข้าไปคำนวณ)
+        # อัปเดตทั้งกราฟ และ Panel สถิติ (โยน raw เข้าไปคำนวณ)
         v.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
         v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, not is_sweep)
 
@@ -405,11 +428,8 @@ class AppController(QObject):
         self.graph_x_data = []
         self.graph_pri_y = []
         self.graph_sec_y = []
-        
-        # ล้างข้อมูลดิบด้วยเมื่อกด Sweep เริ่มใหม่
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
-        
         self.view.graph_display.clear_plots()
         self.update_session_lock()
 
@@ -481,10 +501,8 @@ class AppController(QObject):
             else:
                 v.ctrl_panel.btn_mode_sweep.blockSignals(True)
                 v.ctrl_panel.btn_mode_single.blockSignals(True)
-                
                 v.ctrl_panel.btn_mode_sweep.setChecked(not is_sweep)
                 v.ctrl_panel.btn_mode_single.setChecked(is_sweep)
-                
                 v.ctrl_panel.btn_mode_sweep.blockSignals(False)
                 v.ctrl_panel.btn_mode_single.blockSignals(False)
                 return 
@@ -512,10 +530,9 @@ class AppController(QObject):
             self.is_dc_error = False
             self.update_start_button_state()
             return
-            
+        
         warning_msg = "⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัดก่อนเปิดสวิตช์เสมอ!"
         self.is_dc_error = False
-            
         v.adv_panel.lbl_dc_warning.setText(warning_msg)
         self.update_start_button_state()
 

@@ -12,7 +12,7 @@ class AdvancedPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         # --- 5. Correction ---
-        group_corr = QGroupBox("5. การปรับชดเชยค่าสายวัด (Correction)")
+        group_corr = QGroupBox("การปรับชดเชยค่าสายวัด (Correction)")
         v_corr = QVBoxLayout()
         v_corr.setSpacing(10)
         lbl_corr_hint = QLabel("💡 คำแนะนำ:\n• ถ่างปลายสายวัดออกจากกัน ➔ กด OPEN\n• นำปลายสายวัดมาช็อตกัน ➔ กด SHORT")
@@ -32,7 +32,7 @@ class AdvancedPanel(QWidget):
         group_corr.setLayout(v_corr)
         
         # --- 6. DC Bias ---
-        group_dc = QGroupBox("6. ไฟเลี้ยงกระแสตรง (DC Bias)")
+        group_dc = QGroupBox("ไฟเลี้ยงกระแสตรง (DC Bias)")
         v_dc = QVBoxLayout()
         
         h_dc_enable = QHBoxLayout()
@@ -66,7 +66,7 @@ class AdvancedPanel(QWidget):
         group_dc.setLayout(v_dc)
 
         # --- 7. Deviation (เปรียบเทียบค่า) ---
-        group_dev = QGroupBox("7. เปรียบเทียบค่าอ้างอิง (Deviation)")
+        group_dev = QGroupBox("เปรียบเทียบค่าอ้างอิง (Deviation)")
         v_dev = QVBoxLayout()
         
         h_dev_enable = QHBoxLayout()

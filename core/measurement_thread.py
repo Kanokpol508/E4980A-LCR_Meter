@@ -1,7 +1,7 @@
 # **สำคัญมาก** ทำงานเบื้องหลัง (QThread) เพื่อสแกน Sweep โดยไม่ให้ UI ค้าง
 
 from PyQt6.QtCore import QThread, pyqtSignal
-from hardware.lcr_meter import E4980A 
+from hardware.lcr_meter import E4980A
 
 class MeasurementWorker(QThread):
     """คลาสลูกน้องหลังบ้าน ทำหน้าที่สื่อสารกับฮาร์ดแวร์ (LCR Meter) ของจริง"""
@@ -23,10 +23,10 @@ class MeasurementWorker(QThread):
             if not visa_address or visa_address == "No Device Found":
                 raise ConnectionError("ไม่พบที่อยู่ VISA Resource ที่ถูกต้อง")
 
-            # 1. สร้าง Object และเชื่อมต่อฮาร์ดแวร์ 
+            # 1. สร้าง Object และเชื่อมต่อฮาร์ดแวร์
             lcr = E4980A()
             success, msg = lcr.connect(visa_address)
-            
+
             if not success:
                 raise ConnectionError(f"เชื่อมต่อเครื่องล้มเหลว: {msg}")
 
@@ -39,7 +39,7 @@ class MeasurementWorker(QThread):
             time_mode = self.settings.get('time_mode', 'MED')
             avg       = self.settings.get('avg', 1)
             imp_range = self.settings.get('imp_range', 'AUTO')
-            
+
             lcr.set_measurement_mode(scpi_mode)
             lcr.set_voltage_level(volt)
             lcr.set_frequency(freq)
@@ -49,7 +49,7 @@ class MeasurementWorker(QThread):
                 lcr.inst.write(":FUNCtion:IMPedance:RANGe:AUTO ON")
             else:
                 lcr.inst.write(f":FUNCtion:IMPedance:RANGe {imp_range}")
-            
+
             # --- ตั้งค่า DC Bias (แบบปลอดภัย) ---
             if 'dc_bias_enabled' in self.settings:
                 lcr.apply_dc_bias(
@@ -75,6 +75,8 @@ class MeasurementWorker(QThread):
                 self._run_single_measurement(lcr)
             elif run_mode == 'SWEEP':
                 self._run_sweep_measurement(lcr)
+            elif run_mode == 'LIST':
+                self._run_list_measurement(lcr)
 
         except Exception as e:
             self.error_occurred.emit(f"Hardware Error:\n{str(e)}")
@@ -89,7 +91,7 @@ class MeasurementWorker(QThread):
     def _handle_hardware_status(self, stat: str, current_freq: float = None):
         """จัดการข้อความ Error แยกตามประเภทให้ผู้ใช้อ่านเข้าใจง่ายขึ้น"""
         freq_info = f" ที่ความถี่ {current_freq:.1f}Hz" if current_freq else ""
-        
+
         if stat == "OVERLOAD":
             self.error_occurred.emit(f"⚠️ ค่าเกินย่านวัด (OVERLOAD){freq_info} ชิ้นงานอาจช็อต/ขาด หรือเลือกช่วงวัดผิด")
         elif stat == "NO_DATA":
@@ -106,10 +108,10 @@ class MeasurementWorker(QThread):
         if not self.is_running:
             return
 
-        lcr.wait_until_ready() 
-        lcr.trigger() 
-        
-        pri, sec, stat = lcr.fetch_measurement() 
+        lcr.wait_until_ready()
+        lcr.trigger()
+
+        pri, sec, stat = lcr.fetch_measurement()
 
         if stat == "SUCCESS":
             real_result = {
@@ -128,25 +130,25 @@ class MeasurementWorker(QThread):
         start_f = self.settings.get('start_freq', 100.0)
         stop_f = self.settings.get('stop_freq', 1000000.0)
         step_f = self.settings.get('step_freq', 20000.0)
-        
+
         if step_f <= 0:
-            step_f = 1.0  
+            step_f = 1.0
 
         n_points = int((stop_f - start_f) / step_f) + 1
-        n_points = max(2, min(201, n_points))  
+        n_points = max(2, min(201, n_points))
 
         frequencies = [start_f + i * step_f for i in range(n_points)]
-        frequencies = [min(f, stop_f) for f in frequencies]  
+        frequencies = [min(f, stop_f) for f in frequencies]
 
         points = len(frequencies)
 
         for i, current_freq in enumerate(frequencies):
             if not self.is_running:
-                break 
+                break
 
             lcr.set_frequency(current_freq)
-            lcr.wait_until_ready()  
-            
+            lcr.wait_until_ready()
+
             lcr.trigger()
             pri, sec, stat = lcr.fetch_measurement()
 
@@ -156,12 +158,94 @@ class MeasurementWorker(QThread):
             if stat == "SUCCESS":
                 real_result = {
                     'freq': current_freq,
-                    'primary': float(pri), 
+                    'primary': float(pri),
                     'secondary': float(sec)
                 }
                 self.data_ready.emit(real_result)
             else:
                 self._handle_hardware_status(stat, current_freq)
+
+    # ========================================================
+    # [ใหม่] โหมด Frequency List + Samples per Sweep
+    # ========================================================
+    @staticmethod
+    def _parse_freq_list(raw_text: str) -> list:
+        """
+        แปลง string เช่น '100, 1k, 10k, 100k, 1M, 2M' เป็น list ของ float (หน่วย Hz)
+        รองรับหน่วยย่อ k (x1e3) และ M (x1e6) ไม่สนตัวพิมพ์เล็ก/ใหญ่
+        """
+        frequencies = []
+        if not raw_text:
+            return frequencies
+
+        parts = raw_text.replace(";", ",").split(",")
+        for part in parts:
+            token = part.strip()
+            if not token:
+                continue
+            try:
+                token_upper = token.upper()
+                if token_upper.endswith("K"):
+                    value = float(token_upper[:-1]) * 1e3
+                elif token_upper.endswith("M"):
+                    value = float(token_upper[:-1]) * 1e6
+                elif token_upper.endswith("G"):
+                    value = float(token_upper[:-1]) * 1e9
+                else:
+                    value = float(token_upper)
+                frequencies.append(value)
+            except ValueError:
+                # ข้ามค่าที่แปลงไม่ได้ (กันไม่ให้ทั้งชุดพังเพราะพิมพ์ผิดจุดเดียว)
+                continue
+
+        return frequencies
+
+    def _run_list_measurement(self, lcr):
+        """
+        ตรรกะการวัดตาม Frequency List ที่ผู้ใช้กำหนดเอง
+        วัดซ้ำ N ครั้ง (samples_per_freq) ต่อความถี่ 1 จุด ก่อนขยับไปความถี่ถัดไป
+        โครงสร้าง: for freq in freq_list: for sample in range(samples): วัด 1 ค่า
+        """
+        raw_text = self.settings.get('freq_list_raw', '')
+        samples = max(1, int(self.settings.get('samples_per_freq', 1)))
+
+        frequencies = self._parse_freq_list(raw_text)
+
+        if not frequencies:
+            self.error_occurred.emit("⚠️ รายการความถี่ไม่ถูกต้องหรือว่างเปล่า กรุณากรอกใหม่ เช่น 100, 1k, 10k")
+            return
+
+        total_points = len(frequencies) * samples
+        done_points = 0
+
+        for current_freq in frequencies:
+            if not self.is_running:
+                break
+
+            lcr.set_frequency(current_freq)
+            lcr.wait_until_ready()
+
+            for sample_index in range(samples):
+                if not self.is_running:
+                    break
+
+                lcr.trigger()
+                pri, sec, stat = lcr.fetch_measurement()
+
+                done_points += 1
+                percent = int((done_points / total_points) * 100)
+                self.progress_updated.emit(percent)
+
+                if stat == "SUCCESS":
+                    real_result = {
+                        'freq': current_freq,
+                        'sample_index': sample_index + 1,
+                        'primary': float(pri),
+                        'secondary': float(sec)
+                    }
+                    self.data_ready.emit(real_result)
+                else:
+                    self._handle_hardware_status(stat, current_freq)
 
     def stop(self):
         """ฟังก์ชันหยุดฉุกเฉิน"""

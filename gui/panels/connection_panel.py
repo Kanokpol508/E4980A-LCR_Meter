@@ -8,7 +8,7 @@ class ConnectionPanel(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        group_visa = QGroupBox("VISA Resource")
+        group_visa = QGroupBox("เลือกพอร์ตสื่อสาร (VISA Resource)")
         h_visa = QHBoxLayout()
         
         self.combo_visa = QComboBox()

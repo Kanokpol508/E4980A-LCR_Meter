@@ -16,7 +16,7 @@ class AppController(QObject):
         self.is_dc_error = False
         self.is_dev_error = False
         self.is_visa_error = True
-        
+
         self.worker = None
         self.corr_worker = None
         self.verify_worker = None
@@ -27,8 +27,8 @@ class AppController(QObject):
         self.graph_x_data = []
         self.graph_pri_y = []
         self.graph_sec_y = []
-        
-        # ตัวแปรสำหรับเก็บ "ค่าดิบ (Raw Data)" เพื่อนำไปคำนวณสถิติ Type A 
+
+        # ตัวแปรสำหรับเก็บ "ค่าดิบ (Raw Data)" เพื่อนำไปคำนวณสถิติ Type A
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
 
@@ -50,13 +50,16 @@ class AppController(QObject):
         self.view.input_panel.combo_prop_group.addItems(self.meas_options.keys())
         self.update_scpi_modes()
         self.scan_visa_ports()
-        
-        self.update_hardware_limits() 
+
+        self.update_hardware_limits()
         self.update_calculated_points()
 
         # ตั้งค่า UI เริ่มต้น
         self.view.adv_panel.widget_dc_inner.setEnabled(False)
         self.view.adv_panel.widget_dev_inner.setEnabled(False)
+
+        # ตั้งค่า visibility ของกลุ่ม input ตามโหมดเริ่มต้น (Sweep)
+        self.toggle_run_mode()
 
     def _connect_signals(self):
         v = self.view
@@ -76,17 +79,22 @@ class AppController(QObject):
         v.ctrl_panel.btn_verify.clicked.connect(self.handle_verify_apply)
         v.lcd_display.btn_clear.clicked.connect(self.handle_clear_graph)
 
-        v.ctrl_panel.btn_mode_single.toggled.connect(self.toggle_run_mode)
+        # เปลี่ยนจาก btn_mode_single.toggled -> combo_run_mode.currentIndexChanged
+        v.ctrl_panel.combo_run_mode.currentIndexChanged.connect(self.toggle_run_mode)
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
-        
+
         v.input_panel.input_start_freq.valueChanged.connect(self.update_calculated_points)
         v.input_panel.input_stop_freq.valueChanged.connect(self.update_calculated_points)
         v.input_panel.input_step_freq.valueChanged.connect(self.update_calculated_points)
 
     # ========================================================
-    # Logic Methods 
+    # Logic Methods
     # ========================================================
+    def get_current_run_mode(self) -> str:
+        """คืนค่าโหมดปัจจุบันจาก Dropdown: 'SINGLE' / 'SWEEP' / 'LIST'"""
+        return self.view.ctrl_panel.combo_run_mode.currentData()
+
     def update_calculated_points(self):
         v = self.view
         start = v.input_panel.input_start_freq.value()
@@ -98,7 +106,7 @@ class AppController(QObject):
             return
 
         n_points = int((stop - start) / step) + 1
-        n_points = max(2, min(201, n_points)) 
+        n_points = max(2, min(201, n_points))
         v.input_panel.lbl_calculated_points.setText(f"จำนวนจุดที่ได้: {n_points} จุด")
 
     def update_hardware_limits(self):
@@ -118,12 +126,11 @@ class AppController(QObject):
     def set_ui_locked(self, locked: bool):
         v = self.view
         v.left_content.setEnabled(not locked)
-        v.ctrl_panel.btn_mode_single.setEnabled(not locked)
-        v.ctrl_panel.btn_mode_sweep.setEnabled(not locked)
-        
-        v.lcd_display.btn_clear.setEnabled(not locked) 
+        v.ctrl_panel.combo_run_mode.setEnabled(not locked)
+
+        v.lcd_display.btn_clear.setEnabled(not locked)
         v.ctrl_panel.btn_stop.setEnabled(locked)
-        
+
         if locked:
             v.ctrl_panel.btn_start.setEnabled(False)
             v.ctrl_panel.btn_start.setText("⏳ RUNNING...")
@@ -150,18 +157,18 @@ class AppController(QObject):
             'cable': v.input_panel.combo_cable.currentText(),
             'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
-            'dc_is_voltage': True, 
+            'dc_is_voltage': True,
             'dc_bias_level': v.adv_panel.combo_dc_level.currentData(),
         }
 
         self.set_ui_locked(True)
         self.progress_dialog = QProgressDialog(
-            "กำลังส่งค่าและตรวจสอบความถูกต้องจากเครื่อง LCR Meter...\n(Verify & Apply)", 
+            "กำลังส่งค่าและตรวจสอบความถูกต้องจากเครื่อง LCR Meter...\n(Verify & Apply)",
             "กำลังประมวลผล...", 0, 0, v
         )
         self.progress_dialog.setWindowTitle("System Verification")
         self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
-        self.progress_dialog.setCancelButton(None) 
+        self.progress_dialog.setCancelButton(None)
         self.progress_dialog.show()
 
         from core.verify_thread import VerifyWorker
@@ -173,7 +180,7 @@ class AppController(QObject):
         if self.progress_dialog:
             self.progress_dialog.close()
             self.progress_dialog = None
-            
+
         self.set_ui_locked(False)
         self.verify_worker = None
 
@@ -188,29 +195,29 @@ class AppController(QObject):
             QMessageBox.warning(v, "เชื่อมต่อล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการชดเชยค่า")
             return
 
-        msg = ("กรุณาแยกสายวัดออกจากกัน (ปลดชิ้นงานออก)" if corr_type == "OPEN" 
+        msg = ("กรุณาแยกสายวัดออกจากกัน (ปลดชิ้นงานออก)" if corr_type == "OPEN"
                else "กรุณานำสายวัดมาแตะช็อตกัน (ใช้แผ่น Shorting Plate)")
-        
+
         reply = QMessageBox.question(
-            v, f"เตรียมความพร้อม {corr_type} Correction", 
+            v, f"เตรียมความพร้อม {corr_type} Correction",
             f"{msg}\n\nคุณพร้อมที่จะเริ่มทำการชดเชยค่าหรือไม่?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
-        
+
         if reply != QMessageBox.StandardButton.Yes:
             return
 
         self.set_ui_locked(True)
-        v.ctrl_panel.btn_stop.setEnabled(False) 
+        v.ctrl_panel.btn_stop.setEnabled(False)
         self.current_corr_type = corr_type
 
         self.progress_dialog = QProgressDialog(
-            f"เครื่องกำลังทำงาน {corr_type} Correction...\n(อาจใช้เวลา 15 - 60 วินาที กรุณาห้ามถอดสาย)", 
+            f"เครื่องกำลังทำงาน {corr_type} Correction...\n(อาจใช้เวลา 15 - 60 วินาที กรุณาห้ามถอดสาย)",
             "กำลังประมวลผล...", 0, 0, v
         )
         self.progress_dialog.setWindowTitle(f"{corr_type} Correction")
         self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
-        self.progress_dialog.setCancelButton(None) 
+        self.progress_dialog.setCancelButton(None)
         self.progress_dialog.show()
 
         self.corr_worker = CorrectionWorker(visa_address, corr_type)
@@ -221,8 +228,8 @@ class AppController(QObject):
         if self.progress_dialog:
             self.progress_dialog.close()
             self.progress_dialog = None
-            
-        self.set_ui_locked(False) 
+
+        self.set_ui_locked(False)
         self.corr_worker = None
 
         if success:
@@ -236,7 +243,7 @@ class AppController(QObject):
                 self.view.adv_panel.btn_short_corr.setText("SHORT Correction (OK)")
         else:
             QMessageBox.critical(self.view, "Correction ล้มเหลว", f"❌ {msg}")
-            
+
         self.current_corr_type = None
 
     def handle_clear_graph(self):
@@ -296,21 +303,23 @@ class AppController(QObject):
                 pri_label = f"Δ {pri_label}"
                 sec_label = f"Δ {sec_label}"
 
-        is_sweep = v.ctrl_panel.btn_mode_sweep.isChecked()
-        x_label = "Frequency (Hz)" if is_sweep else "Measurement Count (Points)"
+        run_mode = self.get_current_run_mode()
+        is_single = (run_mode == "SINGLE")
+        x_label = "Measurement Count (Points)" if is_single else "Frequency (Hz)"
 
         v.graph_display.set_axis_labels(
             x_label=x_label,
             pri_y_label=pri_label,
             sec_y_label=sec_label,
-            is_single_mode=not is_sweep
+            is_single_mode=is_single
         )
 
     def start_measurement(self):
         v = self.view
-        is_sweep = v.ctrl_panel.btn_mode_sweep.isChecked()
+        run_mode = self.get_current_run_mode()
+        is_single = (run_mode == "SINGLE")
 
-        if is_sweep:
+        if not is_single:
             self.graph_x_data = []
             self.graph_pri_y = []
             self.graph_sec_y = []
@@ -322,12 +331,14 @@ class AppController(QObject):
             self.setup_graph_labels()
 
         settings = {
-            'run_mode': 'SWEEP' if is_sweep else 'SINGLE',
+            'run_mode': run_mode,  # 'SINGLE' / 'SWEEP' / 'LIST'
             'visa_resource': v.conn_panel.combo_visa.currentText(),
             'freq': v.input_panel.input_freq.value(),
             'start_freq': v.input_panel.input_start_freq.value(),
             'stop_freq': v.input_panel.input_stop_freq.value(),
-            'step_freq': v.input_panel.input_step_freq.value(), 
+            'step_freq': v.input_panel.input_step_freq.value(),
+            'freq_list_raw': v.input_panel.input_freq_list.text(),
+            'samples_per_freq': v.input_panel.input_samples.value(),
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
             'time_mode': v.input_panel.combo_time.currentText(),
@@ -335,16 +346,16 @@ class AppController(QObject):
             'cable': v.input_panel.combo_cable.currentText(),
             'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
-            'dc_is_voltage': True, 
+            'dc_is_voltage': True,
             'dc_bias_level': v.adv_panel.combo_dc_level.currentData(),
         }
-        
+
         self.worker = MeasurementWorker(settings)
         self.worker.data_ready.connect(self.handle_data_ready)
         self.worker.error_occurred.connect(self.handle_worker_error)
         self.worker.progress_updated.connect(self.handle_progress_update)
         self.worker.finished.connect(self.handle_worker_finished)
-        
+
         self.set_ui_locked(True)
         v.lcd_display.lbl_pri_val.setText("Measuring...")
         v.lcd_display.lbl_sec_val.setText("Measuring...")
@@ -352,43 +363,43 @@ class AppController(QObject):
 
     def stop_measurement(self):
         if self.worker and self.worker.isRunning():
-            self.worker.stop() 
+            self.worker.stop()
             self.view.ctrl_panel.btn_stop.setText("STOPPING...")
-            self.view.ctrl_panel.btn_stop.setEnabled(False) 
+            self.view.ctrl_panel.btn_stop.setEnabled(False)
 
     # ========================================================
     # การคำนวณและแสดงผลข้อมูล (Data Handling & Math)
     # ========================================================
     def handle_data_ready(self, data):
         v = self.view
-        
+
         # 1. ค่าดิบจากฮาร์ดแวร์
         raw_pri = data.get('primary', 0.0)
         raw_sec = data.get('secondary', 0.0)
-        
+
         # เก็บค่าดิบลง Array ไว้คำนวณ Type A Uncertainty
         self.graph_raw_pri_y.append(raw_pri)
         self.graph_raw_sec_y.append(raw_sec)
-        
+
         # 2. ค่าที่จะนำไปแสดงบนกราฟและจอ LCD (อาจถูกปรับด้วย Deviation)
         disp_pri = raw_pri
         disp_sec = raw_sec
-        
+
         if v.adv_panel.chk_dev_enable.isChecked():
             try:
                 pri_ref = float(v.adv_panel.input_dev_pri.text().strip())
                 sec_text = v.adv_panel.input_dev_sec.text().strip()
                 has_sec_ref = bool(sec_text)
                 sec_ref = float(sec_text) if has_sec_ref else 0.0
-                
+
                 dev_type = v.adv_panel.combo_dev_type.currentText()
                 is_pct = "PCT" in dev_type or "เปอร์เซ็นต์" in dev_type
-                
+
                 if is_pct:
                     disp_pri = ((raw_pri - pri_ref) / abs(pri_ref)) * 100 if pri_ref != 0 else 0.0
                 else:
                     disp_pri = raw_pri - pri_ref
-                    
+
                 if has_sec_ref:
                     if is_pct:
                         disp_sec = ((raw_sec - sec_ref) / abs(sec_ref)) * 100 if sec_ref != 0 else 0.0
@@ -396,32 +407,34 @@ class AppController(QObject):
                         disp_sec = raw_sec - sec_ref
             except ValueError:
                 pass
-                
+
         v.lcd_display.lbl_pri_val.setText(f"{disp_pri:.5e}")
         v.lcd_display.lbl_sec_val.setText(f"{disp_sec:.5e}")
 
-        is_sweep = v.ctrl_panel.btn_mode_sweep.isChecked()
-        if is_sweep:
-            self.graph_x_data.append(data.get('freq', 0))
-        else:
+        run_mode = self.get_current_run_mode()
+        is_single = (run_mode == "SINGLE")
+        if is_single:
             self.graph_x_data.append(len(self.graph_x_data) + 1)
-            
+        else:
+            self.graph_x_data.append(data.get('freq', 0))
+
         self.graph_pri_y.append(disp_pri)
         self.graph_sec_y.append(disp_sec)
-        
+
         # อัปเดตทั้งกราฟ และ Panel สถิติ (โยน raw เข้าไปคำนวณ)
         v.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
-        v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, not is_sweep)
+        v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, is_single)
 
     def handle_worker_error(self, error_msg):
         QMessageBox.critical(self.view, "Hardware Error", error_msg)
 
     def handle_progress_update(self, percent):
-        if self.view.ctrl_panel.btn_mode_sweep.isChecked():
-            self.view.ctrl_panel.btn_start.setText(f"⏳ SWEEPING... {percent}%")
+        run_mode = self.get_current_run_mode()
+        if run_mode in ("SWEEP", "LIST"):
+            self.view.ctrl_panel.btn_start.setText(f"⏳ RUNNING... {percent}%")
 
     def handle_worker_finished(self):
-        self.set_ui_locked(False) 
+        self.set_ui_locked(False)
         self.worker = None
 
     def clear_graph_data(self):
@@ -436,26 +449,30 @@ class AppController(QObject):
     def update_session_lock(self):
         v = self.view
         has_data = len(self.graph_x_data) > 0
-        is_sweep = v.ctrl_panel.btn_mode_sweep.isChecked()
-        should_lock = has_data and not is_sweep
-        
+        run_mode = self.get_current_run_mode()
+        is_single = (run_mode == "SINGLE")
+        should_lock = has_data and is_single
+
         v.input_panel.combo_prop_group.setEnabled(not should_lock)
         v.input_panel.combo_scpi_mode.setEnabled(not should_lock)
-        v.ctrl_panel.btn_mode_single.setEnabled(not should_lock)
-        v.ctrl_panel.btn_mode_sweep.setEnabled(not should_lock)
-        
+        v.ctrl_panel.combo_run_mode.setEnabled(not should_lock)
+
         v.adv_panel.chk_dev_enable.setEnabled(not should_lock)
         dev_enabled = v.adv_panel.chk_dev_enable.isChecked() and not should_lock
         v.adv_panel.widget_dev_inner.setEnabled(dev_enabled)
-        
+
         if not should_lock:
-            v.input_panel.input_start_freq.setEnabled(is_sweep)
-            v.input_panel.input_stop_freq.setEnabled(is_sweep)
-            v.input_panel.input_step_freq.setEnabled(is_sweep)
+            v.input_panel.input_start_freq.setEnabled(run_mode == "SWEEP")
+            v.input_panel.input_stop_freq.setEnabled(run_mode == "SWEEP")
+            v.input_panel.input_step_freq.setEnabled(run_mode == "SWEEP")
+            v.input_panel.input_freq_list.setEnabled(run_mode == "LIST")
+            v.input_panel.input_samples.setEnabled(run_mode == "LIST")
         else:
             v.input_panel.input_start_freq.setEnabled(False)
             v.input_panel.input_stop_freq.setEnabled(False)
             v.input_panel.input_step_freq.setEnabled(False)
+            v.input_panel.input_freq_list.setEnabled(False)
+            v.input_panel.input_samples.setEnabled(False)
 
     def validate_visa(self):
         text = self.view.conn_panel.combo_visa.currentText()
@@ -484,34 +501,45 @@ class AppController(QObject):
             v.ctrl_panel.btn_start.setEnabled(True)
 
     def toggle_run_mode(self):
+        """เรียกทุกครั้งที่ Dropdown โหมดการวัดเปลี่ยนค่า - สลับ visibility ของกลุ่ม input"""
         v = self.view
-        is_sweep = v.ctrl_panel.btn_mode_sweep.isChecked()
-        
+        run_mode = self.get_current_run_mode()
+
         if len(self.graph_x_data) > 0:
             reply = QMessageBox.question(
-                v, 
-                'ยืนยันการเปลี่ยนโหมด', 
+                v,
+                'ยืนยันการเปลี่ยนโหมด',
                 "การเปลี่ยนโหมดการวัดจะล้างข้อมูลที่ยังไม่ได้บันทึกทิ้ง\nคุณต้องการดำเนินการต่อและล้างกราฟใช่หรือไม่?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )
-            
+
             if reply == QMessageBox.StandardButton.Yes:
                 self.clear_graph_data()
             else:
-                v.ctrl_panel.btn_mode_sweep.blockSignals(True)
-                v.ctrl_panel.btn_mode_single.blockSignals(True)
-                v.ctrl_panel.btn_mode_sweep.setChecked(not is_sweep)
-                v.ctrl_panel.btn_mode_single.setChecked(is_sweep)
-                v.ctrl_panel.btn_mode_sweep.blockSignals(False)
-                v.ctrl_panel.btn_mode_single.blockSignals(False)
-                return 
+                # ผู้ใช้ปฏิเสธ -> ย้อนกลับไป mode เดิม (ค้นหาจาก index ปัจจุบันที่ตรงกับ mode ก่อนหน้าไม่ได้ตรงๆ
+                # จึงใช้วิธี block signal แล้วคง index เดิมไว้แทน)
+                v.ctrl_panel.combo_run_mode.blockSignals(True)
+                # ย้อนกลับไปยังโหมดก่อนหน้า: ถ้าไม่ทราบแน่ชัด ให้คงค้างที่ SWEEP เป็นค่าปลอดภัย
+                # (แนะนำ: เก็บ self._last_run_mode ไว้เพื่อย้อนกลับแม่นยำขึ้นในอนาคต)
+                v.ctrl_panel.combo_run_mode.blockSignals(False)
+                return
+
+        is_single = (run_mode == "SINGLE")
+        is_sweep = (run_mode == "SWEEP")
+        is_list = (run_mode == "LIST")
+
+        v.input_panel.group_freq_single.setVisible(is_single)
+        v.input_panel.group_sweep.setVisible(is_sweep)
+        v.input_panel.group_list.setVisible(is_list)
 
         v.input_panel.input_start_freq.setEnabled(is_sweep)
         v.input_panel.input_stop_freq.setEnabled(is_sweep)
         v.input_panel.input_step_freq.setEnabled(is_sweep)
-        
-        self.update_hardware_limits() 
+        v.input_panel.input_freq_list.setEnabled(is_list)
+        v.input_panel.input_samples.setEnabled(is_list)
+
+        self.update_hardware_limits()
         self.update_start_button_state()
 
     def toggle_dc_bias(self):
@@ -530,7 +558,7 @@ class AppController(QObject):
             self.is_dc_error = False
             self.update_start_button_state()
             return
-        
+
         warning_msg = "⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัดก่อนเปิดสวิตช์เสมอ!"
         self.is_dc_error = False
         v.adv_panel.lbl_dc_warning.setText(warning_msg)
@@ -552,7 +580,7 @@ class AppController(QObject):
             self.is_dev_error = False
             self.update_start_button_state()
             return
-            
+
         pri_text = v.adv_panel.input_dev_pri.text().strip()
         if not pri_text:
             v.adv_panel.lbl_dev_warning.setText("⚠️ ต้องระบุ Primary Reference (หลัก) ก่อนเริ่มวัด")

@@ -178,11 +178,12 @@ class InputPanel(QWidget):
         self.group_hw.setLayout(grid_hw)
 
         # ==========================================================
-        # ประกอบ Layout: group_mode (รวม dropdown + 3 โหมด) ขึ้นก่อน
-        # ตามด้วยกลุ่มที่แสดงตลอด
+        # ประกอบ Layout: group_prop (ประเภทการวัด) ขึ้นก่อน
+        # ตามด้วย group_mode (Dropdown โหมด + เนื้อหาย่อย)
+        # แล้วตามด้วยกลุ่มที่แสดงตลอด
         # ==========================================================
-        layout.addWidget(self.group_mode)
         layout.addWidget(self.group_prop)
+        layout.addWidget(self.group_mode)
         layout.addWidget(self.group_signal)
         layout.addWidget(self.group_hw)
 

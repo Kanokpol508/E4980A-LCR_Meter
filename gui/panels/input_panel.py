@@ -20,14 +20,27 @@ class InputPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # ==========================================================
-        # กลุ่มที่ผูกกับโหมดการวัด (Single / Sweep / List)
-        # ถูกวางไว้บนสุด ต่อจาก ConnectionPanel (VISA Resource) โดยตรง
-        # เพื่อให้ผู้ใช้เห็นการเปลี่ยนแปลงทันทีเมื่อสลับโหมดใน Dropdown
+        # กลุ่มเดียวรวมทุกอย่างเกี่ยวกับโหมดการวัด
+        # (Dropdown เลือกโหมด + เนื้อหาที่เปลี่ยนไปตามโหมดที่เลือก)
+        # วางไว้บนสุด ต่อจาก ConnectionPanel (VISA Resource) โดยตรง
         # ==========================================================
+        self.group_mode = QGroupBox("ตั้งค่าความถี่ (Frequency Settings)")
+        v_mode = QVBoxLayout()
+        v_mode.setSpacing(10)
 
-        # --- Frequency (โหมดวัดจุดเดียว) - ซ่อน/โชว์ตามโหมด SINGLE ---
-        self.group_freq_single = QGroupBox("วัดจุดเดียว (Single Frequency)")
-        grid_freq_single = QGridLayout()
+        # --- Dropdown เลือกโหมดการวัด (อยู่บนสุดของกล่อง ควบคุมเนื้อหาด้านล่างตัวเอง) ---
+        v_mode.addWidget(QLabel("เลือกโหมดการวัด (Select Measurement Mode):"))
+        self.combo_run_mode = QComboBox()
+        self.combo_run_mode.addItem("วัดจุดเดียว (Single)", userData="SINGLE")
+        self.combo_run_mode.addItem("สแกนความถี่ (Sweep)", userData="SWEEP")
+        self.combo_run_mode.addItem("รายการความถี่ (List)", userData="LIST")
+        self.combo_run_mode.setCurrentIndex(1)  # ค่าเริ่มต้น = Sweep
+        v_mode.addWidget(self.combo_run_mode)
+
+        # --- เนื้อหาย่อย: วัดจุดเดียว (SINGLE) ---
+        self.widget_freq_single = QWidget()
+        grid_freq_single = QGridLayout(self.widget_freq_single)
+        grid_freq_single.setContentsMargins(0, 0, 0, 0)
         grid_freq_single.addWidget(QLabel("ความถี่ (Frequency) Hz:"), 0, 0)
         self.input_freq = CleanDoubleSpinBox()
         self.input_freq.setRange(20.0, 2000000.0)
@@ -35,11 +48,12 @@ class InputPanel(QWidget):
         self.input_freq.setSingleStep(100)
         self.input_freq.setValue(100000.0)
         grid_freq_single.addWidget(self.input_freq, 1, 0)
-        self.group_freq_single.setLayout(grid_freq_single)
+        v_mode.addWidget(self.widget_freq_single)
 
-        # --- Sweep (Linear) - ซ่อน/โชว์ตามโหมด SWEEP ---
-        self.group_sweep = QGroupBox("สแกนความถี่ (Step Sweep)")
-        grid_sweep = QGridLayout()
+        # --- เนื้อหาย่อย: สแกนความถี่ Linear (SWEEP) ---
+        self.widget_sweep = QWidget()
+        grid_sweep = QGridLayout(self.widget_sweep)
+        grid_sweep.setContentsMargins(0, 0, 0, 0)
 
         self.input_start_freq = CleanDoubleSpinBox()
         self.input_start_freq.setRange(20.0, 2000000.0)
@@ -71,11 +85,13 @@ class InputPanel(QWidget):
         self.lbl_calculated_points.setStyleSheet("color: #38bdf8; font-weight: bold;")
         grid_sweep.addWidget(self.lbl_calculated_points, 3, 1)
 
-        self.group_sweep.setLayout(grid_sweep)
+        v_mode.addWidget(self.widget_sweep)
 
-        # --- Frequency List + Samples per Sweep - ซ่อน/โชว์ตามโหมด LIST ---
-        self.group_list = QGroupBox("รายการความถี่ (Frequency List)")
-        v_list = QVBoxLayout()
+        # --- เนื้อหาย่อย: รายการความถี่ + Samples ต่อจุด (LIST) ---
+        self.widget_list = QWidget()
+        v_list = QVBoxLayout(self.widget_list)
+        v_list.setContentsMargins(0, 0, 0, 0)
+        v_list.setSpacing(10)
 
         v_list.addWidget(QLabel("รายการความถี่ (คั่นด้วย comma เช่น 100, 1k, 10k, 100k, 1M):"))
         self.input_freq_list = QLineEdit()
@@ -90,7 +106,9 @@ class InputPanel(QWidget):
         h_samples.addWidget(self.input_samples)
         v_list.addLayout(h_samples)
 
-        self.group_list.setLayout(v_list)
+        v_mode.addWidget(self.widget_list)
+
+        self.group_mode.setLayout(v_mode)
 
         # ==========================================================
         # กลุ่มที่แสดงตลอดทุกโหมด
@@ -160,14 +178,10 @@ class InputPanel(QWidget):
         self.group_hw.setLayout(grid_hw)
 
         # ==========================================================
-        # ประกอบ Layout ตามลำดับใหม่:
-        # 1) กลุ่มที่ผูกกับโหมด (freq_single / sweep / list) ขึ้นก่อน
-        # 2) ตามด้วยกลุ่มที่แสดงตลอด (prop, signal, hw)
+        # ประกอบ Layout: group_mode (รวม dropdown + 3 โหมด) ขึ้นก่อน
+        # ตามด้วยกลุ่มที่แสดงตลอด
         # ==========================================================
-        layout.addWidget(self.group_freq_single)
-        layout.addWidget(self.group_sweep)
-        layout.addWidget(self.group_list)
-
+        layout.addWidget(self.group_mode)
         layout.addWidget(self.group_prop)
         layout.addWidget(self.group_signal)
         layout.addWidget(self.group_hw)

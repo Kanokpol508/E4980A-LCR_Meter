@@ -58,7 +58,7 @@ class AppController(QObject):
         self.view.adv_panel.widget_dc_inner.setEnabled(False)
         self.view.adv_panel.widget_dev_inner.setEnabled(False)
 
-        # ตั้งค่า visibility ของกลุ่ม input ตามโหมดเริ่มต้น (Sweep)
+        # ตั้งค่า visibility ของเนื้อหาย่อยใน group_mode ตามโหมดเริ่มต้น (Sweep)
         self.toggle_run_mode()
 
     def _connect_signals(self):
@@ -79,8 +79,8 @@ class AppController(QObject):
         v.ctrl_panel.btn_verify.clicked.connect(self.handle_verify_apply)
         v.lcd_display.btn_clear.clicked.connect(self.handle_clear_graph)
 
-        # เปลี่ยนจาก btn_mode_single.toggled -> combo_run_mode.currentIndexChanged
-        v.ctrl_panel.combo_run_mode.currentIndexChanged.connect(self.toggle_run_mode)
+        # Dropdown เลือกโหมดตอนนี้อยู่ใน input_panel (ย้ายมาจาก ctrl_panel)
+        v.input_panel.combo_run_mode.currentIndexChanged.connect(self.toggle_run_mode)
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
 
@@ -92,8 +92,8 @@ class AppController(QObject):
     # Logic Methods
     # ========================================================
     def get_current_run_mode(self) -> str:
-        """คืนค่าโหมดปัจจุบันจาก Dropdown: 'SINGLE' / 'SWEEP' / 'LIST'"""
-        return self.view.ctrl_panel.combo_run_mode.currentData()
+        """คืนค่าโหมดปัจจุบันจาก Dropdown (อยู่ใน input_panel): 'SINGLE' / 'SWEEP' / 'LIST'"""
+        return self.view.input_panel.combo_run_mode.currentData()
 
     def update_calculated_points(self):
         v = self.view
@@ -126,7 +126,7 @@ class AppController(QObject):
     def set_ui_locked(self, locked: bool):
         v = self.view
         v.left_content.setEnabled(not locked)
-        v.ctrl_panel.combo_run_mode.setEnabled(not locked)
+        v.input_panel.combo_run_mode.setEnabled(not locked)
 
         v.lcd_display.btn_clear.setEnabled(not locked)
         v.ctrl_panel.btn_stop.setEnabled(locked)
@@ -455,7 +455,7 @@ class AppController(QObject):
 
         v.input_panel.combo_prop_group.setEnabled(not should_lock)
         v.input_panel.combo_scpi_mode.setEnabled(not should_lock)
-        v.ctrl_panel.combo_run_mode.setEnabled(not should_lock)
+        v.input_panel.combo_run_mode.setEnabled(not should_lock)
 
         v.adv_panel.chk_dev_enable.setEnabled(not should_lock)
         dev_enabled = v.adv_panel.chk_dev_enable.isChecked() and not should_lock
@@ -501,7 +501,8 @@ class AppController(QObject):
             v.ctrl_panel.btn_start.setEnabled(True)
 
     def toggle_run_mode(self):
-        """เรียกทุกครั้งที่ Dropdown โหมดการวัดเปลี่ยนค่า - สลับ visibility ของกลุ่ม input"""
+        """เรียกทุกครั้งที่ Dropdown โหมดการวัด (ใน input_panel) เปลี่ยนค่า
+        สลับ visibility ของเนื้อหาย่อยภายใน group_mode เดียวกัน"""
         v = self.view
         run_mode = self.get_current_run_mode()
 
@@ -517,21 +518,19 @@ class AppController(QObject):
             if reply == QMessageBox.StandardButton.Yes:
                 self.clear_graph_data()
             else:
-                # ผู้ใช้ปฏิเสธ -> ย้อนกลับไป mode เดิม (ค้นหาจาก index ปัจจุบันที่ตรงกับ mode ก่อนหน้าไม่ได้ตรงๆ
-                # จึงใช้วิธี block signal แล้วคง index เดิมไว้แทน)
-                v.ctrl_panel.combo_run_mode.blockSignals(True)
-                # ย้อนกลับไปยังโหมดก่อนหน้า: ถ้าไม่ทราบแน่ชัด ให้คงค้างที่ SWEEP เป็นค่าปลอดภัย
-                # (แนะนำ: เก็บ self._last_run_mode ไว้เพื่อย้อนกลับแม่นยำขึ้นในอนาคต)
-                v.ctrl_panel.combo_run_mode.blockSignals(False)
+                v.input_panel.combo_run_mode.blockSignals(True)
+                # หมายเหตุ: ยังไม่ได้เก็บ "โหมดก่อนหน้า" ไว้ย้อนกลับแบบแม่นยำ
+                # (แนะนำเพิ่ม self._last_run_mode ในอนาคตถ้าต้องการย้อนกลับ index เป๊ะๆ)
+                v.input_panel.combo_run_mode.blockSignals(False)
                 return
 
         is_single = (run_mode == "SINGLE")
         is_sweep = (run_mode == "SWEEP")
         is_list = (run_mode == "LIST")
 
-        v.input_panel.group_freq_single.setVisible(is_single)
-        v.input_panel.group_sweep.setVisible(is_sweep)
-        v.input_panel.group_list.setVisible(is_list)
+        v.input_panel.widget_freq_single.setVisible(is_single)
+        v.input_panel.widget_sweep.setVisible(is_sweep)
+        v.input_panel.widget_list.setVisible(is_list)
 
         v.input_panel.input_start_freq.setEnabled(is_sweep)
         v.input_panel.input_stop_freq.setEnabled(is_sweep)

@@ -1,6 +1,8 @@
-# กล่องปุ่ม โหมด Single/Sweep/List (Dropdown), Verify & Apply, START, STOP
+# กล่องปุ่ม Verify & Apply, START, STOP
+# (Dropdown เลือกโหมดการวัดถูกย้ายไปอยู่ใน input_panel.py แล้ว
+#  เพราะมันควบคุมเนื้อหาที่อยู่ใน Group เดียวกันโดยตรง)
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QSizePolicy
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QHBoxLayout, QPushButton, QLabel, QSizePolicy
 from PyQt6.QtCore import Qt
 
 class ControlPanel(QWidget):
@@ -15,21 +17,11 @@ class ControlPanel(QWidget):
         grid_run.setColumnStretch(1, 1)
         grid_run.setVerticalSpacing(5)
 
-        # --- Dropdown เลือกโหมดการวัด (ไม่มี label กำกับด้านบนแล้ว) ---
-        self.combo_run_mode = QComboBox()
-        self.combo_run_mode.addItem("วัดจุดเดียว (Single)", userData="SINGLE")
-        self.combo_run_mode.addItem("สแกนความถี่ (Sweep)", userData="SWEEP")
-        self.combo_run_mode.addItem("รายการความถี่ (List)", userData="LIST")
-        self.combo_run_mode.setCurrentIndex(1)  # ค่าเริ่มต้น = Sweep
-        self.combo_run_mode.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-
-        grid_run.addWidget(self.combo_run_mode, 0, 0)
-
         self.btn_verify = QPushButton("Verify & Apply")
         self.btn_verify.setObjectName("btnVerify")
         self.btn_verify.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_verify.setMinimumHeight(30)
-        grid_run.addWidget(self.btn_verify, 0, 1)
+        grid_run.addWidget(self.btn_verify, 0, 0, 1, 2)
 
         # แถวล่าง: ปุ่ม START และ STOP
         self.btn_start = QPushButton("START")

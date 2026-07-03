@@ -48,15 +48,19 @@ class LcdDisplay(QWidget):
         
         self.btn_save = QPushButton("Save Result")
         self.btn_view = QPushButton("View Save Result")
-        self.btn_clear = QPushButton("Clear Graph")
+
+        # ปุ่มเตรียมไว้สำหรับระบบ Export Excel ในอนาคต
+        # (ยังไม่ผูกฟังก์ชันการทำงานจริง - เป็นปุ่มเปล่าตามที่ตั้งใจไว้ก่อน)
+        self.btn_export_excel = QPushButton("Export Excel")
+        self.btn_export_excel.setObjectName("btnExportExcel")
         
         # ปรับให้ปุ่มขยายตัวเต็มพื้นที่แนวตั้ง
         self.btn_save.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         self.btn_view.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-        self.btn_clear.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        self.btn_export_excel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         
         v_tools.addWidget(self.btn_save)
         v_tools.addWidget(self.btn_view)
-        v_tools.addWidget(self.btn_clear)
+        v_tools.addWidget(self.btn_export_excel)
         
         layout.addLayout(v_tools)

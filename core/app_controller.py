@@ -77,9 +77,8 @@ class AppController(QObject):
         v.adv_panel.btn_short_corr.clicked.connect(lambda: self.start_correction("SHORT"))
 
         v.ctrl_panel.btn_verify.clicked.connect(self.handle_verify_apply)
-        v.lcd_display.btn_clear.clicked.connect(self.handle_clear_graph)
+        v.ctrl_panel.btn_clear.clicked.connect(self.handle_clear_graph)
 
-        # Dropdown เลือกโหมดตอนนี้อยู่ใน input_panel (ย้ายมาจาก ctrl_panel)
         v.input_panel.combo_run_mode.currentIndexChanged.connect(self.toggle_run_mode)
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
@@ -128,7 +127,7 @@ class AppController(QObject):
         v.left_content.setEnabled(not locked)
         v.input_panel.combo_run_mode.setEnabled(not locked)
 
-        v.lcd_display.btn_clear.setEnabled(not locked)
+        v.ctrl_panel.btn_clear.setEnabled(not locked)
         v.ctrl_panel.btn_stop.setEnabled(locked)
 
         if locked:

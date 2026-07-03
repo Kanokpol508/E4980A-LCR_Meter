@@ -1,6 +1,4 @@
-# กล่องปุ่ม Verify & Apply, START, STOP
-# (Dropdown เลือกโหมดการวัดถูกย้ายไปอยู่ใน input_panel.py แล้ว
-#  เพราะมันควบคุมเนื้อหาที่อยู่ใน Group เดียวกันโดยตรง)
+# กล่องปุ่ม Verify & Apply, Clear Data, START, STOP
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QGridLayout, QHBoxLayout, QPushButton, QLabel, QSizePolicy
 from PyQt6.QtCore import Qt
@@ -17,11 +15,18 @@ class ControlPanel(QWidget):
         grid_run.setColumnStretch(1, 1)
         grid_run.setVerticalSpacing(5)
 
+        # แถวบน: Verify & Apply (เหนือ Start) / Clear Data (เหนือ Stop)
         self.btn_verify = QPushButton("Verify & Apply")
         self.btn_verify.setObjectName("btnVerify")
         self.btn_verify.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_verify.setMinimumHeight(30)
-        grid_run.addWidget(self.btn_verify, 0, 0, 1, 2)
+        grid_run.addWidget(self.btn_verify, 0, 0)
+
+        self.btn_clear = QPushButton("Clear Data")
+        self.btn_clear.setObjectName("btnClearData")
+        self.btn_clear.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_clear.setMinimumHeight(30)
+        grid_run.addWidget(self.btn_clear, 0, 1)
 
         # แถวล่าง: ปุ่ม START และ STOP
         self.btn_start = QPushButton("START")

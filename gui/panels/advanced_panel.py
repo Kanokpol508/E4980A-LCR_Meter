@@ -1,9 +1,19 @@
-# กล่องตั้งค่า DC Bias, Deviation, Correction
+# กล่องตั้งค่า Correction, Deviation
+
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QHBoxLayout, 
                              QPushButton, QLabel, QCheckBox, 
                              QGridLayout, QLineEdit, QComboBox, QSizePolicy)
 from PyQt6.QtCore import Qt
+
+
+def _make_row(label_text, widget):
+    """สร้างแถว: [หัวข้อ:] [ช่องกรอก/dropdown (ขยายเต็มที่)]"""
+    row = QHBoxLayout()
+    row.addWidget(QLabel(label_text))
+    row.addWidget(widget, stretch=1)
+    return row
+
 
 class AdvancedPanel(QWidget):
     def __init__(self, parent=None):
@@ -30,42 +40,9 @@ class AdvancedPanel(QWidget):
         h_corr_buttons.addWidget(self.btn_short_corr)
         v_corr.addLayout(h_corr_buttons)
         group_corr.setLayout(v_corr)
-        
-        # --- 6. DC Bias ---
-        group_dc = QGroupBox("ไฟเลี้ยงกระแสตรง (DC Bias)")
-        v_dc = QVBoxLayout()
-        
-        h_dc_enable = QHBoxLayout()
-        self.chk_dc_enable = QCheckBox("เปิดใช้งาน (Enable DC Bias)")
-        h_dc_enable.addWidget(self.chk_dc_enable)
-        v_dc.addLayout(h_dc_enable)
-        
-        self.widget_dc_inner = QWidget()
-        v_dc_inner = QVBoxLayout(self.widget_dc_inner)
-        v_dc_inner.setContentsMargins(0, 0, 0, 0)
-        v_dc_inner.setSpacing(10)
-        
-        h_dc_level = QHBoxLayout()
-        h_dc_level.addWidget(QLabel("ระดับไฟ (Level):"))
-        
-        self.combo_dc_level = QComboBox()
-        self.combo_dc_level.addItem("1.5 V", userData=1.5)
-        self.combo_dc_level.addItem("2.0 V", userData=2.0)
-        self.combo_dc_level.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        
-        h_dc_level.addWidget(self.combo_dc_level, stretch=1)
-        v_dc_inner.addLayout(h_dc_level)
-        
-        # เริ่มต้นด้วยข้อความว่างเปล่า จะได้ไม่โชว์ขึ้นมาตอนยังไม่เปิดใช้งาน
-        self.lbl_dc_warning = QLabel("")
-        self.lbl_dc_warning.setWordWrap(True)
-        self.lbl_dc_warning.setStyleSheet("color: #ff4444; font-weight: bold; font-size: 11px;")
-        v_dc_inner.addWidget(self.lbl_dc_warning)
-        
-        v_dc.addWidget(self.widget_dc_inner)
-        group_dc.setLayout(v_dc)
 
-        # --- 7. Deviation (เปรียบเทียบค่า) ---
+        # --- 6. Deviation (เปรียบเทียบค่า) ---
+        # รูปแบบ: หัวข้อ: [ช่องกรอก/dropdown] เรียงลงมาทีละแถว
         group_dev = QGroupBox("เปรียบเทียบค่าอ้างอิง (Deviation)")
         v_dev = QVBoxLayout()
         
@@ -77,27 +54,23 @@ class AdvancedPanel(QWidget):
         self.widget_dev_inner = QWidget()
         v_dev_inner = QVBoxLayout(self.widget_dev_inner)
         v_dev_inner.setContentsMargins(0, 0, 0, 0)
-        v_dev_inner.setSpacing(10)
-        
-        grid_dev_refs = QGridLayout()
-        grid_dev_refs.addWidget(QLabel("Primary Ref (หลัก) *"), 0, 0)
+        v_dev_inner.setSpacing(8)
+
         self.input_dev_pri = QLineEdit()
         self.input_dev_pri.setPlaceholderText("กรอกค่าอ้างอิงหลัก")
-        grid_dev_refs.addWidget(self.input_dev_pri, 1, 0)
-        grid_dev_refs.addWidget(QLabel("Secondary Ref (รอง)"), 0, 1)
+
         self.input_dev_sec = QLineEdit()
         self.input_dev_sec.setPlaceholderText("กรอกค่าอ้างอิงรอง")
-        grid_dev_refs.addWidget(self.input_dev_sec, 1, 1)
-        v_dev_inner.addLayout(grid_dev_refs)
-        
-        v_dev_inner.addWidget(QLabel("รูปแบบเอาต์พุต (OUTPUT TYPE)"))
+
         self.combo_dev_type = QComboBox()
-        self.combo_dev_type.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.combo_dev_type.addItems([
             "Δ (ส่วนต่างจริง)", 
             "Δ% (ส่วนต่างเป็นเปอร์เซ็นต์)"
         ])
-        v_dev_inner.addWidget(self.combo_dev_type)
+
+        v_dev_inner.addLayout(_make_row("Primary Ref (หลัก) *:", self.input_dev_pri))
+        v_dev_inner.addLayout(_make_row("Secondary Ref (รอง):", self.input_dev_sec))
+        v_dev_inner.addLayout(_make_row("รูปแบบเอาต์พุต (OUTPUT TYPE):", self.combo_dev_type))
         
         self.lbl_dev_warning = QLabel("")
         self.lbl_dev_warning.setWordWrap(True)
@@ -108,5 +81,4 @@ class AdvancedPanel(QWidget):
         group_dev.setLayout(v_dev)
 
         layout.addWidget(group_corr)
-        layout.addWidget(group_dc)
         layout.addWidget(group_dev)

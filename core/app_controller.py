@@ -55,7 +55,7 @@ class AppController(QObject):
         self.update_calculated_points()
 
         # ตั้งค่า UI เริ่มต้น
-        self.view.adv_panel.widget_dc_inner.setEnabled(False)
+        self.view.input_panel.widget_dc_inner.setEnabled(False)
         self.view.adv_panel.widget_dev_inner.setEnabled(False)
 
         # ตั้งค่า visibility ของเนื้อหาย่อยใน group_mode ตามโหมดเริ่มต้น (Sweep)
@@ -67,8 +67,8 @@ class AppController(QObject):
         v.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
-        v.adv_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
-        v.adv_panel.combo_dc_level.currentIndexChanged.connect(self.validate_dc_bias)
+        v.input_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
+        v.input_panel.combo_dc_level.currentIndexChanged.connect(self.validate_dc_bias)
 
         v.adv_panel.chk_dev_enable.stateChanged.connect(self.toggle_deviation)
         v.adv_panel.input_dev_pri.textChanged.connect(self.validate_deviation)
@@ -79,6 +79,7 @@ class AppController(QObject):
         v.ctrl_panel.btn_verify.clicked.connect(self.handle_verify_apply)
         v.ctrl_panel.btn_clear.clicked.connect(self.handle_clear_graph)
 
+        # Dropdown เลือกโหมดตอนนี้อยู่ใน input_panel (ย้ายมาจาก ctrl_panel)
         v.input_panel.combo_run_mode.currentIndexChanged.connect(self.toggle_run_mode)
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
@@ -101,12 +102,12 @@ class AppController(QObject):
         step = v.input_panel.input_step_freq.value()
 
         if step <= 0 or stop <= start:
-            v.input_panel.lbl_calculated_points.setText("จำนวนจุดที่ได้: -")
+            v.input_panel.lbl_calculated_points.setText("-")
             return
 
         n_points = int((stop - start) / step) + 1
         n_points = max(2, min(201, n_points))
-        v.input_panel.lbl_calculated_points.setText(f"จำนวนจุดที่ได้: {n_points} จุด")
+        v.input_panel.lbl_calculated_points.setText(f"{n_points} จุด")
 
     def update_hardware_limits(self):
         v = self.view
@@ -155,9 +156,9 @@ class AppController(QObject):
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
             'imp_range': v.input_panel.combo_range.currentData(),
-            'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
+            'dc_bias_enabled': v.input_panel.chk_dc_enable.isChecked(),
             'dc_is_voltage': True,
-            'dc_bias_level': v.adv_panel.combo_dc_level.currentData(),
+            'dc_bias_level': v.input_panel.combo_dc_level.currentData(),
         }
 
         self.set_ui_locked(True)
@@ -344,9 +345,9 @@ class AppController(QObject):
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
             'imp_range': v.input_panel.combo_range.currentData(),
-            'dc_bias_enabled': v.adv_panel.chk_dc_enable.isChecked(),
+            'dc_bias_enabled': v.input_panel.chk_dc_enable.isChecked(),
             'dc_is_voltage': True,
-            'dc_bias_level': v.adv_panel.combo_dc_level.currentData(),
+            'dc_bias_level': v.input_panel.combo_dc_level.currentData(),
         }
 
         self.worker = MeasurementWorker(settings)
@@ -541,25 +542,25 @@ class AppController(QObject):
         self.update_start_button_state()
 
     def toggle_dc_bias(self):
-        is_enabled = self.view.adv_panel.chk_dc_enable.isChecked()
-        self.view.adv_panel.widget_dc_inner.setEnabled(is_enabled)
+        is_enabled = self.view.input_panel.chk_dc_enable.isChecked()
+        self.view.input_panel.widget_dc_inner.setEnabled(is_enabled)
         if is_enabled:
             self.validate_dc_bias()
         else:
-            self.view.adv_panel.lbl_dc_warning.setText("")
+            self.view.input_panel.lbl_dc_warning.setText("")
             self.is_dc_error = False
             self.update_start_button_state()
 
     def validate_dc_bias(self):
         v = self.view
-        if not v.adv_panel.chk_dc_enable.isChecked():
+        if not v.input_panel.chk_dc_enable.isChecked():
             self.is_dc_error = False
             self.update_start_button_state()
             return
 
-        warning_msg = "⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัดก่อนเปิดสวิตช์เสมอ!"
+        warning_msg = "⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัด\nก่อนเปิดสวิตช์เสมอ!"
         self.is_dc_error = False
-        v.adv_panel.lbl_dc_warning.setText(warning_msg)
+        v.input_panel.lbl_dc_warning.setText(warning_msg)
         self.update_start_button_state()
 
     def toggle_deviation(self):

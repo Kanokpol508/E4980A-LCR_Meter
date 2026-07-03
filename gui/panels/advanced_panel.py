@@ -1,5 +1,6 @@
 # กล่องตั้งค่า Correction, Deviation
-
+# (หมายเหตุ: DC Bias ย้ายไปอยู่ใน input_panel.py แล้ว
+#  เพื่อให้วางคู่กับกล่อง "สัญญาณทดสอบ (Test Signal)" ในแนวนอนเดียวกัน)
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QHBoxLayout, 
                              QPushButton, QLabel, QCheckBox, 
@@ -25,7 +26,12 @@ class AdvancedPanel(QWidget):
         group_corr = QGroupBox("การปรับชดเชยค่าสายวัด (Correction)")
         v_corr = QVBoxLayout()
         v_corr.setSpacing(10)
-        lbl_corr_hint = QLabel("💡 คำแนะนำ:\n• ถ่างปลายสายวัดออกจากกัน ➔ กด OPEN\n• นำปลายสายวัดมาช็อตกัน ➔ กด SHORT")
+        lbl_corr_hint = QLabel(
+            "💡 คำแนะนำ:\n"
+            "• ถ่างปลายสายวัดออกจากกัน ➔ กด OPEN\n"
+            "• นำปลายสายวัดมาช็อตกัน ➔ กด SHORT\n"
+            "• ตรวจสอบตั้งค่า สายวัด (Cable Length) ให้ตรงกับสายที่ใช้จริงก่อนกดปุ่มเสมอ"
+        )
         lbl_corr_hint.setWordWrap(True)
         v_corr.addWidget(lbl_corr_hint)
         
@@ -42,7 +48,6 @@ class AdvancedPanel(QWidget):
         group_corr.setLayout(v_corr)
 
         # --- 6. Deviation (เปรียบเทียบค่า) ---
-        # รูปแบบ: หัวข้อ: [ช่องกรอก/dropdown] เรียงลงมาทีละแถว
         group_dev = QGroupBox("เปรียบเทียบค่าอ้างอิง (Deviation)")
         v_dev = QVBoxLayout()
         

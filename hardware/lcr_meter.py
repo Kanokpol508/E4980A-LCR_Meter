@@ -172,6 +172,27 @@ class E4980A:
         # ผูกคำสั่ง Averaging เข้าไปใน APERture ตามคู่มือ
         self.inst.write(f":APERture {time_mode},{avg_factor}")
 
+    def set_cable_length(self, cable_text: str):
+        """
+        [ใหม่] ตั้งค่าการชดเชยความยาวสายวัด (Cable Length Correction)
+        รับค่าจาก GUI Combobox เช่น "0 m", "1 m", "2 m", "4 m"
+        แล้วแปลงเป็นตัวเลข 0/1/2/4 ก่อนส่งคำสั่ง :CORRection:LENGth
+
+        หมายเหตุ: คำสั่งนี้เป็นการตั้งค่าถาวร ไม่ต้องกด Execute เหมือน OPEN/SHORT
+        Correction - มีผลกับการวัดทุกครั้งทันทีที่ตั้ง ไม่ว่าจะเคยทำ
+        OPEN/SHORT Correction มาก่อนหรือไม่ก็ตาม จึงต้องตั้งให้ตรงกับสายที่ใช้จริงเสมอ
+        """
+        if not self.is_connected:
+            raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
+
+        try:
+            cable_val = str(cable_text).replace("m", "").strip()
+            cable_val = int(float(cable_val))
+        except (ValueError, TypeError):
+            cable_val = 0               # ค่า fallback ปลอดภัยหากแปลงไม่ได้
+
+        self.inst.write(f":CORRection:LENGth {cable_val}")
+
     def trigger(self):
         """บังคับ Trigger 1 ครั้ง"""
         if not self.is_connected:

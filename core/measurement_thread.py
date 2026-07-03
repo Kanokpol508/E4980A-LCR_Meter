@@ -45,6 +45,10 @@ class MeasurementWorker(QThread):
             lcr.set_frequency(freq)
             lcr.set_aperture(time_mode, avg)
 
+            # ต้องตั้งค่านี้ก่อนวัดเสมอ เพราะมีผลกับทุกการวัดทันที (ไม่เกี่ยวกับ OPEN/SHORT Correction)
+            cable_text = self.settings.get('cable', '0 m')
+            lcr.set_cable_length(cable_text)
+
             if str(imp_range) == 'AUTO':
                 lcr.inst.write(":FUNCtion:IMPedance:RANGe:AUTO ON")
             else:
@@ -166,7 +170,7 @@ class MeasurementWorker(QThread):
                 self._handle_hardware_status(stat, current_freq)
 
     # ========================================================
-    # [ใหม่] โหมด Frequency List + Samples per Sweep
+    # โหมด Frequency List + Samples per Sweep
     # ========================================================
     @staticmethod
     def _parse_freq_list(raw_text: str) -> list:

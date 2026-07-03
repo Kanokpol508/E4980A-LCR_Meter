@@ -50,7 +50,7 @@ class InputPanel(QWidget):
         # ==========================================================
         # 1. ประเภทการวัด (Measurement Type)
         # ใช้ QGridLayout เพื่อให้ทั้ง 2 dropdown อยู่คอลัมน์เดียวกัน
-        # ความกว้างเท่ากันและชิดตรงกันโดยอัตโนมัติ
+        # -> ความกว้างเท่ากันและชิดตรงกันโดยอัตโนมัติ
         # ==========================================================
         self.group_prop = QGroupBox("ประเภทการวัด (Measurement Type)")
         grid_prop = QGridLayout()
@@ -88,7 +88,7 @@ class InputPanel(QWidget):
         self.combo_run_mode.setCurrentIndex(1)  # ค่าเริ่มต้น = Sweep
         v_mode.addWidget(self.combo_run_mode)
 
-        # --- เนื้อหาย่อย: วัดจุดเดียว (SINGLE) ---
+        # --- เนื้อหาย่อย: วัดจุดเดียว (SINGLE) - ช่องกรอกสั้นลง ---
         self.widget_freq_single = QWidget()
         v_freq_single = QVBoxLayout(self.widget_freq_single)
         v_freq_single.setContentsMargins(0, 0, 0, 0)
@@ -154,7 +154,7 @@ class InputPanel(QWidget):
 
         v_mode.addWidget(self.widget_sweep)
 
-        # --- เนื้อหาย่อย: รายการความถี่ + Samples ต่อจุด (LIST) ---
+        # --- เนื้อหาย่อย: รายการความถี่ + Samples ต่อจุด (LIST) - คงรูปแบบเดิม ---
         self.widget_list = QWidget()
         v_list = QVBoxLayout(self.widget_list)
         v_list.setContentsMargins(0, 0, 0, 0)
@@ -165,13 +165,36 @@ class InputPanel(QWidget):
         self.input_freq_list.setPlaceholderText("100, 1k, 10k, 100k, 1M, 2M")
         v_list.addWidget(self.input_freq_list)
 
-        h_samples = QHBoxLayout()
-        h_samples.addWidget(QLabel("จำนวนรอบวัดซ้ำต่อความถี่ (Samples per Sweep):"))
+        grid_list_nums = QGridLayout()
+        grid_list_nums.setVerticalSpacing(8)
+        grid_list_nums.setColumnStretch(2, 1)
+
         self.input_samples = QSpinBox()
         self.input_samples.setRange(1, 999)
         self.input_samples.setValue(10)
-        h_samples.addWidget(self.input_samples)
-        v_list.addLayout(h_samples)
+
+        self.input_discard_first = QSpinBox()
+        self.input_discard_first.setRange(0, 5)
+        self.input_discard_first.setValue(1)
+        self.input_discard_first.setToolTip(
+            "จำนวนตัวอย่างแรกสุดของแต่ละความถี่ที่จะไม่นำไปคำนวณสถิติ\n"
+            "(ค่าที่วัดได้ทันทีหลังเปลี่ยนความถี่มักยังไม่นิ่ง)\n"
+            "โปรแกรมจะวัดเพิ่มจากจำนวน Samples per Sweep โดยอัตโนมัติ\n"
+            "เช่น Samples=5 + Discard=3 -> วัดจริง 8 ครั้ง เหลือใช้คำนวณสถิติครบ 5 ค่า"
+        )
+
+        self.input_samples.setFixedWidth(105)
+        self.input_discard_first.setFixedWidth(105)
+
+        grid_list_nums.addWidget(QLabel("จำนวนรอบวัดซ้ำต่อความถี่ (Samples per Sweep):"), 0, 0)
+        grid_list_nums.addWidget(self.input_samples, 0, 1)
+        grid_list_nums.addWidget(QLabel("ครั้ง"), 0, 2)
+
+        grid_list_nums.addWidget(QLabel("ทิ้งค่าตัวอย่างแรกสุด (Discard First Reading):"), 1, 0)
+        grid_list_nums.addWidget(self.input_discard_first, 1, 1)
+        grid_list_nums.addWidget(QLabel("ครั้ง"), 1, 2)
+
+        v_list.addLayout(grid_list_nums)
 
         v_mode.addWidget(self.widget_list)
 

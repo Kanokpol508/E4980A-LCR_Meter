@@ -339,6 +339,7 @@ class AppController(QObject):
             'step_freq': v.input_panel.input_step_freq.value(),
             'freq_list_raw': v.input_panel.input_freq_list.text(),
             'samples_per_freq': v.input_panel.input_samples.value(),
+            'discard_first': v.input_panel.input_discard_first.value(),
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
             'time_mode': v.input_panel.combo_time.currentText(),
@@ -467,12 +468,14 @@ class AppController(QObject):
             v.input_panel.input_step_freq.setEnabled(run_mode == "SWEEP")
             v.input_panel.input_freq_list.setEnabled(run_mode == "LIST")
             v.input_panel.input_samples.setEnabled(run_mode == "LIST")
+            v.input_panel.input_discard_first.setEnabled(run_mode == "LIST")
         else:
             v.input_panel.input_start_freq.setEnabled(False)
             v.input_panel.input_stop_freq.setEnabled(False)
             v.input_panel.input_step_freq.setEnabled(False)
             v.input_panel.input_freq_list.setEnabled(False)
             v.input_panel.input_samples.setEnabled(False)
+            v.input_panel.input_discard_first.setEnabled(False)
 
     def validate_visa(self):
         text = self.view.conn_panel.combo_visa.currentText()
@@ -537,6 +540,7 @@ class AppController(QObject):
         v.input_panel.input_step_freq.setEnabled(is_sweep)
         v.input_panel.input_freq_list.setEnabled(is_list)
         v.input_panel.input_samples.setEnabled(is_list)
+        v.input_panel.input_discard_first.setEnabled(is_list)
 
         self.update_hardware_limits()
         self.update_start_button_state()

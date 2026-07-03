@@ -170,7 +170,7 @@ class MeasurementWorker(QThread):
                 self._handle_hardware_status(stat, current_freq)
 
     # ========================================================
-    # โหมด Frequency List + Samples per Sweep
+    # [ใหม่] โหมด Frequency List + Samples per Sweep
     # ========================================================
     @staticmethod
     def _parse_freq_list(raw_text: str) -> list:
@@ -209,9 +209,18 @@ class MeasurementWorker(QThread):
         ตรรกะการวัดตาม Frequency List ที่ผู้ใช้กำหนดเอง
         วัดซ้ำ N ครั้ง (samples_per_freq) ต่อความถี่ 1 จุด ก่อนขยับไปความถี่ถัดไป
         โครงสร้าง: for freq in freq_list: for sample in range(samples): วัด 1 ค่า
+
+        [Discard First Reading] เป็นการ "วัดเพิ่ม" จากจำนวน samples_per_freq ปกติ
+        ไม่ใช่การหักออกจากจำนวนที่ตั้งไว้ เช่น Samples=5 + Discard=3 -> วัดจริง
+        ทั้งหมด 8 ครั้งต่อความถี่ แต่ 3 ครั้งแรกจะไม่ถูกส่ง data_ready ออกไป
+        (ไม่นำไปคำนวณสถิติ/ไม่ขึ้นกราฟ) เหลือใช้คำนวณสถิติครบตามจำนวน samples
+        ที่ผู้ใช้ตั้งใจไว้จริงๆ
         """
         raw_text = self.settings.get('freq_list_raw', '')
         samples = max(1, int(self.settings.get('samples_per_freq', 1)))
+        discard_first = max(0, int(self.settings.get('discard_first', 0)))
+
+        total_rounds_per_freq = discard_first + samples
 
         frequencies = self._parse_freq_list(raw_text)
 
@@ -219,7 +228,7 @@ class MeasurementWorker(QThread):
             self.error_occurred.emit("⚠️ รายการความถี่ไม่ถูกต้องหรือว่างเปล่า กรุณากรอกใหม่ เช่น 100, 1k, 10k")
             return
 
-        total_points = len(frequencies) * samples
+        total_points = len(frequencies) * total_rounds_per_freq
         done_points = 0
 
         for current_freq in frequencies:
@@ -229,7 +238,7 @@ class MeasurementWorker(QThread):
             lcr.set_frequency(current_freq)
             lcr.wait_until_ready()
 
-            for sample_index in range(samples):
+            for round_index in range(total_rounds_per_freq):
                 if not self.is_running:
                     break
 
@@ -240,15 +249,21 @@ class MeasurementWorker(QThread):
                 percent = int((done_points / total_points) * 100)
                 self.progress_updated.emit(percent)
 
+                # รอบแรกสุด (round_index < discard_first) คือรอบที่ "วัดเพิ่ม" เพื่อทิ้ง
+                # ไม่นับเป็นส่วนหนึ่งของ samples_per_freq ที่ผู้ใช้ตั้งใจไว้
+                is_discarded = round_index < discard_first
+
                 if stat == "SUCCESS":
-                    real_result = {
-                        'freq': current_freq,
-                        'sample_index': sample_index + 1,
-                        'primary': float(pri),
-                        'secondary': float(sec)
-                    }
-                    self.data_ready.emit(real_result)
-                else:
+                    if not is_discarded:
+                        usable_sample_index = round_index - discard_first + 1  # 1..samples
+                        real_result = {
+                            'freq': current_freq,
+                            'sample_index': usable_sample_index,
+                            'primary': float(pri),
+                            'secondary': float(sec)
+                        }
+                        self.data_ready.emit(real_result)
+                elif not is_discarded:
                     self._handle_hardware_status(stat, current_freq)
 
     def stop(self):

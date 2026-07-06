@@ -2,8 +2,9 @@
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QGridLayout,
                              QLabel, QComboBox, QDoubleSpinBox, QSpinBox, QHBoxLayout,
-                             QSizePolicy, QLineEdit, QCheckBox)
-from PyQt6.QtCore import Qt
+                             QSizePolicy, QLineEdit, QCheckBox, QPushButton)
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QDoubleValidator
 
 # ความกว้างมาตรฐานของช่องกรอกค่าตัวเลขสั้นๆ (ความถี่ / แรงดัน)
 FREQ_FIELD_WIDTH = 150
@@ -39,6 +40,214 @@ def _make_fixed_row(label_text, widget, unit_text=None, width=FREQ_FIELD_WIDTH):
         row.addWidget(QLabel(unit_text))
     row.addStretch()
     return row
+
+
+class FrequencyListWidget(QWidget):
+    """
+    ช่องกรอกรายการความถี่แบบทีละแถว (แทนวิธีพิมพ์คั่นด้วย comma แบบเดิม)
+    - เริ่มต้นมี 2 แถวเสมอ (ความถี่ที่ 1, 2) ลบไม่ได้ ต้องมีอย่างน้อย 2 จุด
+    - กด "เพิ่มรายการความถี่" เพื่อเพิ่มแถวใหม่ได้เรื่อยๆ แถวที่เพิ่มมา (ที่ 3 ขึ้นไป) มีปุ่ม "X" ลบได้
+    - มี .text() คืนค่าเป็น string คั่น comma เหมือน QLineEdit เดิม เพื่อให้โค้ดส่วนอื่น
+      (validate_freq_list, start_measurement ใน app_controller.py) ใช้งานต่อได้โดยไม่ต้องแก้
+    - มีข้อความเตือนในตัว (ใต้แถวความถี่ล่าสุด เหนือปุ่ม "เพิ่มรายการความถี่") กรณีกรอกไม่ครบทุกช่อง
+      หรือกรอกความถี่เกินสเปคเครื่อง (20 Hz - 2,000,000 Hz)
+    """
+    freq_changed = pyqtSignal()
+
+    MIN_ROWS = 2
+    MIN_FREQ = 20.0
+    MAX_FREQ = 2_000_000.0
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._rows = []  # each: {'container': QWidget, 'input': QLineEdit, 'label': QLabel}
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(6)
+
+        self.rows_layout = QVBoxLayout()
+        self.rows_layout.setSpacing(6)
+        main_layout.addLayout(self.rows_layout)
+
+        # ข้อความเตือน: กรอกไม่ครบทุกช่อง / ค่าเกินสเปคเครื่อง
+        # วางไว้ใต้แถวความถี่ล่าสุด เหนือปุ่ม "เพิ่มรายการความถี่" ตามที่ต้องการ
+        self.lbl_incomplete = QLabel("")
+        self.lbl_incomplete.setWordWrap(True)
+        self.lbl_incomplete.setStyleSheet("color: #ff4444; font-weight: bold; font-size: 11px;")
+        self.lbl_incomplete.setVisible(False)
+        main_layout.addWidget(self.lbl_incomplete)
+
+        # ปุ่มเพิ่มรายการความถี่ - เปลี่ยนจาก "+" วงกลมเป็นปุ่มข้อความ (สีเขียวเหมือนเดิม)
+        self.btn_add = QPushButton("+ เพิ่มรายการความถี่")
+        self.btn_add.setMinimumHeight(32)
+        self.btn_add.setStyleSheet(
+            "QPushButton { background-color: #22c55e; color: white; border-radius: 6px; "
+            "font-weight: bold; font-size: 13px; padding: 4px 14px; border: 1px solid #16a34a; }"
+            "QPushButton:hover { background-color: #16a34a; }"
+        )
+        self.btn_add.clicked.connect(self.add_row)
+
+        h_add = QHBoxLayout()
+        h_add.addWidget(self.btn_add)
+        h_add.addStretch()
+        main_layout.addLayout(h_add)
+
+        # เชื่อมสัญญาณให้เช็คความครบถ้วน/ช่วงค่าใหม่ทุกครั้งที่มีการแก้ไขรายการ
+        self.freq_changed.connect(self._check_and_warn)
+
+        # เริ่มต้นด้วย 2 แถวเสมอ (ลบไม่ได้)
+        self.add_row()
+        self.add_row()
+
+    def add_row(self):
+        index = len(self._rows) + 1
+
+        row_container = QWidget()
+        row_layout = QHBoxLayout(row_container)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+
+        lbl = QLabel(f"ความถี่ที่ {index}")
+        lbl.setFixedWidth(95)
+
+        input_field = QLineEdit()
+        input_field.setFixedWidth(FREQ_FIELD_WIDTH)
+        # จำกัดช่วงค่าตามสเปคเครื่อง E4980A: 20 Hz - 2,000,000 Hz (2 MHz)
+        # ใช้ StandardNotation แทน ScientificNotation เพราะ QDoubleValidator
+        # ของ Qt มีบั๊กที่รู้จักกันดี คือไม่บังคับค่า top/bottom อย่างเข้มงวดตอนอยู่โหมด
+        # ScientificNotation (ยังพิมพ์เกินได้) จึงต้องดักซ้ำด้วย _on_freq_text_changed ด้านล่างด้วย
+        validator = QDoubleValidator(self.MIN_FREQ, self.MAX_FREQ, 6)
+        validator.setNotation(QDoubleValidator.Notation.StandardNotation)
+        input_field.setValidator(validator)
+        input_field.textChanged.connect(lambda _text, w=input_field: self._on_freq_text_changed(w))
+
+        row_layout.addWidget(lbl)
+        row_layout.addWidget(input_field)
+        row_layout.addWidget(QLabel("Hz"))
+
+        # ลบได้เฉพาะแถวที่ 3 ขึ้นไป (2 แถวแรกบังคับให้มีอย่างน้อยเสมอ)
+        if index > self.MIN_ROWS:
+            btn_del = QPushButton("X")
+            btn_del.setFixedSize(32, 32)
+            btn_del.setStyleSheet(
+                "QPushButton { background-color: #ef4444; color: white; border-radius: 16px; "
+                "font-weight: bold; font-size: 11px; border: 1px solid #dc2626;}"
+                "QPushButton:hover { background-color: #dc2626; }"
+            )
+            btn_del.clicked.connect(lambda: self.remove_row(row_container))
+            row_layout.addWidget(btn_del)
+
+        row_layout.addStretch()
+
+        self.rows_layout.addWidget(row_container)
+        self._rows.append({'container': row_container, 'input': input_field, 'label': lbl})
+        self.freq_changed.emit()
+
+    def _on_freq_text_changed(self, field: QLineEdit):
+        """เรียกทุกครั้งที่มีการพิมพ์/แก้ไข/วางข้อความในช่องความถี่ช่องใดช่องหนึ่ง
+        ถ้าค่าที่ได้เกิน MAX_FREQ (2,000,000 Hz) จะตัดตัวอักษรท้ายสุดทิ้งไปเรื่อยๆ
+        จนกว่าค่าจะกลับมาอยู่ในช่วงที่อนุญาต (ป้องกันไม่ให้พิมพ์เกินได้ตั้งแต่ต้น
+        ไม่ต้องรอ validate ตอนกด Start) จากนั้นค่อย emit freq_changed ให้ตรวจสอบต่อ"""
+        text = field.text()
+        if text:
+            try:
+                val = float(text)
+                if val > self.MAX_FREQ:
+                    cursor_pos = field.cursorPosition()
+                    trimmed = text
+                    while trimmed:
+                        trimmed = trimmed[:-1]
+                        if trimmed == "":
+                            break
+                        try:
+                            if float(trimmed) <= self.MAX_FREQ:
+                                break
+                        except ValueError:
+                            break
+                    field.blockSignals(True)
+                    field.setText(trimmed)
+                    field.setCursorPosition(min(cursor_pos, len(trimmed)))
+                    field.blockSignals(False)
+            except ValueError:
+                pass  # ข้อความระหว่างพิมพ์ที่ยังแปลงเป็นตัวเลขไม่ได้ (เช่น "-", ".") ปล่อยผ่านไปก่อน
+
+        self.freq_changed.emit()
+
+    def remove_row(self, row_container):
+        for i, r in enumerate(self._rows):
+            if r['container'] is row_container:
+                self.rows_layout.removeWidget(row_container)
+                row_container.deleteLater()
+                self._rows.pop(i)
+                break
+        self._renumber_labels()
+        self.freq_changed.emit()
+
+    def _renumber_labels(self):
+        for i, r in enumerate(self._rows):
+            r['label'].setText(f"ความถี่ที่ {i + 1}")
+
+    def _check_and_warn(self):
+        """ตรวจสอบว่ารายการความถี่กรอกครบทุกช่อง (ไม่มีช่องว่างค้าง) และค่าที่กรอก
+        อยู่ในช่วงสเปคเครื่องหรือไม่ แล้วอัปเดตข้อความเตือนใต้แถวล่าสุด (เหนือปุ่มเพิ่มรายการ)
+        คืนค่า True ถ้าไม่มีปัญหาใดๆ เลย"""
+        filled = [r for r in self._rows if r['input'].text().strip() != ""]
+        empty = [r for r in self._rows if r['input'].text().strip() == ""]
+
+        problems = []
+
+        # มีช่องว่างค้างอยู่ (ไม่ว่าจะยังไม่กรอกเลยสักช่อง หรือกรอกบางช่องแต่ไม่ครบ)
+        if empty:
+            if len(self._rows) > self.MIN_ROWS:
+                # มีแถวเกิน 2 แถวขั้นต่ำ -> ลบแถวที่ไม่ใช้ทิ้งได้ จึงเสนอตัวเลือกนี้เพิ่ม
+                problems.append("กรุณากรอกให้ครบทุกช่อง หรือลบช่องที่ไม่ใช้ทิ้ง")
+            else:
+                # มีแค่ 2 แถวขั้นต่ำ (ลบไม่ได้อยู่แล้ว) -> ต้องกรอกให้ครบเท่านั้น
+                problems.append("กรุณากรอกให้ครบทุกช่อง")
+
+        # ค่าที่กรอกเกินสเปคเครื่อง (เผื่อกรณี validator ปล่อยผ่านค่าที่กำลังพิมพ์อยู่ชั่วขณะ)
+        out_of_range = False
+        for r in filled:
+            try:
+                val = float(r['input'].text().strip())
+                if val < self.MIN_FREQ or val > self.MAX_FREQ:
+                    out_of_range = True
+            except ValueError:
+                pass
+        if out_of_range:
+            problems.append(f"ความถี่ต้องอยู่ในช่วง {self.MIN_FREQ:.0f} Hz - {self.MAX_FREQ:,.0f} Hz (2 MHz) เท่านั้น")
+
+        if problems:
+            self.lbl_incomplete.setText("⚠️ " + "\n".join(problems))
+            self.lbl_incomplete.setVisible(True)
+            return False
+
+        self.lbl_incomplete.setText("")
+        self.lbl_incomplete.setVisible(False)
+        return True
+
+    def is_valid(self) -> bool:
+        """ให้ภายนอก (app_controller.py) เรียกเช็คว่ารายการความถี่ผ่านทุกเงื่อนไขหรือไม่
+        (กรอกครบ + อยู่ในช่วงสเปค) ก่อนอนุญาตให้กด Start"""
+        return self._check_and_warn()
+
+    def get_frequencies(self) -> list:
+        """คืนค่าเป็น list ของ float (ข้ามช่องว่าง/พิมพ์ผิดที่แปลงไม่ได้)"""
+        freqs = []
+        for r in self._rows:
+            text = r['input'].text().strip()
+            if not text:
+                continue
+            try:
+                freqs.append(float(text))
+            except ValueError:
+                continue
+        return freqs
+
+    def text(self) -> str:
+        """Mimic QLineEdit.text() -> คืนค่าเป็น string คั่น comma เพื่อให้ใช้กับ
+        parser เดิม (MeasurementWorker._parse_freq_list) ได้โดยไม่ต้องแก้โค้ดที่อื่น"""
+        return ",".join(str(f) for f in self.get_frequencies())
 
 
 class InputPanel(QWidget):
@@ -160,9 +369,8 @@ class InputPanel(QWidget):
         v_list.setContentsMargins(0, 0, 0, 0)
         v_list.setSpacing(10)
 
-        v_list.addWidget(QLabel("รายการความถี่ (คั่นด้วย comma เช่น 100, 1k, 10k, 100k, 1M):"))
-        self.input_freq_list = QLineEdit()
-        self.input_freq_list.setPlaceholderText("100, 1k, 10k, 100k, 1M, 2M")
+        v_list.addWidget(QLabel("รายการความถี่ (Frequency List)"))
+        self.input_freq_list = FrequencyListWidget()
         v_list.addWidget(self.input_freq_list)
 
         grid_list_nums = QGridLayout()
@@ -183,6 +391,8 @@ class InputPanel(QWidget):
             "เช่น Samples=5 + Discard=3 -> วัดจริง 8 ครั้ง เหลือใช้คำนวณสถิติครบ 5 ค่า"
         )
 
+        # บังคับให้ทั้งสองช่องกว้างเท่ากันเป๊ะ (แคบกว่าช่องความถี่ปกติเล็กน้อย
+        # เพราะค่าที่กรอกเป็นแค่จำนวนครั้ง ไม่ใช่ตัวเลขความถี่ที่อาจยาวหลักล้าน)
         self.input_samples.setFixedWidth(105)
         self.input_discard_first.setFixedWidth(105)
 

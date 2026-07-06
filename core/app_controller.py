@@ -16,6 +16,7 @@ class AppController(QObject):
         self.is_dc_error = False
         self.is_dev_error = False
         self.is_visa_error = True
+        self.is_freqlist_error = False
 
         self.worker = None
         self.corr_worker = None
@@ -94,6 +95,9 @@ class AppController(QObject):
         v.input_panel.input_start_freq.valueChanged.connect(self.update_calculated_points)
         v.input_panel.input_stop_freq.valueChanged.connect(self.update_calculated_points)
         v.input_panel.input_step_freq.valueChanged.connect(self.update_calculated_points)
+
+        # ตรวจสอบ Frequency List ทุกครั้งที่มีการแก้ไข (เฉพาะมีผลตอนอยู่โหมด List)
+        v.input_panel.input_freq_list.freq_changed.connect(self.validate_freq_list)
 
     # ========================================================
     # Logic Methods
@@ -531,6 +535,9 @@ class AppController(QObject):
             v.input_panel.input_samples.setEnabled(False)
             v.input_panel.input_discard_first.setEnabled(False)
 
+        # เช็คใหม่ทุกครั้งที่ session lock เปลี่ยน (เผื่อ mode เปลี่ยนระหว่างล็อก/ปลดล็อก)
+        self.validate_freq_list()
+
     def validate_visa(self):
         text = self.view.conn_panel.combo_visa.currentText()
         self.is_visa_error = (text == "No Device Found" or text.strip() == "")
@@ -545,10 +552,11 @@ class AppController(QObject):
 
     def update_start_button_state(self):
         v = self.view
-        is_blocked = self.is_dc_error or self.is_dev_error or self.is_visa_error
+        is_blocked = self.is_dc_error or self.is_dev_error or self.is_visa_error or self.is_freqlist_error
         v.ctrl_panel.lbl_warn_visa.setVisible(self.is_visa_error)
         v.ctrl_panel.lbl_warn_dc_start.setVisible(self.is_dc_error)
         v.ctrl_panel.lbl_warn_dev_start.setVisible(self.is_dev_error)
+        v.ctrl_panel.lbl_warn_freqlist_start.setVisible(self.is_freqlist_error)
 
         if is_blocked:
             v.ctrl_panel.btn_start.setText("🔒 START")
@@ -556,6 +564,34 @@ class AppController(QObject):
         else:
             v.ctrl_panel.btn_start.setText("START")
             v.ctrl_panel.btn_start.setEnabled(True)
+
+    def validate_freq_list(self):
+        """
+        เช็คว่ารายการความถี่ (Frequency List) ถูกกรอกและ parse ได้จริงหรือไม่
+        มีผลเฉพาะตอนอยู่โหมด LIST เท่านั้น - ใช้ parser ตัวเดียวกับที่
+        measurement_thread.py ใช้จริงตอนวัด (MeasurementWorker._parse_freq_list)
+        เพื่อไม่ให้ผลการเช็คที่นี่กับตอนวัดจริงไม่ตรงกัน
+
+        [ใหม่] เช็คเพิ่มผ่าน FrequencyListWidget.is_valid() ว่ากรอกครบทุกช่อง
+        (ไม่มีช่องว่างค้างระหว่างช่องที่กรอกแล้ว) และค่าที่กรอกอยู่ในช่วงสเปคเครื่อง
+        (20 Hz - 2,000,000 Hz) หรือไม่ - ถ้าไม่ผ่านจะบล็อกปุ่ม Start เหมือนกัน
+        พร้อมข้อความเตือนละเอียดแสดงในตัว FrequencyListWidget เอง
+        """
+        v = self.view
+        run_mode = self.get_current_run_mode()
+
+        if run_mode != "LIST":
+            self.is_freqlist_error = False
+            self.update_start_button_state()
+            return
+
+        raw_text = v.input_panel.input_freq_list.text()
+        frequencies = MeasurementWorker._parse_freq_list(raw_text)
+
+        list_widget_ok = v.input_panel.input_freq_list.is_valid()
+
+        self.is_freqlist_error = (len(frequencies) == 0) or (not list_widget_ok)
+        self.update_start_button_state()
 
     def toggle_run_mode(self):
         """เรียกทุกครั้งที่ Dropdown โหมดการวัด (ใน input_panel) เปลี่ยนค่า
@@ -597,6 +633,7 @@ class AppController(QObject):
         v.input_panel.input_discard_first.setEnabled(is_list)
 
         self.update_hardware_limits()
+        self.validate_freq_list()
         self.update_start_button_state()
 
     def toggle_dc_bias(self):

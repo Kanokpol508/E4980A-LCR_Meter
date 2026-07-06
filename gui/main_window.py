@@ -1,7 +1,7 @@
 # หน้าต่างหลัก (ประกอบจิ๊กซอว์ทุก panel เข้าด้วยกัน)
 
 
-from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QScrollArea
+from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QScrollArea, QTabWidget
 from PyQt6.QtCore import Qt, QLocale
 
 # นำเข้าชิ้นส่วน UI ที่แยกไฟล์ไว้ (Panels & Displays)
@@ -11,6 +11,7 @@ from gui.panels.advanced_panel import AdvancedPanel
 from gui.panels.control_panel import ControlPanel
 from gui.displays.graph_display import GraphDisplay
 from gui.displays.lcd_display import LcdDisplay
+from gui.displays.statistics_table import StatisticsTable
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -58,14 +59,22 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(left_panel_container)
 
         # ----------------------------------------------------
-        # โซนฝั่งขวา (Right Layout) - กราฟและจอ LCD
+        # โซนฝั่งขวา (Right Layout) - กราฟ/ตารางสถิติ และจอ LCD
         # ----------------------------------------------------
         right_layout = QVBoxLayout()
-        
+
         self.graph_display = GraphDisplay()
+        self.stats_table = StatisticsTable()
+
+        # ห่อ GraphDisplay เดิม + StatisticsTable ใหม่ ด้วย QTabWidget
+        # เพื่อให้สลับดูกราฟ / ตารางสถิติได้ในพื้นที่เดียวกัน
+        self.right_tabs = QTabWidget()
+        self.right_tabs.addTab(self.graph_display, "กราฟ (Graph)")
+        self.right_tabs.addTab(self.stats_table, "ตารางสถิติ (Statistics Table)")
+
         self.lcd_display = LcdDisplay()
         
-        right_layout.addWidget(self.graph_display, stretch=1)
+        right_layout.addWidget(self.right_tabs, stretch=1)
         right_layout.addWidget(self.lcd_display, stretch=0)
         
         main_layout.addLayout(right_layout)

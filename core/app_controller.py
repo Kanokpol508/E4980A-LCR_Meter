@@ -426,6 +426,32 @@ class AppController(QObject):
         v.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
         v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, is_single)
 
+        # Statistics Table สด (เฉพาะ Sweep/List ที่แกน X เป็นความถี่จริง
+        # โหมด Single แกน X เป็นแค่ลำดับครั้งที่วัด ไม่ใช่ความถี่ จึงไม่จัดกลุ่มตามความถี่)
+        if not is_single:
+            self.update_statistics_table()
+
+    def update_statistics_table(self):
+        """สร้าง raw_records จากข้อมูลที่เก็บไว้ แล้วส่งให้ StatisticsTable คำนวณ/แสดงผลใหม่"""
+        v = self.view
+        raw_records = [
+            {'freq': f, 'primary': p, 'secondary': s}
+            for f, p, s in zip(self.graph_x_data, self.graph_raw_pri_y, self.graph_raw_sec_y)
+        ]
+
+        pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if v.adv_panel.chk_dev_enable.isChecked() else None
+        sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if v.adv_panel.chk_dev_enable.isChecked() else None
+
+        v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
+
+    @staticmethod
+    def _safe_float(text: str):
+        try:
+            text = text.strip()
+            return float(text) if text else None
+        except (ValueError, AttributeError):
+            return None
+
     def handle_worker_error(self, error_msg):
         QMessageBox.critical(self.view, "Hardware Error", error_msg)
 
@@ -445,6 +471,7 @@ class AppController(QObject):
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
         self.view.graph_display.clear_plots()
+        self.view.stats_table.clear_table()
         self.update_session_lock()
 
     def update_session_lock(self):

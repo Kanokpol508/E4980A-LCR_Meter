@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt
 from data.data_processor import calculate_frequency_stats, format_stats_row_for_table
 
 COLUMNS = [
-    ("freq", "ความถี่ (Hz)"),
+    ("freq", "Frequency (Hz)"),
     ("n_samples", "N"),
     ("pri_mean", "Primary Mean"),
     ("pri_sd", "Primary SD"),

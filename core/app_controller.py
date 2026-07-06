@@ -57,6 +57,7 @@ class AppController(QObject):
         # ตั้งค่า UI เริ่มต้น
         self.view.input_panel.widget_dc_inner.setEnabled(False)
         self.view.adv_panel.widget_dev_inner.setEnabled(False)
+        self.view.adv_panel.combo_dev_type.setEnabled(False)
 
         # ตั้งค่า visibility ของเนื้อหาย่อยใน group_mode ตามโหมดเริ่มต้น (Sweep)
         self.toggle_run_mode()
@@ -64,14 +65,20 @@ class AppController(QObject):
     def _connect_signals(self):
         v = self.view
         v.input_panel.combo_prop_group.currentIndexChanged.connect(self.update_scpi_modes)
+        v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._refresh_deviation_preview)
         v.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
         v.input_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
         v.input_panel.combo_dc_level.currentIndexChanged.connect(self.validate_dc_bias)
 
-        v.adv_panel.chk_dev_enable.stateChanged.connect(self.toggle_deviation)
+        v.adv_panel.chk_dev_graph_enable.stateChanged.connect(self.toggle_deviation)
+        v.adv_panel.chk_dev_ppm_enable.stateChanged.connect(self.toggle_deviation)
         v.adv_panel.input_dev_pri.textChanged.connect(self.validate_deviation)
+        v.adv_panel.input_dev_pri.textChanged.connect(self._refresh_deviation_preview)
+        v.adv_panel.input_dev_sec.textChanged.connect(self.validate_deviation)
+        v.adv_panel.input_dev_sec.textChanged.connect(self._refresh_deviation_preview)
+        v.adv_panel.combo_dev_type.currentIndexChanged.connect(self._refresh_deviation_preview)
 
         v.adv_panel.btn_open_corr.clicked.connect(lambda: self.start_correction("OPEN"))
         v.adv_panel.btn_short_corr.clicked.connect(lambda: self.start_correction("SHORT"))
@@ -257,6 +264,13 @@ class AppController(QObject):
     def setup_graph_labels(self):
         v = self.view
         scpi_mode = v.input_panel.combo_scpi_mode.currentData()
+
+        # ป้องกัน AttributeError ตอน combo_scpi_mode ถูก .clear() ชั่วขณะ
+        # (เช่นระหว่าง update_scpi_modes() กำลังล้าง dropdown ก่อนเติมรายการใหม่)
+        # ตอนนั้น currentData() จะคืนค่า None -> ยังไม่มีโหมดจริงให้ตั้งชื่อแกน จึงข้ามไปก่อน
+        if scpi_mode is None:
+            return
+
         pri_label = "Primary"
         sec_label = "Secondary"
 
@@ -293,15 +307,27 @@ class AppController(QObject):
         elif scpi_mode.endswith("RS") or scpi_mode.endswith("RP") or scpi_mode == "RX":
             sec_label = "Resistance (Ω)"             # CSRS, LSRS, CPRP, LPRP, RX
 
-        # --- Deviation mode ปรับชื่อแกนตามประเภท deviation ---
-        if v.adv_panel.chk_dev_enable.isChecked():
+        # --- Deviation mode ปรับชื่อแกนตามประเภท deviation (ใช้ checkbox เฉพาะกราฟ) ---
+        # Primary Ref และ Secondary Ref ไม่มีตัวไหนบังคับกรอกอีกต่อไป (สมมาตรกันทั้งคู่)
+        # -> เช็คทีละตัวอิสระกัน ถ้าตัวไหนไม่มีค่า ให้คงชื่อแกนเดิมไว้ (ไม่ใส่ Δ)
+        # เพราะข้อมูลจริงจะไม่ถูกแปลงเป็น Δ ด้วย (ดูตรรกะใน handle_data_ready)
+        if v.adv_panel.chk_dev_graph_enable.isChecked():
+            has_pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) is not None
+            has_sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) is not None
+
             dev_type = v.adv_panel.combo_dev_type.currentText()
-            if "PCT" in dev_type or "เปอร์เซ็นต์" in dev_type:
-                pri_label = f"Δ {pri_label.split(',')[0]} (%)"
-                sec_label = f"Δ {sec_label.split(',')[0]} (%)"
+            is_pct = "PCT" in dev_type or "เปอร์เซ็นต์" in dev_type
+
+            if is_pct:
+                if has_pri_ref:
+                    pri_label = f"Δ {pri_label.split(',')[0]} (%)"
+                if has_sec_ref:
+                    sec_label = f"Δ {sec_label.split(',')[0]} (%)"
             else:
-                pri_label = f"Δ {pri_label}"
-                sec_label = f"Δ {sec_label}"
+                if has_pri_ref:
+                    pri_label = f"Δ {pri_label}"
+                if has_sec_ref:
+                    sec_label = f"Δ {sec_label}"
 
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
@@ -386,28 +412,24 @@ class AppController(QObject):
         disp_pri = raw_pri
         disp_sec = raw_sec
 
-        if v.adv_panel.chk_dev_enable.isChecked():
-            try:
-                pri_ref = float(v.adv_panel.input_dev_pri.text().strip())
-                sec_text = v.adv_panel.input_dev_sec.text().strip()
-                has_sec_ref = bool(sec_text)
-                sec_ref = float(sec_text) if has_sec_ref else 0.0
+        if v.adv_panel.chk_dev_graph_enable.isChecked():
+            dev_type = v.adv_panel.combo_dev_type.currentText()
+            is_pct = "PCT" in dev_type or "เปอร์เซ็นต์" in dev_type
 
-                dev_type = v.adv_panel.combo_dev_type.currentText()
-                is_pct = "PCT" in dev_type or "เปอร์เซ็นต์" in dev_type
+            pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text())
+            sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text())
 
+            if pri_ref is not None:
                 if is_pct:
                     disp_pri = ((raw_pri - pri_ref) / abs(pri_ref)) * 100 if pri_ref != 0 else 0.0
                 else:
                     disp_pri = raw_pri - pri_ref
 
-                if has_sec_ref:
-                    if is_pct:
-                        disp_sec = ((raw_sec - sec_ref) / abs(sec_ref)) * 100 if sec_ref != 0 else 0.0
-                    else:
-                        disp_sec = raw_sec - sec_ref
-            except ValueError:
-                pass
+            if sec_ref is not None:
+                if is_pct:
+                    disp_sec = ((raw_sec - sec_ref) / abs(sec_ref)) * 100 if sec_ref != 0 else 0.0
+                else:
+                    disp_sec = raw_sec - sec_ref
 
         v.lcd_display.lbl_pri_val.setText(f"{disp_pri:.5e}")
         v.lcd_display.lbl_sec_val.setText(f"{disp_sec:.5e}")
@@ -426,7 +448,7 @@ class AppController(QObject):
         v.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
         v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, is_single)
 
-        # Statistics Table สด (เฉพาะ Sweep/List ที่แกน X เป็นความถี่จริง
+        # อัปเดต Statistics Table สด (เฉพาะ Sweep/List ที่แกน X เป็นความถี่จริง
         # โหมด Single แกน X เป็นแค่ลำดับครั้งที่วัด ไม่ใช่ความถี่ จึงไม่จัดกลุ่มตามความถี่)
         if not is_single:
             self.update_statistics_table()
@@ -439,8 +461,8 @@ class AppController(QObject):
             for f, p, s in zip(self.graph_x_data, self.graph_raw_pri_y, self.graph_raw_sec_y)
         ]
 
-        pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if v.adv_panel.chk_dev_enable.isChecked() else None
-        sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if v.adv_panel.chk_dev_enable.isChecked() else None
+        pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if v.adv_panel.chk_dev_ppm_enable.isChecked() else None
+        sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if v.adv_panel.chk_dev_ppm_enable.isChecked() else None
 
         v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
 
@@ -485,9 +507,14 @@ class AppController(QObject):
         v.input_panel.combo_scpi_mode.setEnabled(not should_lock)
         v.input_panel.combo_run_mode.setEnabled(not should_lock)
 
-        v.adv_panel.chk_dev_enable.setEnabled(not should_lock)
-        dev_enabled = v.adv_panel.chk_dev_enable.isChecked() and not should_lock
+        v.adv_panel.chk_dev_graph_enable.setEnabled(not should_lock)
+        v.adv_panel.chk_dev_ppm_enable.setEnabled(not should_lock)
+        dev_enabled = (
+            (v.adv_panel.chk_dev_graph_enable.isChecked() or v.adv_panel.chk_dev_ppm_enable.isChecked())
+            and not should_lock
+        )
         v.adv_panel.widget_dev_inner.setEnabled(dev_enabled)
+        v.adv_panel.combo_dev_type.setEnabled(v.adv_panel.chk_dev_graph_enable.isChecked() and not should_lock)
 
         if not should_lock:
             v.input_panel.input_start_freq.setEnabled(run_mode == "SWEEP")
@@ -594,33 +621,46 @@ class AppController(QObject):
         v.input_panel.lbl_dc_warning.setText(warning_msg)
         self.update_start_button_state()
 
+    def _refresh_deviation_preview(self):
+        """เรียกใช้ทุกครั้งที่ Ref/ประเภทกราฟ Δ เปลี่ยน เพื่ออัปเดตชื่อแกนแบบสด
+        (อัปเดตเฉพาะตอนยังไม่มีข้อมูลในกราฟ - ถ้าเริ่มวัดไปแล้วชื่อแกนจะถูกล็อกไว้ตามที่ตั้งไว้ตอนเริ่ม)"""
+        if len(self.graph_x_data) == 0:
+            self.setup_graph_labels()
+
     def toggle_deviation(self):
-        is_enabled = self.view.adv_panel.chk_dev_enable.isChecked()
-        self.view.adv_panel.widget_dev_inner.setEnabled(is_enabled)
+        v = self.view
+        is_enabled = v.adv_panel.chk_dev_graph_enable.isChecked() or v.adv_panel.chk_dev_ppm_enable.isChecked()
+        v.adv_panel.widget_dev_inner.setEnabled(is_enabled)
+
+        # "รูปแบบกราฟ Δ" ใช้ได้เฉพาะตอนเปิด Graph Deviation เท่านั้น
+        # (แม้ widget_dev_inner โดยรวมจะ enable จาก PPM checkbox ก็ตาม)
+        v.adv_panel.combo_dev_type.setEnabled(v.adv_panel.chk_dev_graph_enable.isChecked())
+
         if is_enabled:
             self.validate_deviation()
         else:
-            self.view.adv_panel.lbl_dev_warning.setText("")
+            v.adv_panel.lbl_dev_warning.setText("")
             self.is_dev_error = False
             self.update_start_button_state()
 
+        self._refresh_deviation_preview()
+
     def validate_deviation(self):
         v = self.view
-        if not v.adv_panel.chk_dev_enable.isChecked():
+        if not (v.adv_panel.chk_dev_graph_enable.isChecked() or v.adv_panel.chk_dev_ppm_enable.isChecked()):
             self.is_dev_error = False
             self.update_start_button_state()
             return
 
-        pri_text = v.adv_panel.input_dev_pri.text().strip()
-        if not pri_text:
-            v.adv_panel.lbl_dev_warning.setText("⚠️ ต้องระบุ Primary Reference (หลัก) ก่อนเริ่มวัด")
+        pri_has_value = self._safe_float(v.adv_panel.input_dev_pri.text()) is not None
+        sec_has_value = self._safe_float(v.adv_panel.input_dev_sec.text()) is not None
+
+        if not pri_has_value and not sec_has_value:
+            v.adv_panel.lbl_dev_warning.setText(
+                "⚠️ ต้องระบุ Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่า ก่อนเริ่มวัด"
+            )
             self.is_dev_error = True
         else:
-            try:
-                float(pri_text)
-                v.adv_panel.lbl_dev_warning.setText("")
-                self.is_dev_error = False
-            except ValueError:
-                v.adv_panel.lbl_dev_warning.setText("⚠️ กรุณาป้อนตัวเลขให้ถูกต้อง เช่น 100E-9")
-                self.is_dev_error = True
+            v.adv_panel.lbl_dev_warning.setText("")
+            self.is_dev_error = False
         self.update_start_button_state()

@@ -46,11 +46,12 @@ class ControlPanel(QWidget):
         # Label แจ้งเตือนข้อผิดพลาด
         self.lbl_warn_visa = QLabel("⚠️ กรุณาเลือกเครื่องมือวัด (VISA)")
         self.lbl_warn_dc_start = QLabel("⚠️ ตั้งค่า DC Bias ไม่ถูกต้อง")
-        self.lbl_warn_dev_start = QLabel("⚠️ ต้องกรอก Primary Ref ก่อน")
+        self.lbl_warn_dev_start = QLabel("⚠️ ต้องกรอก Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่า")
 
         self.lbl_warn_visa.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_warn_dc_start.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_warn_dev_start.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_warn_dev_start.setWordWrap(True)
 
         self.lbl_warn_visa.setVisible(False)
         self.lbl_warn_dc_start.setVisible(False)

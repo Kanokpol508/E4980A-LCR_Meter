@@ -52,11 +52,7 @@ class VerifyWorker(QThread):
             cable_val = s['cable'].replace("m", "").strip()
             inst.write(f":CORRection:LENGth {cable_val}")
 
-            if str(s['imp_range']) == "AUTO":
-                inst.write(":FUNCtion:IMPedance:RANGe:AUTO ON")
-            else:
-                # เครื่องจะปิด AUTO ให้เองอัตโนมัติตามคู่มือ
-                inst.write(f":FUNCtion:IMPedance:RANGe {s['imp_range']}")
+            lcr.set_impedance_range(s['imp_range'])
             
             if s.get('dc_bias_enabled', False):
                 inst.write(":BIAS:STAT ON")

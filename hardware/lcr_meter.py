@@ -174,7 +174,7 @@ class E4980A:
 
     def set_cable_length(self, cable_text: str):
         """
-        [ใหม่] ตั้งค่าการชดเชยความยาวสายวัด (Cable Length Correction)
+        ตั้งค่าการชดเชยความยาวสายวัด (Cable Length Correction)
         รับค่าจาก GUI Combobox เช่น "0 m", "1 m", "2 m", "4 m"
         แล้วแปลงเป็นตัวเลข 0/1/2/4 ก่อนส่งคำสั่ง :CORRection:LENGth
 
@@ -192,6 +192,22 @@ class E4980A:
             cable_val = 0               # ค่า fallback ปลอดภัยหากแปลงไม่ได้
 
         self.inst.write(f":CORRection:LENGth {cable_val}")
+
+    def set_impedance_range(self, imp_range):
+        """
+        ตั้งย่านวัดอิมพีแดนซ์ (Z Range)
+        - imp_range = 'AUTO'  -> เปิดโหมด Auto Range
+        - imp_range = ตัวเลข  -> ล็อค Range ที่ค่าที่กำหนด (หน่วย Ω) เช่น 100, 1000
+        หมายเหตุ: เมื่อส่งคำสั่ง RANGe ตรงๆ เครื่องจะปิด AUTO ให้อัตโนมัติตามคู่มือ
+        จึงไม่ต้องส่งคำสั่งปิด AUTO ก่อน
+        """
+        if not self.is_connected:
+            raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
+
+        if str(imp_range) == 'AUTO':
+            self.inst.write(":FUNCtion:IMPedance:RANGe:AUTO ON")
+        else:
+            self.inst.write(f":FUNCtion:IMPedance:RANGe {imp_range}")
 
     def trigger(self):
         """บังคับ Trigger 1 ครั้ง"""

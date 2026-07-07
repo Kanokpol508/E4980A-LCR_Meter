@@ -49,10 +49,7 @@ class MeasurementWorker(QThread):
             cable_text = self.settings.get('cable', '0 m')
             lcr.set_cable_length(cable_text)
 
-            if str(imp_range) == 'AUTO':
-                lcr.inst.write(":FUNCtion:IMPedance:RANGe:AUTO ON")
-            else:
-                lcr.inst.write(f":FUNCtion:IMPedance:RANGe {imp_range}")
+            lcr.set_impedance_range(imp_range)
 
             # --- ตั้งค่า DC Bias (แบบปลอดภัย) ---
             if 'dc_bias_enabled' in self.settings:

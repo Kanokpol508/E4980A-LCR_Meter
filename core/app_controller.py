@@ -46,6 +46,10 @@ class AppController(QObject):
             "Admittance (แอดมิตแทนซ์)": [("G-B", "GB"), ("Y-θd", "YTD"), ("Y-θr", "YTR")]
         }
 
+        # ดึง Logger จาก LogDisplay ก่อนเรียก scan_visa_ports และ method อื่นๆ ที่ใช้ self.log
+        self.log = self.view.log_display.get_logger()
+        self.log.info("โปรแกรมเริ่มต้นเรียบร้อย | E4980A LCR Meter Controller พร้อมใช้งาน")
+
         # รันตอนเปิดโปรแกรม
         self._connect_signals()
         self.view.input_panel.combo_prop_group.addItems(self.meas_options.keys())
@@ -130,8 +134,10 @@ class AppController(QObject):
         resources = E4980A.scan_ports()
         if resources:
             self.view.conn_panel.combo_visa.addItems(resources)
+            self.log.info(f"สแกนพบอุปกรณ์ VISA {len(resources)} รายการ: {', '.join(resources)}")
         else:
             self.view.conn_panel.combo_visa.addItem("No Device Found")
+            self.log.warning("ไม่พบอุปกรณ์ VISA — ตรวจสอบสาย USB/GPIB และ Driver")
         self.validate_visa()
 
     def set_ui_locked(self, locked: bool):
@@ -157,6 +163,8 @@ class AppController(QObject):
         if not visa_address or visa_address == "No Device Found":
             QMessageBox.warning(v, "ตรวจสอบล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการตรวจสอบการตั้งค่า")
             return
+
+        self.log.info(f"เริ่ม Verify & Apply → {visa_address}")
 
         settings = {
             'visa_resource': visa_address,
@@ -197,6 +205,12 @@ class AppController(QObject):
         self.set_ui_locked(False)
         self.verify_worker = None
 
+        if success:
+            self.log.info("Verify & Apply ✅ ผ่านทุกรายการ")
+        else:
+            fail_params = [r['param'] for r in results if "FAIL" in str(r.get('status', ''))]
+            self.log.warning(f"Verify & Apply ❌ ไม่ผ่าน: {', '.join(fail_params) if fail_params else error_msg}")
+
         from gui.dialogs.verify_dialog import VerifyDialog
         dialog = VerifyDialog(results, error_msg, self.view)
         dialog.exec()
@@ -223,6 +237,7 @@ class AppController(QObject):
         self.set_ui_locked(True)
         v.ctrl_panel.btn_stop.setEnabled(False)
         self.current_corr_type = corr_type
+        self.log.info(f"เริ่ม {corr_type} Correction...")
 
         self.progress_dialog = QProgressDialog(
             f"เครื่องกำลังทำงาน {corr_type} Correction...\n(อาจใช้เวลา 15 - 60 วินาที กรุณาห้ามถอดสาย)",
@@ -246,6 +261,7 @@ class AppController(QObject):
         self.corr_worker = None
 
         if success:
+            self.log.info(f"{self.current_corr_type} Correction ✅ สำเร็จ")
             QMessageBox.information(self.view, "Correction สำเร็จ", f"✅ {msg}")
             green_style = "background-color: #10b981; color: white; border: none;"
             if self.current_corr_type == "OPEN":
@@ -255,6 +271,7 @@ class AppController(QObject):
                 self.view.adv_panel.btn_short_corr.setStyleSheet(green_style)
                 self.view.adv_panel.btn_short_corr.setText("SHORT Correction (OK)")
         else:
+            self.log.error(f"{self.current_corr_type} Correction ❌ ล้มเหลว: {msg}")
             QMessageBox.critical(self.view, "Correction ล้มเหลว", f"❌ {msg}")
 
         self.current_corr_type = None
@@ -394,6 +411,16 @@ class AppController(QObject):
         self.set_ui_locked(True)
         v.lcd_display.lbl_pri_val.setText("Measuring...")
         v.lcd_display.lbl_sec_val.setText("Measuring...")
+
+        mode_label = {"SINGLE": "วัดจุดเดียว", "SWEEP": "Sweep", "LIST": "List"}.get(run_mode, run_mode)
+        scpi = settings.get('scpi_mode', '-')
+        freq_info = f"{settings.get('freq', '-')} Hz" if run_mode == "SINGLE" else f"{settings.get('start_freq', '-')}–{settings.get('stop_freq', '-')} Hz" if run_mode == "SWEEP" else "รายการความถี่"
+        level_unit = "Arms" if settings.get('level_mode') == 'Current' else "Vrms"
+        self.log.info(
+            f"▶ เริ่มวัด | โหมด: {mode_label} | SCPI: {scpi} | "
+            f"ความถี่: {freq_info} | สัญญาณ: {settings.get('volt', '-')} {level_unit} | "
+            f"ALC: {'ON' if settings.get('alc_enabled') else 'OFF'}"
+        )
         self.worker.start()
 
     def stop_measurement(self):
@@ -401,6 +428,7 @@ class AppController(QObject):
             self.worker.stop()
             self.view.ctrl_panel.btn_stop.setText("STOPPING...")
             self.view.ctrl_panel.btn_stop.setEnabled(False)
+            self.log.warning("⏹ ผู้ใช้กด STOP — กำลังหยุดการวัด...")
 
     # ========================================================
     # การคำนวณและแสดงผลข้อมูล (Data Handling & Math)
@@ -483,6 +511,7 @@ class AppController(QObject):
             return None
 
     def handle_worker_error(self, error_msg):
+        self.log.error(f"Hardware Error: {error_msg}")
         QMessageBox.critical(self.view, "Hardware Error", error_msg)
 
     def handle_progress_update(self, percent):
@@ -491,6 +520,7 @@ class AppController(QObject):
             self.view.ctrl_panel.btn_start.setText(f"⏳ RUNNING... {percent}%")
 
     def handle_worker_finished(self):
+        self.log.info("✅ การวัดเสร็จสมบูรณ์")
         self.set_ui_locked(False)
         self.worker = None
 
@@ -502,6 +532,7 @@ class AppController(QObject):
         self.graph_raw_sec_y = []
         self.view.graph_display.clear_plots()
         self.view.stats_table.clear_table()
+        self.log.info("🗑 ล้างข้อมูลกราฟและตารางสถิติเรียบร้อย")
         self.update_session_lock()
 
     def update_session_lock(self):

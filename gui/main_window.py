@@ -12,6 +12,7 @@ from gui.panels.control_panel import ControlPanel
 from gui.displays.graph_display import GraphDisplay
 from gui.displays.lcd_display import LcdDisplay
 from gui.displays.statistics_table import StatisticsTable
+from gui.displays.log_display import LogDisplay
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -65,12 +66,14 @@ class MainWindow(QMainWindow):
 
         self.graph_display = GraphDisplay()
         self.stats_table = StatisticsTable()
+        self.log_display = LogDisplay()
 
         # ห่อ GraphDisplay เดิม + StatisticsTable ใหม่ ด้วย QTabWidget
         # เพื่อให้สลับดูกราฟ / ตารางสถิติได้ในพื้นที่เดียวกัน
         self.right_tabs = QTabWidget()
         self.right_tabs.addTab(self.graph_display, "กราฟ (Graph)")
         self.right_tabs.addTab(self.stats_table, "ตารางสถิติ (Statistics Table)")
+        self.right_tabs.addTab(self.log_display, "บันทึกเหตุการณ์ (Log)")
 
         self.lcd_display = LcdDisplay()
         

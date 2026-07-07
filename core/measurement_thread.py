@@ -40,8 +40,12 @@ class MeasurementWorker(QThread):
             avg       = self.settings.get('avg', 1)
             imp_range = self.settings.get('imp_range', 'AUTO')
 
+            level_mode = self.settings.get('level_mode', 'Voltage')
+            alc_enabled = self.settings.get('alc_enabled', False)
+
             lcr.set_measurement_mode(scpi_mode)
-            lcr.set_voltage_level(volt)
+            lcr.set_signal_level(volt, level_mode)
+            lcr.set_alc(alc_enabled)
             lcr.set_frequency(freq)
             lcr.set_aperture(time_mode, avg)
 

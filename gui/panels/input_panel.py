@@ -414,18 +414,42 @@ class InputPanel(QWidget):
         # 3. สัญญาณทดสอบ (Test Signal) + DC Bias (วางข้างกัน)
         # ==========================================================
 
-        # --- 3a. Test Signal - ช่องกรอกแรงดันสั้นลง ---
+        # --- 3a. Test Signal ---
         self.group_signal = QGroupBox("สัญญาณทดสอบ (Test Signal)")
         v_signal = QVBoxLayout()
+        v_signal.setSpacing(8)
 
         self.input_volt = CleanDoubleSpinBox()
         self.input_volt.setRange(0.0001, 20.0)
         self.input_volt.setDecimals(4)
         self.input_volt.setSingleStep(0.1)
         self.input_volt.setValue(1.0)
+        self.input_volt.setFixedWidth(111)
 
-        v_signal.addWidget(QLabel("แรงดัน (Voltage):"))
-        v_signal.addLayout(_make_row("", self.input_volt, "Vrms"))
+        # Dropdown หน่วย: Vrms (Voltage) หรือ Arms (Current)
+        self.combo_level_mode = QComboBox()
+        self.combo_level_mode.addItem("Vrms", userData="Voltage")
+        self.combo_level_mode.addItem("Arms", userData="Current")
+        self.combo_level_mode.setFixedWidth(104)
+
+        # Label อยู่แถวบน, SpinBox + Dropdown อยู่แถวล่าง
+        v_signal.addWidget(QLabel("ระดับสัญญาณ (Signal Level):"))
+
+        h_level = QHBoxLayout()
+        h_level.addWidget(self.input_volt)
+        h_level.addWidget(self.combo_level_mode)
+        h_level.addStretch()
+        v_signal.addLayout(h_level)
+
+        # ALC (Automatic Level Control)
+        self.chk_alc = QCheckBox("เปิด ALC (Automatic Level Control)")
+        self.chk_alc.setToolTip(
+            "ALC ทำให้ระดับสัญญาณ ณ จุดที่ชิ้นงาน เท่ากับค่าที่ตั้งไว้จริงๆ\n"
+            "แนะนำเปิดเมื่อวัด Inductor ด้วยโหมด Arms\n"
+            "เพื่อให้กระแสทดสอบคงที่ตลอดการวัดทุกความถี่"
+        )
+
+        v_signal.addWidget(self.chk_alc)
         v_signal.addStretch()
         self.group_signal.setLayout(v_signal)
 
@@ -453,7 +477,7 @@ class InputPanel(QWidget):
         self.lbl_dc_warning = QLabel("")
         self.lbl_dc_warning.setWordWrap(True)
         self.lbl_dc_warning.setMaximumWidth(190)
-        self.lbl_dc_warning.setStyleSheet("color: #ff4444; font-weight: bold; font-size: 11px;")
+        self.lbl_dc_warning.setStyleSheet("color: #FF9900; font-weight: bold; font-size: 11px;")
         v_dc_inner.addWidget(self.lbl_dc_warning)
 
         v_dc.addWidget(self.widget_dc_inner)

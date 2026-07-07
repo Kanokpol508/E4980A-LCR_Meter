@@ -155,11 +155,30 @@ class E4980A:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         self.inst.write(f":FREQuency:CW {freq}")
 
-    def set_voltage_level(self, voltage: float):
-        """ตั้งแรงดันสัญญาณทดสอบ AC (Vrms)"""
+    def set_signal_level(self, level: float, mode: str = 'Voltage'):
+        """
+        ตั้งระดับสัญญาณทดสอบ (Test Signal Level)
+        - mode = 'Voltage' -> ตั้งแรงดัน AC (หน่วย Vrms) ใช้กับ Capacitor
+        - mode = 'Current' -> ตั้งกระแส AC (หน่วย Arms) ใช้กับ Inductor
+        คำสั่ง SCPI: :VOLTage:LEVel หรือ :CURRent:LEVel ตามโหมด
+        """
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
-        self.inst.write(f":VOLTage:LEVel {voltage}")
+        if mode == 'Current':
+            self.inst.write(f":CURRent:LEVel {level}")
+        else:
+            self.inst.write(f":VOLTage:LEVel {level}")
+
+    def set_alc(self, enabled: bool):
+        """
+        ตั้งค่า ALC (Automatic Level Control)
+        - enabled = True  -> เปิด ALC ทำให้ระดับสัญญาณ ณ จุดชิ้นงานเท่ากับค่าที่ตั้ง
+        - enabled = False -> ปิด ALC ระดับสัญญาณถูกตั้งที่ขั้วส่งออกของเครื่อง (ค่าเริ่มต้น)
+        แนะนำเปิดเมื่อวัด Inductor ด้วย Current Mode เพื่อให้กระแสคงที่ตลอดการวัด
+        """
+        if not self.is_connected:
+            raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
+        self.inst.write(f":AMPLitude:ALC {'ON' if enabled else 'OFF'}")
 
     def set_aperture(self, time_mode: str, averaging: int = 1):
         """ตั้งเวลาการวัดและค่าเฉลี่ย (SHOR, MED, LONG) และ (1-256)"""
@@ -174,7 +193,7 @@ class E4980A:
 
     def set_cable_length(self, cable_text: str):
         """
-        ตั้งค่าการชดเชยความยาวสายวัด (Cable Length Correction)
+        [ใหม่] ตั้งค่าการชดเชยความยาวสายวัด (Cable Length Correction)
         รับค่าจาก GUI Combobox เช่น "0 m", "1 m", "2 m", "4 m"
         แล้วแปลงเป็นตัวเลข 0/1/2/4 ก่อนส่งคำสั่ง :CORRection:LENGth
 

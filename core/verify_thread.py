@@ -46,13 +46,19 @@ class VerifyWorker(QThread):
             inst.write(f":FREQuency:CW {s['freq']}")
             inst.write(f":VOLTage:LEVel {s['volt']}")
             
+            lcr.set_signal_level(s['volt'], s.get('level_mode', 'Voltage'))
+            lcr.set_alc(s.get('alc_enabled', False))
             avg_count = max(1, min(256, int(s['avg'])))
             inst.write(f":APERture {s['time_mode']},{avg_count}")
                 
             cable_val = s['cable'].replace("m", "").strip()
             inst.write(f":CORRection:LENGth {cable_val}")
 
-            lcr.set_impedance_range(s['imp_range'])
+            if str(s['imp_range']) == "AUTO":
+                inst.write(":FUNCtion:IMPedance:RANGe:AUTO ON")
+            else:
+                # เครื่องจะปิด AUTO ให้เองอัตโนมัติตามคู่มือ
+                inst.write(f":FUNCtion:IMPedance:RANGe {s['imp_range']}")
             
             if s.get('dc_bias_enabled', False):
                 inst.write(":BIAS:STAT ON")
@@ -80,8 +86,18 @@ class VerifyWorker(QThread):
             act_freq = inst.query(":FREQuency:CW?").strip()
             add_res("Frequency (Hz)", s['freq'], act_freq, self.check_float_match(s['freq'], act_freq))
 
-            act_volt = inst.query(":VOLTage:LEVel?").strip()
-            add_res("Voltage (Vrms)", s['volt'], act_volt, self.check_float_match(s['volt'], act_volt))
+            level_mode = s.get('level_mode', 'Voltage')
+            if level_mode == 'Current':
+                act_level = inst.query(":CURRent:LEVel?").strip()
+                add_res("Signal Level (Arms)", s['volt'], act_level, self.check_float_match(s['volt'], act_level))
+            else:
+                act_level = inst.query(":VOLTage:LEVel?").strip()
+                add_res("Signal Level (Vrms)", s['volt'], act_level, self.check_float_match(s['volt'], act_level))
+
+            act_alc = inst.query(":AMPLitude:ALC?").strip()
+            exp_alc = "1" if s.get('alc_enabled', False) else "0"
+            add_res("ALC", "ON" if s.get('alc_enabled', False) else "OFF",
+                    "ON" if act_alc == "1" else "OFF", act_alc == exp_alc)
 
             act_aper_raw = inst.query(":APERture?").strip()
             act_aper_parts = act_aper_raw.split(',')

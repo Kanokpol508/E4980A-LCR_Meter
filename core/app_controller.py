@@ -16,7 +16,7 @@ class AppController(QObject):
         self.is_dc_error = False
         self.is_dev_error = False
         self.is_visa_error = True
-        self.is_freqlist_error = False
+        self.is_freqlist_error = False          # [restored] ป้องกัน AttributeError
 
         self.worker = None
         self.corr_worker = None
@@ -96,7 +96,7 @@ class AppController(QObject):
         v.input_panel.input_stop_freq.valueChanged.connect(self.update_calculated_points)
         v.input_panel.input_step_freq.valueChanged.connect(self.update_calculated_points)
 
-        # ตรวจสอบ Frequency List ทุกครั้งที่มีการแก้ไข (เฉพาะมีผลตอนอยู่โหมด List)
+        # [restored] ตรวจสอบ Frequency List ทุกครั้งที่มีการแก้ไข (เฉพาะมีผลตอนอยู่โหมด List)
         v.input_panel.input_freq_list.freq_changed.connect(self.validate_freq_list)
 
     # ========================================================
@@ -163,6 +163,8 @@ class AppController(QObject):
             'freq': v.input_panel.input_freq.value(),
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
+            'level_mode': v.input_panel.combo_level_mode.currentData(),  # [new] Current/Voltage mode
+            'alc_enabled': v.input_panel.chk_alc.isChecked(),            # [new] ALC
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
@@ -372,6 +374,8 @@ class AppController(QObject):
             'discard_first': v.input_panel.input_discard_first.value(),
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
+            'level_mode': v.input_panel.combo_level_mode.currentData(),  # [new] Current/Voltage mode
+            'alc_enabled': v.input_panel.chk_alc.isChecked(),            # [new] ALC
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
@@ -535,7 +539,7 @@ class AppController(QObject):
             v.input_panel.input_samples.setEnabled(False)
             v.input_panel.input_discard_first.setEnabled(False)
 
-        # เช็คใหม่ทุกครั้งที่ session lock เปลี่ยน (เผื่อ mode เปลี่ยนระหว่างล็อก/ปลดล็อก)
+        # [restored] เช็คใหม่ทุกครั้งที่ session lock เปลี่ยน (เผื่อ mode เปลี่ยนระหว่างล็อก/ปลดล็อก)
         self.validate_freq_list()
 
     def validate_visa(self):
@@ -552,11 +556,12 @@ class AppController(QObject):
 
     def update_start_button_state(self):
         v = self.view
+        # [restored] รวม is_freqlist_error กลับเข้ามา
         is_blocked = self.is_dc_error or self.is_dev_error or self.is_visa_error or self.is_freqlist_error
         v.ctrl_panel.lbl_warn_visa.setVisible(self.is_visa_error)
         v.ctrl_panel.lbl_warn_dc_start.setVisible(self.is_dc_error)
         v.ctrl_panel.lbl_warn_dev_start.setVisible(self.is_dev_error)
-        v.ctrl_panel.lbl_warn_freqlist_start.setVisible(self.is_freqlist_error)
+        v.ctrl_panel.lbl_warn_freqlist_start.setVisible(self.is_freqlist_error)  # [restored]
 
         if is_blocked:
             v.ctrl_panel.btn_start.setText("🔒 START")
@@ -567,12 +572,12 @@ class AppController(QObject):
 
     def validate_freq_list(self):
         """
-        เช็คว่ารายการความถี่ (Frequency List) ถูกกรอกและ parse ได้จริงหรือไม่
+        [restored] เช็คว่ารายการความถี่ (Frequency List) ถูกกรอกและ parse ได้จริงหรือไม่
         มีผลเฉพาะตอนอยู่โหมด LIST เท่านั้น - ใช้ parser ตัวเดียวกับที่
         measurement_thread.py ใช้จริงตอนวัด (MeasurementWorker._parse_freq_list)
         เพื่อไม่ให้ผลการเช็คที่นี่กับตอนวัดจริงไม่ตรงกัน
 
-        [ใหม่] เช็คเพิ่มผ่าน FrequencyListWidget.is_valid() ว่ากรอกครบทุกช่อง
+        เช็คเพิ่มผ่าน FrequencyListWidget.is_valid() ว่ากรอกครบทุกช่อง
         (ไม่มีช่องว่างค้างระหว่างช่องที่กรอกแล้ว) และค่าที่กรอกอยู่ในช่วงสเปคเครื่อง
         (20 Hz - 2,000,000 Hz) หรือไม่ - ถ้าไม่ผ่านจะบล็อกปุ่ม Start เหมือนกัน
         พร้อมข้อความเตือนละเอียดแสดงในตัว FrequencyListWidget เอง
@@ -633,7 +638,7 @@ class AppController(QObject):
         v.input_panel.input_discard_first.setEnabled(is_list)
 
         self.update_hardware_limits()
-        self.validate_freq_list()
+        self.validate_freq_list()          # [restored]
         self.update_start_button_state()
 
     def toggle_dc_bias(self):

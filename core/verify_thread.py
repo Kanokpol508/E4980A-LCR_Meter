@@ -59,15 +59,15 @@ class VerifyWorker(QThread):
                 # เครื่องจะปิด AUTO ให้เองอัตโนมัติตามคู่มือ
                 inst.write(f":FUNCtion:IMPedance:RANGe {s['imp_range']}")
             
-            if s.get('dc_bias_enabled', False):
-                inst.write(":BIAS:STAT ON")
-                if s.get('dc_is_voltage', True):
-                    inst.write(f":BIAS:VOLTage:LEVel {s['dc_bias_level']}")
-                else:
-                    inst.write(f":BIAS:CURRent:LEVel {s['dc_bias_level']}")
-            else:
-                inst.write(":BIAS:STAT OFF")
-            
+            # ใช้ apply_dc_bias() ที่ปลอดภัยแทนการ inst.write() ตรงๆ
+            # (ปิดก่อน -> ตั้งค่า -> เปิด) ป้องกันไฟกระชากเข้าชิ้นงานจากค่า Bias
+            # เดิมที่อาจค้างอยู่ในเครื่องจาก session ก่อนหน้า
+            lcr.apply_dc_bias(
+                enable=s.get('dc_bias_enabled', False),
+                level=s.get('dc_bias_level', 0.0),
+                is_voltage=s.get('dc_is_voltage', True)
+            )
+
             inst.query("*OPC?")
 
             # ==========================================

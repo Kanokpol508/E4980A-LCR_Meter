@@ -15,8 +15,8 @@ from data.data_processor import (
 # Column definitions แยกตามโหมด
 # ==========================================
 _COLS_SINGLE = [
-    ("freq",           "Frequency (Hz)"),   # ความถี่ที่ใช้วัดใน session นี้
-    ("n",              "N (ครั้ง)"),
+    ("freq",           "Frequency (Hz)"),
+    ("n",              "Readings (Count)"),
     ("pri_mean",       "Primary Mean"),
     ("pri_sd",         "Primary SD"),
     ("pri_min",        "Primary Min"),
@@ -32,14 +32,16 @@ _COLS_SINGLE = [
 ]
 
 _COLS_SWEEP = [
-    ("freq",      "Frequency (Hz)"),
-    ("primary",   "Primary"),
-    ("secondary", "Secondary"),
+    ("point_num",  "Point No."),
+    ("step_size",  "Step Size (Hz)"),
+    ("freq",       "Frequency (Hz)"),
+    ("primary",    "Primary"),
+    ("secondary",  "Secondary"),
 ]
 
 _COLS_LIST = [
     ("freq",           "Frequency (Hz)"),
-    ("n_samples",      "N"),
+    ("n_samples",      "Samples (Count)"),
     ("pri_mean",       "Primary Mean"),
     ("pri_sd",         "Primary SD"),
     ("pri_min",        "Primary Min"),
@@ -129,10 +131,11 @@ class StatisticsTable(QWidget):
         if mode != self._current_mode:
             self._apply_columns(mode)
 
-    def update_table(self, raw_records: list, pri_ref=None, sec_ref=None, mode: str = None):
+    def update_table(self, raw_records: list, pri_ref=None, sec_ref=None, mode: str = None, step_size: float = None):
         """
         อัปเดตตารางใหม่ทั้งหมดจากข้อมูลดิบ
         raw_records: [{'freq':.., 'primary':.., 'secondary':..}, ...]
+        step_size: ค่า Step Size (Hz) สำหรับโหมด SWEEP — ใช้แสดงในคอลัมน์ "ค่าเพิ่มต่อจุด"
         สูตรทั้งหมดอยู่ใน data_processor.py — ที่นี่แค่แสดงผล
         """
         if mode and mode != self._current_mode:
@@ -141,7 +144,7 @@ class StatisticsTable(QWidget):
         if self._current_mode == "SINGLE":
             self._render_single(raw_records)
         elif self._current_mode == "SWEEP":
-            self._render_sweep(raw_records)
+            self._render_sweep(raw_records, step_size=step_size)
         else:
             self._render_list(raw_records, pri_ref, sec_ref)
 
@@ -154,8 +157,8 @@ class StatisticsTable(QWidget):
         self.table.setRowCount(1)
         self._set_row(0, [fmt[key] for key, _ in _COLS_SINGLE])
 
-    def _render_sweep(self, raw_records: list):
-        rows = calculate_sweep_rows(raw_records)
+    def _render_sweep(self, raw_records: list, step_size: float = None):
+        rows = calculate_sweep_rows(raw_records, step_size=step_size)
         self.table.setRowCount(len(rows))
         for i, row in enumerate(rows):
             fmt = format_sweep_row_for_table(row)

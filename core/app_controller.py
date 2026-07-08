@@ -504,7 +504,10 @@ class AppController(QObject):
         pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if v.adv_panel.chk_dev_ppm_enable.isChecked() else None
         sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if v.adv_panel.chk_dev_ppm_enable.isChecked() else None
 
-        v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode)
+        # ส่ง step_size เข้าไปด้วยสำหรับโหมด SWEEP เพื่อแสดงคอลัมน์ "ค่าเพิ่มต่อจุด"
+        step_size = v.input_panel.input_step_freq.value() if run_mode == "SWEEP" else None
+
+        v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode, step_size=step_size)
 
     @staticmethod
     def _safe_float(text: str):

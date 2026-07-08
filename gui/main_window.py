@@ -1,10 +1,8 @@
 # หน้าต่างหลัก (ประกอบจิ๊กซอว์ทุก panel เข้าด้วยกัน)
 
-
 from PyQt6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QScrollArea, QTabWidget
 from PyQt6.QtCore import Qt, QLocale
 
-# นำเข้าชิ้นส่วน UI ที่แยกไฟล์ไว้ (Panels & Displays)
 from gui.panels.connection_panel import ConnectionPanel
 from gui.panels.input_panel import InputPanel
 from gui.panels.advanced_panel import AdvancedPanel
@@ -12,7 +10,8 @@ from gui.panels.control_panel import ControlPanel
 from gui.displays.graph_display import GraphDisplay
 from gui.displays.lcd_display import LcdDisplay
 from gui.displays.statistics_table import StatisticsTable
-from gui.displays.log_display import LogDisplay
+from gui.displays.log_display import LogDisplay 
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -21,14 +20,11 @@ class MainWindow(QMainWindow):
         self.resize(1280, 720)
         self.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
 
-        # ประกอบ UI ร่างหลัก
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
         main_layout = QHBoxLayout(main_widget)
 
-        # ----------------------------------------------------
-        # โซนฝั่งซ้าย (Left Layout) - แผงควบคุม
-        # ----------------------------------------------------
+        # ─────────────── ฝั่งซ้าย: แผงควบคุม ─────────────────────────────
         left_panel_container = QWidget()
         left_panel_container.setMinimumWidth(450)
         left_panel_container.setMaximumWidth(500)
@@ -38,46 +34,41 @@ class MainWindow(QMainWindow):
         self.left_scroll = QScrollArea()
         self.left_scroll.setWidgetResizable(True)
         self.left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        
+
         self.left_content = QWidget()
         left_layout = QVBoxLayout(self.left_content)
-        
-        # ดึงจิ๊กซอว์ Panels มาประกอบ
-        self.conn_panel = ConnectionPanel()
+
+        self.conn_panel  = ConnectionPanel()
         self.input_panel = InputPanel()
-        self.adv_panel = AdvancedPanel()
-        self.ctrl_panel = ControlPanel()
+        self.adv_panel   = AdvancedPanel()
+        self.ctrl_panel  = ControlPanel()
 
         left_layout.addWidget(self.conn_panel)
         left_layout.addWidget(self.input_panel)
         left_layout.addWidget(self.adv_panel)
         left_layout.addStretch(1)
-        
+
         self.left_scroll.setWidget(self.left_content)
         left_main_layout.addWidget(self.left_scroll, stretch=1)
-        left_main_layout.addWidget(self.ctrl_panel, stretch=0)
-        
+        left_main_layout.addWidget(self.ctrl_panel,  stretch=0)
+
         main_layout.addWidget(left_panel_container)
 
-        # ----------------------------------------------------
-        # โซนฝั่งขวา (Right Layout) - กราฟ/ตารางสถิติ และจอ LCD
-        # ----------------------------------------------------
+        # ─────────────── ฝั่งขวา: กราฟ / ตารางสถิติ / Log และจอ LCD ──────────────────
         right_layout = QVBoxLayout()
 
         self.graph_display = GraphDisplay()
-        self.stats_table = StatisticsTable()
-        self.log_display = LogDisplay()
+        self.stats_table   = StatisticsTable()
+        self.log_display   = LogDisplay() 
 
-        # ห่อ GraphDisplay เดิม + StatisticsTable ใหม่ ด้วย QTabWidget
-        # เพื่อให้สลับดูกราฟ / ตารางสถิติได้ในพื้นที่เดียวกัน
         self.right_tabs = QTabWidget()
         self.right_tabs.addTab(self.graph_display, "กราฟ (Graph)")
-        self.right_tabs.addTab(self.stats_table, "ตารางสถิติ (Statistics Table)")
-        self.right_tabs.addTab(self.log_display, "บันทึกเหตุการณ์ (Log)")
+        self.right_tabs.addTab(self.stats_table,   "ตารางสถิติ (Statistics Table)")
+        self.right_tabs.addTab(self.log_display,   "บันทึกเหตุการณ์ (Log)")
 
         self.lcd_display = LcdDisplay()
-        
-        right_layout.addWidget(self.right_tabs, stretch=1)
-        right_layout.addWidget(self.lcd_display, stretch=0)
-        
+
+        right_layout.addWidget(self.right_tabs,    stretch=1)
+        right_layout.addWidget(self.lcd_display,   stretch=0)
+
         main_layout.addLayout(right_layout)

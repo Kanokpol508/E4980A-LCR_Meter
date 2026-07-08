@@ -420,17 +420,17 @@ class InputPanel(QWidget):
         v_signal.setSpacing(8)
 
         self.input_volt = CleanDoubleSpinBox()
-        self.input_volt.setRange(0.0001, 20.0)
+        self.input_volt.setRange(0.0001, 2.0)   # E4980A (ไม่มี Option 001) สูงสุด 2.0 Vrms / Arms
         self.input_volt.setDecimals(4)
         self.input_volt.setSingleStep(0.1)
         self.input_volt.setValue(1.0)
-        self.input_volt.setFixedWidth(111)
+        self.input_volt.setFixedWidth(110)
 
         # Dropdown หน่วย: Vrms (Voltage) หรือ Arms (Current)
         self.combo_level_mode = QComboBox()
         self.combo_level_mode.addItem("Vrms", userData="Voltage")
         self.combo_level_mode.addItem("Arms", userData="Current")
-        self.combo_level_mode.setFixedWidth(104)
+        self.combo_level_mode.setFixedWidth(103)
 
         # Label อยู่แถวบน, SpinBox + Dropdown อยู่แถวล่าง
         v_signal.addWidget(QLabel("ระดับสัญญาณ (Signal Level):"))
@@ -467,12 +467,19 @@ class InputPanel(QWidget):
         v_dc_inner.setContentsMargins(0, 0, 0, 0)
         v_dc_inner.setSpacing(8)
 
-        self.combo_dc_level = QComboBox()
-        self.combo_dc_level.addItem("1.5 V", userData=1.5)
-        self.combo_dc_level.addItem("2.0 V", userData=2.0)
-
+        # SpinBox รับค่า DC Bias ได้อิสระ 0–2 V (E4980A standard) แทน Dropdown แบบตายตัว
         v_dc_inner.addWidget(QLabel("ระดับไฟ (Level):"))
-        v_dc_inner.addWidget(self.combo_dc_level)
+        h_dc_level = QHBoxLayout()
+        self.combo_dc_level = QDoubleSpinBox()
+        self.combo_dc_level.setRange(0.0, 2.0)
+        self.combo_dc_level.setDecimals(3)
+        self.combo_dc_level.setSingleStep(0.1)
+        self.combo_dc_level.setValue(1.5)
+        self.combo_dc_level.setFixedWidth(120)
+        h_dc_level.addWidget(self.combo_dc_level)
+        h_dc_level.addWidget(QLabel("V"))
+        h_dc_level.addStretch()
+        v_dc_inner.addLayout(h_dc_level)
 
         self.lbl_dc_warning = QLabel("")
         self.lbl_dc_warning.setWordWrap(True)

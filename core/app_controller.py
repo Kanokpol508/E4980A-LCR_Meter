@@ -16,7 +16,7 @@ class AppController(QObject):
         self.is_dc_error = False
         self.is_dev_error = False
         self.is_visa_error = True
-        self.is_freqlist_error = False          # [restored] ป้องกัน AttributeError
+        self.is_freqlist_error = False          # ป้องกัน AttributeError
 
         self.worker = None
         self.corr_worker = None
@@ -46,7 +46,7 @@ class AppController(QObject):
             "Admittance (แอดมิตแทนซ์)": [("G-B", "GB"), ("Y-θd", "YTD"), ("Y-θr", "YTR")]
         }
 
-        # ดึง Logger จาก LogDisplay ก่อนเรียก scan_visa_ports และ method อื่นๆ ที่ใช้ self.log
+        # ดึง Logger จาก LogDisplay ก่อนเรียก method อื่นๆ ที่ใช้ self.log
         self.log = self.view.log_display.get_logger()
         self.log.info("โปรแกรมเริ่มต้นเรียบร้อย | E4980A LCR Meter Controller พร้อมใช้งาน")
 
@@ -75,7 +75,7 @@ class AppController(QObject):
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
         v.input_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
-        v.input_panel.combo_dc_level.currentIndexChanged.connect(self.validate_dc_bias)
+        v.input_panel.combo_dc_level.valueChanged.connect(self.validate_dc_bias)
 
         v.adv_panel.chk_dev_graph_enable.stateChanged.connect(self.toggle_deviation)
         v.adv_panel.chk_dev_ppm_enable.stateChanged.connect(self.toggle_deviation)
@@ -100,7 +100,7 @@ class AppController(QObject):
         v.input_panel.input_stop_freq.valueChanged.connect(self.update_calculated_points)
         v.input_panel.input_step_freq.valueChanged.connect(self.update_calculated_points)
 
-        # [restored] ตรวจสอบ Frequency List ทุกครั้งที่มีการแก้ไข (เฉพาะมีผลตอนอยู่โหมด List)
+        # ตรวจสอบ Frequency List ทุกครั้งที่มีการแก้ไข (เฉพาะมีผลตอนอยู่โหมด List)
         v.input_panel.input_freq_list.freq_changed.connect(self.validate_freq_list)
 
     # ========================================================
@@ -164,22 +164,20 @@ class AppController(QObject):
             QMessageBox.warning(v, "ตรวจสอบล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการตรวจสอบการตั้งค่า")
             return
 
-        self.log.info(f"เริ่ม Verify & Apply → {visa_address}")
-
         settings = {
             'visa_resource': visa_address,
             'freq': v.input_panel.input_freq.value(),
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
-            'level_mode': v.input_panel.combo_level_mode.currentData(),  # [new] Current/Voltage mode
-            'alc_enabled': v.input_panel.chk_alc.isChecked(),            # [new] ALC
+            'level_mode': v.input_panel.combo_level_mode.currentData(),
+            'alc_enabled': v.input_panel.chk_alc.isChecked(),
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
             'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.input_panel.chk_dc_enable.isChecked(),
             'dc_is_voltage': True,
-            'dc_bias_level': v.input_panel.combo_dc_level.currentData(),
+            'dc_bias_level': v.input_panel.combo_dc_level.value(),
         }
 
         self.set_ui_locked(True)
@@ -391,15 +389,15 @@ class AppController(QObject):
             'discard_first': v.input_panel.input_discard_first.value(),
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
-            'level_mode': v.input_panel.combo_level_mode.currentData(),  # [new] Current/Voltage mode
-            'alc_enabled': v.input_panel.chk_alc.isChecked(),            # [new] ALC
+            'level_mode': v.input_panel.combo_level_mode.currentData(),
+            'alc_enabled': v.input_panel.chk_alc.isChecked(),           
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
             'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.input_panel.chk_dc_enable.isChecked(),
             'dc_is_voltage': True,
-            'dc_bias_level': v.input_panel.combo_dc_level.currentData(),
+            'dc_bias_level': v.input_panel.combo_dc_level.value(),
         }
 
         self.worker = MeasurementWorker(settings)
@@ -414,8 +412,13 @@ class AppController(QObject):
 
         mode_label = {"SINGLE": "วัดจุดเดียว", "SWEEP": "Sweep", "LIST": "List"}.get(run_mode, run_mode)
         scpi = settings.get('scpi_mode', '-')
-        freq_info = f"{settings.get('freq', '-')} Hz" if run_mode == "SINGLE" else f"{settings.get('start_freq', '-')}–{settings.get('stop_freq', '-')} Hz" if run_mode == "SWEEP" else "รายการความถี่"
         level_unit = "Arms" if settings.get('level_mode') == 'Current' else "Vrms"
+        if run_mode == "SINGLE":
+            freq_info = f"{settings.get('freq', '-')} Hz"
+        elif run_mode == "SWEEP":
+            freq_info = f"{settings.get('start_freq', '-')}–{settings.get('stop_freq', '-')} Hz"
+        else:
+            freq_info = "รายการความถี่"
         self.log.info(
             f"▶ เริ่มวัด | โหมด: {mode_label} | SCPI: {scpi} | "
             f"ความถี่: {freq_info} | สัญญาณ: {settings.get('volt', '-')} {level_unit} | "
@@ -484,14 +487,15 @@ class AppController(QObject):
         v.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
         v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, is_single)
 
-        # อัปเดต Statistics Table สด (เฉพาะ Sweep/List ที่แกน X เป็นความถี่จริง
-        # โหมด Single แกน X เป็นแค่ลำดับครั้งที่วัด ไม่ใช่ความถี่ จึงไม่จัดกลุ่มตามความถี่)
-        if not is_single:
-            self.update_statistics_table()
+        # อัปเดต Statistics Table ทุกโหมด (SINGLE=overall stats, SWEEP=per-freq raw, LIST=per-freq stats)
+        self.update_statistics_table()
 
     def update_statistics_table(self):
-        """สร้าง raw_records จากข้อมูลที่เก็บไว้ แล้วส่งให้ StatisticsTable คำนวณ/แสดงผลใหม่"""
+        """สร้าง raw_records จากข้อมูลที่เก็บไว้ แล้วส่งให้ StatisticsTable คำนวณ/แสดงผลใหม่
+        รองรับทุกโหมด: SINGLE (overall stats) / SWEEP (per-freq raw) / LIST (per-freq stats)"""
         v = self.view
+        run_mode = self.get_current_run_mode()
+
         raw_records = [
             {'freq': f, 'primary': p, 'secondary': s}
             for f, p, s in zip(self.graph_x_data, self.graph_raw_pri_y, self.graph_raw_sec_y)
@@ -500,7 +504,7 @@ class AppController(QObject):
         pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if v.adv_panel.chk_dev_ppm_enable.isChecked() else None
         sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if v.adv_panel.chk_dev_ppm_enable.isChecked() else None
 
-        v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
+        v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode)
 
     @staticmethod
     def _safe_float(text: str):
@@ -592,7 +596,7 @@ class AppController(QObject):
         v.ctrl_panel.lbl_warn_visa.setVisible(self.is_visa_error)
         v.ctrl_panel.lbl_warn_dc_start.setVisible(self.is_dc_error)
         v.ctrl_panel.lbl_warn_dev_start.setVisible(self.is_dev_error)
-        v.ctrl_panel.lbl_warn_freqlist_start.setVisible(self.is_freqlist_error)  # [restored]
+        v.ctrl_panel.lbl_warn_freqlist_start.setVisible(self.is_freqlist_error)
 
         if is_blocked:
             v.ctrl_panel.btn_start.setText("🔒 START")
@@ -669,8 +673,9 @@ class AppController(QObject):
         v.input_panel.input_discard_first.setEnabled(is_list)
 
         self.update_hardware_limits()
-        self.validate_freq_list()          # [restored]
+        self.validate_freq_list()      
         self.update_start_button_state()
+        self.view.stats_table.set_mode(run_mode)
 
     def toggle_dc_bias(self):
         is_enabled = self.view.input_panel.chk_dc_enable.isChecked()

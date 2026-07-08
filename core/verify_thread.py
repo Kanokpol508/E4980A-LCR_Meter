@@ -44,8 +44,7 @@ class VerifyWorker(QThread):
             s = self.settings
             inst.write(f":FUNCtion:IMPedance:TYPE {s['scpi_mode']}")
             inst.write(f":FREQuency:CW {s['freq']}")
-            inst.write(f":VOLTage:LEVel {s['volt']}")
-            
+
             lcr.set_signal_level(s['volt'], s.get('level_mode', 'Voltage'))
             lcr.set_alc(s.get('alc_enabled', False))
             avg_count = max(1, min(256, int(s['avg'])))

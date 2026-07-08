@@ -58,6 +58,8 @@ class AppController(QObject):
 
         self.update_hardware_limits()
         self.update_calculated_points()
+        self.update_single_total()
+        self.update_list_total()
 
         # ตั้งค่า UI เริ่มต้น
         self.view.input_panel.widget_dc_inner.setEnabled(False)
@@ -100,6 +102,14 @@ class AppController(QObject):
         v.input_panel.input_stop_freq.valueChanged.connect(self.update_calculated_points)
         v.input_panel.input_step_freq.valueChanged.connect(self.update_calculated_points)
 
+        # SINGLE: อัปเดต label รวมรอบวัดทั้งหมดเมื่อ Readings หรือ Discard เปลี่ยน
+        v.input_panel.input_n_single.valueChanged.connect(self.update_single_total)
+        v.input_panel.input_discard_single.valueChanged.connect(self.update_single_total)
+
+        # LIST: อัปเดต label รวมรอบวัดทั้งหมด/ความถี่ เมื่อ Samples หรือ Discard เปลี่ยน
+        v.input_panel.input_samples.valueChanged.connect(self.update_list_total)
+        v.input_panel.input_discard_first.valueChanged.connect(self.update_list_total)
+
         # ตรวจสอบ Frequency List ทุกครั้งที่มีการแก้ไข (เฉพาะมีผลตอนอยู่โหมด List)
         v.input_panel.input_freq_list.freq_changed.connect(self.validate_freq_list)
 
@@ -123,6 +133,26 @@ class AppController(QObject):
         n_points = int((stop - start) / step) + 1
         n_points = max(2, min(201, n_points))
         v.input_panel.lbl_calculated_points.setText(f"{n_points} จุด")
+
+    def update_single_total(self):
+        """คำนวณและแสดงรวมรอบวัดทั้งหมดของโหมด SINGLE
+        รวมรอบ = Discard First + Readings Count
+        (จำนวนครั้งที่เครื่องจะวัดจริงทั้งหมดต่อ 1 ครั้งที่กด Start)"""
+        v = self.view
+        n = v.input_panel.input_n_single.value()
+        d = v.input_panel.input_discard_single.value()
+        total = n + d
+        v.input_panel.lbl_total_rounds_single.setText(f"{total} ครั้ง  (ทิ้ง {d} + วัด{n})")
+
+    def update_list_total(self):
+        """คำนวณและแสดงรวมรอบวัดทั้งหมดต่อความถี่ของโหมด LIST
+        รวมรอบ/ความถี่ = Discard First + Samples per Sweep
+        (จำนวนครั้งที่เครื่องวัดต่อ 1 ความถี่ ก่อนขยับไปความถี่ถัดไป)"""
+        v = self.view
+        s = v.input_panel.input_samples.value()
+        d = v.input_panel.input_discard_first.value()
+        total = s + d
+        v.input_panel.lbl_total_rounds_list.setText(f"{total} ครั้ง/ความถี่ \n (ทิ้ง {d} + วัด {s})")
 
     def update_hardware_limits(self):
         v = self.view
@@ -387,16 +417,10 @@ class AppController(QObject):
             'freq_list_raw': v.input_panel.input_freq_list.text(),
             'samples_per_freq': v.input_panel.input_samples.value(),
             'discard_first': v.input_panel.input_discard_first.value(),
-            # SINGLE mode: N ครั้ง + Discard First
-            'n_single':      v.input_panel.input_n_single.value(),
-            'discard_single': v.input_panel.input_discard_single.value(),
-            # True = session แรก (ยังไม่มีข้อมูล) → ทำ Discard
-            # False = กด Start ต่อเนื่อง (เครื่องนิ่งแล้ว) → ไม่ Discard ซ้ำ
-            'is_first_single_session': (len(self.graph_x_data) == 0),
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
             'level_mode': v.input_panel.combo_level_mode.currentData(),
-            'alc_enabled': v.input_panel.chk_alc.isChecked(),
+            'alc_enabled': v.input_panel.chk_alc.isChecked(),           
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
@@ -575,9 +599,6 @@ class AppController(QObject):
             v.input_panel.input_freq_list.setEnabled(run_mode == "LIST")
             v.input_panel.input_samples.setEnabled(run_mode == "LIST")
             v.input_panel.input_discard_first.setEnabled(run_mode == "LIST")
-            # SINGLE mode widgets
-            v.input_panel.input_n_single.setEnabled(run_mode == "SINGLE")
-            v.input_panel.input_discard_single.setEnabled(run_mode == "SINGLE")
         else:
             v.input_panel.input_start_freq.setEnabled(False)
             v.input_panel.input_stop_freq.setEnabled(False)
@@ -585,9 +606,6 @@ class AppController(QObject):
             v.input_panel.input_freq_list.setEnabled(False)
             v.input_panel.input_samples.setEnabled(False)
             v.input_panel.input_discard_first.setEnabled(False)
-            # SINGLE: ล็อก N แต่ยังเปลี่ยน Discard ได้ (ไม่มีผลกับข้อมูลที่วัดไปแล้ว)
-            v.input_panel.input_n_single.setEnabled(False)
-            v.input_panel.input_discard_single.setEnabled(False)
 
         # [restored] เช็คใหม่ทุกครั้งที่ session lock เปลี่ยน (เผื่อ mode เปลี่ยนระหว่างล็อก/ปลดล็อก)
         self.validate_freq_list()
@@ -686,8 +704,6 @@ class AppController(QObject):
         v.input_panel.input_freq_list.setEnabled(is_list)
         v.input_panel.input_samples.setEnabled(is_list)
         v.input_panel.input_discard_first.setEnabled(is_list)
-        v.input_panel.input_n_single.setEnabled(is_single)
-        v.input_panel.input_discard_single.setEnabled(is_single)
 
         # ซ่อน checkbox "คำนวณ PPM ในตารางสถิติ" เมื่อไม่ได้อยู่โหมด LIST
         # และ reset สถานะเป็นไม่ติ๊กเสมอเมื่อออกจาก LIST

@@ -297,23 +297,26 @@ class InputPanel(QWidget):
         self.combo_run_mode.setCurrentIndex(1)  # ค่าเริ่มต้น = Sweep
         v_mode.addWidget(self.combo_run_mode)
 
-        # --- เนื้อหาย่อย: วัดจุดเดียว (SINGLE) - ช่องกรอกสั้นลง ---
+        # --- เนื้อหาย่อย: วัดจุดเดียว (SINGLE) ---
+        # ใช้ QGridLayout เพื่อให้ช่องกรอกทุกแถว (Frequency / Readings / Discard)
+        # เสมอกันในแนวตั้ง (คอลัมน์ spinbox เริ่ม x เดียวกันเป๊ะ)
         self.widget_freq_single = QWidget()
-        v_freq_single = QVBoxLayout(self.widget_freq_single)
-        v_freq_single.setContentsMargins(0, 0, 0, 0)
-        v_freq_single.setSpacing(8)
+        grid_single = QGridLayout(self.widget_freq_single)
+        grid_single.setContentsMargins(0, 0, 0, 0)
+        grid_single.setVerticalSpacing(8)
 
         self.input_freq = CleanDoubleSpinBox()
         self.input_freq.setRange(20.0, 2000000.0)
         self.input_freq.setDecimals(2)
         self.input_freq.setSingleStep(100)
         self.input_freq.setValue(100000.0)
+        self.input_freq.setFixedWidth(FREQ_FIELD_WIDTH)
 
         # จำนวนครั้งที่วัดซ้ำ (N) ใน SINGLE mode
         self.input_n_single = QSpinBox()
         self.input_n_single.setRange(1, 9999)
         self.input_n_single.setValue(10)
-        self.input_n_single.setFixedWidth(105)
+        self.input_n_single.setFixedWidth(FREQ_FIELD_WIDTH)
         self.input_n_single.setToolTip(
             "จำนวนครั้งที่วัดซ้ำต่อ 1 ครั้งที่กด Start\n"
             "ยิ่งมาก Type A (ppm) ยิ่งน่าเชื่อถือ\n"
@@ -324,16 +327,38 @@ class InputPanel(QWidget):
         self.input_discard_single = QSpinBox()
         self.input_discard_single.setRange(0, 5)
         self.input_discard_single.setValue(1)
-        self.input_discard_single.setFixedWidth(105)
+        self.input_discard_single.setFixedWidth(FREQ_FIELD_WIDTH)
         self.input_discard_single.setToolTip(
             "จำนวนครั้งแรกที่วัดแล้วทิ้ง ไม่นำไปคำนวณสถิติ\n"
             "เครื่องต้องใช้เวลาปรับตัวหลังตั้งค่า ค่าแรกๆ อาจยังไม่นิ่ง\n"
             "ทำงานเฉพาะครั้งแรกของ session (กด Start ครั้งที่ 2 เป็นต้นไปไม่ Discard)"
         )
 
-        v_freq_single.addLayout(_make_fixed_row("ความถี่ (Frequency):", self.input_freq, "Hz"))
-        v_freq_single.addLayout(_make_fixed_row("จำนวนครั้งที่วัด (Readings Count):", self.input_n_single, "ครั้ง"))
-        v_freq_single.addLayout(_make_fixed_row("ทิ้งค่าตัวอย่างแรกสุด (Discard First Reading):", self.input_discard_single, "ครั้ง"))
+        # Label แสดงจำนวนรอบวัดทั้งหมด = Discard + Readings (คล้ายกับ "จำนวนจุดที่ได้" ของ SWEEP)
+        self.lbl_total_rounds_single = QLabel("-")
+        self.lbl_total_rounds_single.setStyleSheet("color: #38bdf8; font-weight: bold;")
+
+        grid_single.addWidget(QLabel("ความถี่ (Frequency):"), 0, 0)
+        grid_single.addWidget(self.input_freq, 0, 1)
+        grid_single.addWidget(QLabel("Hz"), 0, 2)
+
+        grid_single.addWidget(QLabel("จำนวนครั้งที่วัด (Readings Count):"), 1, 0)
+        grid_single.addWidget(self.input_n_single, 1, 1)
+        grid_single.addWidget(QLabel("ครั้ง"), 1, 2)
+
+        grid_single.addWidget(QLabel("ทิ้งค่าแรกสุด (Discard First):"), 2, 0)
+        grid_single.addWidget(self.input_discard_single, 2, 1)
+        grid_single.addWidget(QLabel("ครั้ง"), 2, 2)
+
+        grid_single.addWidget(QLabel("รวมรอบวัดทั้งหมด:"), 3, 0)
+        grid_single.addWidget(self.lbl_total_rounds_single, 3, 1)
+
+        grid_single.setColumnStretch(3, 1)
+
+        # เชื่อมสัญญาณเพื่ออัปเดต label ทุกครั้งที่ค่าเปลี่ยน
+        # (signal connect และการคำนวณจริงอยู่ใน app_controller.py เพื่อรวมไว้กับ
+        #  update_calculated_points ของ SWEEP ให้อยู่ที่เดียวกัน)
+
         v_mode.addWidget(self.widget_freq_single)
 
         # --- เนื้อหาย่อย: สแกนความถี่ Linear (SWEEP) ---
@@ -420,6 +445,10 @@ class InputPanel(QWidget):
         self.input_samples.setFixedWidth(105)
         self.input_discard_first.setFixedWidth(105)
 
+        # Label แสดงจำนวนรอบวัดทั้งหมดต่อ 1 ความถี่ = Discard + Samples
+        self.lbl_total_rounds_list = QLabel("-")
+        self.lbl_total_rounds_list.setStyleSheet("color: #38bdf8; font-weight: bold;")
+
         grid_list_nums.addWidget(QLabel("จำนวนรอบวัดซ้ำต่อความถี่ (Samples per Sweep):"), 0, 0)
         grid_list_nums.addWidget(self.input_samples, 0, 1)
         grid_list_nums.addWidget(QLabel("ครั้ง"), 0, 2)
@@ -427,6 +456,13 @@ class InputPanel(QWidget):
         grid_list_nums.addWidget(QLabel("ทิ้งค่าตัวอย่างแรกสุด (Discard First Reading):"), 1, 0)
         grid_list_nums.addWidget(self.input_discard_first, 1, 1)
         grid_list_nums.addWidget(QLabel("ครั้ง"), 1, 2)
+
+        grid_list_nums.addWidget(QLabel("รวมรอบวัดทั้งหมด/ความถี่:"), 2, 0)
+        grid_list_nums.addWidget(self.lbl_total_rounds_list, 2, 1)
+
+        # เชื่อมสัญญาณเพื่ออัปเดต label ทุกครั้งที่ค่าเปลี่ยน
+        # (signal connect และการคำนวณจริงอยู่ใน app_controller.py เพื่อรวมไว้กับ
+        #  update_calculated_points ของ SWEEP ให้อยู่ที่เดียวกัน)
 
         v_list.addLayout(grid_list_nums)
 
@@ -454,7 +490,7 @@ class InputPanel(QWidget):
         self.combo_level_mode = QComboBox()
         self.combo_level_mode.addItem("Vrms", userData="Voltage")
         self.combo_level_mode.addItem("Arms", userData="Current")
-        self.combo_level_mode.setFixedWidth(105)
+        self.combo_level_mode.setFixedWidth(103)
 
         # Label อยู่แถวบน, SpinBox + Dropdown อยู่แถวล่าง
         v_signal.addWidget(QLabel("ระดับสัญญาณ (Signal Level):"))
@@ -508,7 +544,7 @@ class InputPanel(QWidget):
         self.lbl_dc_warning = QLabel("")
         self.lbl_dc_warning.setWordWrap(True)
         self.lbl_dc_warning.setMaximumWidth(190)
-        self.lbl_dc_warning.setStyleSheet("color: #ff9900; font-weight: bold; font-size: 11px;")
+        self.lbl_dc_warning.setStyleSheet("color: #FF9900; font-weight: bold; font-size: 11px;")
         v_dc_inner.addWidget(self.lbl_dc_warning)
 
         v_dc.addWidget(self.widget_dc_inner)

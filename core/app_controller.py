@@ -387,10 +387,16 @@ class AppController(QObject):
             'freq_list_raw': v.input_panel.input_freq_list.text(),
             'samples_per_freq': v.input_panel.input_samples.value(),
             'discard_first': v.input_panel.input_discard_first.value(),
+            # SINGLE mode: N ครั้ง + Discard First
+            'n_single':      v.input_panel.input_n_single.value(),
+            'discard_single': v.input_panel.input_discard_single.value(),
+            # True = session แรก (ยังไม่มีข้อมูล) → ทำ Discard
+            # False = กด Start ต่อเนื่อง (เครื่องนิ่งแล้ว) → ไม่ Discard ซ้ำ
+            'is_first_single_session': (len(self.graph_x_data) == 0),
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
             'level_mode': v.input_panel.combo_level_mode.currentData(),
-            'alc_enabled': v.input_panel.chk_alc.isChecked(),           
+            'alc_enabled': v.input_panel.chk_alc.isChecked(),
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
@@ -569,6 +575,9 @@ class AppController(QObject):
             v.input_panel.input_freq_list.setEnabled(run_mode == "LIST")
             v.input_panel.input_samples.setEnabled(run_mode == "LIST")
             v.input_panel.input_discard_first.setEnabled(run_mode == "LIST")
+            # SINGLE mode widgets
+            v.input_panel.input_n_single.setEnabled(run_mode == "SINGLE")
+            v.input_panel.input_discard_single.setEnabled(run_mode == "SINGLE")
         else:
             v.input_panel.input_start_freq.setEnabled(False)
             v.input_panel.input_stop_freq.setEnabled(False)
@@ -576,6 +585,9 @@ class AppController(QObject):
             v.input_panel.input_freq_list.setEnabled(False)
             v.input_panel.input_samples.setEnabled(False)
             v.input_panel.input_discard_first.setEnabled(False)
+            # SINGLE: ล็อก N แต่ยังเปลี่ยน Discard ได้ (ไม่มีผลกับข้อมูลที่วัดไปแล้ว)
+            v.input_panel.input_n_single.setEnabled(False)
+            v.input_panel.input_discard_single.setEnabled(False)
 
         # [restored] เช็คใหม่ทุกครั้งที่ session lock เปลี่ยน (เผื่อ mode เปลี่ยนระหว่างล็อก/ปลดล็อก)
         self.validate_freq_list()
@@ -674,6 +686,8 @@ class AppController(QObject):
         v.input_panel.input_freq_list.setEnabled(is_list)
         v.input_panel.input_samples.setEnabled(is_list)
         v.input_panel.input_discard_first.setEnabled(is_list)
+        v.input_panel.input_n_single.setEnabled(is_single)
+        v.input_panel.input_discard_single.setEnabled(is_single)
 
         # ซ่อน checkbox "คำนวณ PPM ในตารางสถิติ" เมื่อไม่ได้อยู่โหมด LIST
         # และ reset สถานะเป็นไม่ติ๊กเสมอเมื่อออกจาก LIST

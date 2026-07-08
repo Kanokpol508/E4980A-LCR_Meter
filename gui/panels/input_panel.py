@@ -309,7 +309,31 @@ class InputPanel(QWidget):
         self.input_freq.setSingleStep(100)
         self.input_freq.setValue(100000.0)
 
+        # จำนวนครั้งที่วัดซ้ำ (N) ใน SINGLE mode
+        self.input_n_single = QSpinBox()
+        self.input_n_single.setRange(1, 9999)
+        self.input_n_single.setValue(10)
+        self.input_n_single.setFixedWidth(105)
+        self.input_n_single.setToolTip(
+            "จำนวนครั้งที่วัดซ้ำต่อ 1 ครั้งที่กด Start\n"
+            "ยิ่งมาก Type A (ppm) ยิ่งน่าเชื่อถือ\n"
+            "แนะนำ: ≥ 10 ครั้ง สำหรับงาน Metrology"
+        )
+
+        # Discard First Reading ใน SINGLE mode (ทิ้งค่าแรกหลังตั้งค่าเครื่อง)
+        self.input_discard_single = QSpinBox()
+        self.input_discard_single.setRange(0, 5)
+        self.input_discard_single.setValue(1)
+        self.input_discard_single.setFixedWidth(105)
+        self.input_discard_single.setToolTip(
+            "จำนวนครั้งแรกที่วัดแล้วทิ้ง ไม่นำไปคำนวณสถิติ\n"
+            "เครื่องต้องใช้เวลาปรับตัวหลังตั้งค่า ค่าแรกๆ อาจยังไม่นิ่ง\n"
+            "ทำงานเฉพาะครั้งแรกของ session (กด Start ครั้งที่ 2 เป็นต้นไปไม่ Discard)"
+        )
+
         v_freq_single.addLayout(_make_fixed_row("ความถี่ (Frequency):", self.input_freq, "Hz"))
+        v_freq_single.addLayout(_make_fixed_row("จำนวนครั้งที่วัด (Readings Count):", self.input_n_single, "ครั้ง"))
+        v_freq_single.addLayout(_make_fixed_row("ทิ้งค่าตัวอย่างแรกสุด (Discard First Reading):", self.input_discard_single, "ครั้ง"))
         v_mode.addWidget(self.widget_freq_single)
 
         # --- เนื้อหาย่อย: สแกนความถี่ Linear (SWEEP) ---
@@ -430,7 +454,7 @@ class InputPanel(QWidget):
         self.combo_level_mode = QComboBox()
         self.combo_level_mode.addItem("Vrms", userData="Voltage")
         self.combo_level_mode.addItem("Arms", userData="Current")
-        self.combo_level_mode.setFixedWidth(103)
+        self.combo_level_mode.setFixedWidth(105)
 
         # Label อยู่แถวบน, SpinBox + Dropdown อยู่แถวล่าง
         v_signal.addWidget(QLabel("ระดับสัญญาณ (Signal Level):"))
@@ -484,7 +508,7 @@ class InputPanel(QWidget):
         self.lbl_dc_warning = QLabel("")
         self.lbl_dc_warning.setWordWrap(True)
         self.lbl_dc_warning.setMaximumWidth(190)
-        self.lbl_dc_warning.setStyleSheet("color: #FF9900; font-weight: bold; font-size: 11px;")
+        self.lbl_dc_warning.setStyleSheet("color: #ff9900; font-weight: bold; font-size: 11px;")
         v_dc_inner.addWidget(self.lbl_dc_warning)
 
         v_dc.addWidget(self.widget_dc_inner)

@@ -109,26 +109,45 @@ class MeasurementWorker(QThread):
             self.error_occurred.emit(f"การวัดขัดข้อง{freq_info} (Status: {stat})")
 
     def _run_single_measurement(self, lcr):
-        """ตรรกะการวัดค่าแบบจุดเดียว (Single Point)"""
-        if not self.is_running:
-            return
+        """
+        ตรรกะการวัดค่าแบบจุดเดียว (Single Point)
+        - วัดซ้ำ n_single ครั้ง ตามที่ผู้ใช้กำหนด
+        - Discard First: ทิ้งค่าแรก discard_single ครั้ง เฉพาะตอนเริ่ม session ใหม่
+          (ตรวจจากการที่ยังไม่มีข้อมูลใน graph_x_data ก่อนกด Start ครั้งนี้)
+        """
+        n_single      = max(1, int(self.settings.get('n_single', 1)))
+        discard_single = max(0, int(self.settings.get('discard_single', 0)))
+        is_first_session = self.settings.get('is_first_single_session', True)
 
-        lcr.wait_until_ready()
-        lcr.trigger()
+        total_rounds = (discard_single if is_first_session else 0) + n_single
+        freq = self.settings.get('freq', 1000.0)
 
-        pri, sec, stat = lcr.fetch_measurement()
+        for round_idx in range(total_rounds):
+            if not self.is_running:
+                break
 
-        if stat == "SUCCESS":
-            real_result = {
-                'freq': self.settings.get('freq', 1000.0),
-                'primary': float(pri),
-                'secondary': float(sec)
-            }
-            self.data_ready.emit(real_result)
-        else:
-            self._handle_hardware_status(stat)
+            is_discarded = is_first_session and (round_idx < discard_single)
 
-        self.progress_updated.emit(100)
+            lcr.wait_until_ready()
+            lcr.trigger()
+            pri, sec, stat = lcr.fetch_measurement()
+
+            if is_discarded:
+                # วัดเพื่อทิ้ง — ไม่ emit data_ready
+                continue
+
+            usable_idx = round_idx - (discard_single if is_first_session else 0)
+            percent = int(((usable_idx + 1) / n_single) * 100)
+            self.progress_updated.emit(percent)
+
+            if stat == "SUCCESS":
+                self.data_ready.emit({
+                    'freq':      freq,
+                    'primary':   float(pri),
+                    'secondary': float(sec),
+                })
+            else:
+                self._handle_hardware_status(stat, current_freq=freq)
 
     def _run_sweep_measurement(self, lcr):
         """ตรรกะการวัดค่าแบบสแกนความถี่ (Linear sweep ด้วย Step size)"""

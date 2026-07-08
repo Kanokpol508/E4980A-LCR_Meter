@@ -180,16 +180,27 @@ class E4980A:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         self.inst.write(f":AMPLitude:ALC {'ON' if enabled else 'OFF'}")
 
+    # ตาราง Map ชื่อที่ UI ใช้ → SCPI token ที่ :APERture รับได้จริง
+    _TIME_MODE_MAP = {
+        "SHORT":  "SHOR",
+        "MEDIUM": "MED",
+        "LONG":   "LONG",
+        "SHOR":   "SHOR",   # fallback ถ้าส่งมาเป็น token ตรงๆ อยู่แล้ว
+        "MED":    "MED",
+    }
+
     def set_aperture(self, time_mode: str, averaging: int = 1):
-        """ตั้งเวลาการวัดและค่าเฉลี่ย (SHOR, MED, LONG) และ (1-256)"""
+        """
+        ตั้งเวลาการวัดและค่าเฉลี่ย
+        รับค่า 'SHORT' / 'MEDIUM' / 'LONG' จาก UI แล้ว map เป็น SCPI token
+        (SCPI รับได้แค่ SHOR / MED / LONG — ไม่รับ MEDIUM)
+        """
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
-        
-        # รับประกันว่าค่า Averaging จะต้องอยู่ในช่วง 1 ถึง 256 เท่านั้นตามสเปคเครื่อง
+
         avg_factor = max(1, min(256, int(averaging)))
-        
-        # ผูกคำสั่ง Averaging เข้าไปใน APERture ตามคู่มือ
-        self.inst.write(f":APERture {time_mode},{avg_factor}")
+        scpi_token = self._TIME_MODE_MAP.get(time_mode.upper(), "MED")
+        self.inst.write(f":APERture {scpi_token},{avg_factor}")
 
     def set_cable_length(self, cable_text: str):
         """

@@ -672,6 +672,17 @@ class AppController(QObject):
         v.input_panel.input_samples.setEnabled(is_list)
         v.input_panel.input_discard_first.setEnabled(is_list)
 
+        # ซ่อน checkbox "คำนวณ PPM ในตารางสถิติ" เมื่อไม่ได้อยู่โหมด LIST
+        # และ reset สถานะเป็นไม่ติ๊กเสมอเมื่อออกจาก LIST
+        # เพื่อป้องกัน PPM ทำงานค้างอยู่ในโหมดที่ไม่รองรับ
+        # ผู้ใช้ต้องกลับมา LIST แล้วติ๊กเปิดใหม่ทุกครั้ง
+        if not is_list:
+            v.adv_panel.chk_dev_ppm_enable.setChecked(False)
+        v.adv_panel.chk_dev_ppm_enable.setVisible(is_list)
+
+        # Sync สถานะ widget_dev_inner หลังเปลี่ยน visibility/checked state
+        self.toggle_deviation()
+
         self.update_hardware_limits()
         self.validate_freq_list()      
         self.update_start_button_state()

@@ -5,14 +5,14 @@ from hardware.lcr_meter import E4980A
 
 class MeasurementWorker(QThread):
     """คลาสลูกน้องหลังบ้าน ทำหน้าที่สื่อสารกับฮาร์ดแวร์ (LCR Meter) ของจริง"""
-    data_ready = pyqtSignal(dict)               # ส่งข้อมูลผลการวัด
-    error_occurred = pyqtSignal(str)            # ส่งข้อความ Error
-    progress_updated = pyqtSignal(int)          # ส่งเลขเปอร์เซ็นต์
-    finished = pyqtSignal()                     # ส่งสัญญาณจบการทำงาน
+    data_ready       = pyqtSignal(dict)     # ส่งข้อมูลผลการวัด
+    error_occurred   = pyqtSignal(str)      # ส่งข้อความ Error
+    progress_updated = pyqtSignal(int)      # ส่งเลขเปอร์เซ็นต์
+    finished         = pyqtSignal()         # ส่งสัญญาณจบการทำงาน
 
     def __init__(self, settings: dict):
         super().__init__()
-        self.settings = settings
+        self.settings   = settings
         self.is_running = True
 
     def run(self):
@@ -40,7 +40,7 @@ class MeasurementWorker(QThread):
             avg       = self.settings.get('avg', 1)
             imp_range = self.settings.get('imp_range', 'AUTO')
 
-            level_mode = self.settings.get('level_mode', 'Voltage')
+            level_mode  = self.settings.get('level_mode', 'Voltage')
             alc_enabled = self.settings.get('alc_enabled', False)
 
             lcr.set_measurement_mode(scpi_mode)
@@ -48,6 +48,11 @@ class MeasurementWorker(QThread):
             lcr.set_alc(alc_enabled)
             lcr.set_frequency(freq)
             lcr.set_aperture(time_mode, avg)
+
+            # ปรับ VISA timeout ให้เหมาะกับ time_mode + averaging ที่ใช้จริง
+            # ต้องเรียกหลัง set_aperture() เสมอ เพราะ timeout ขึ้นกับ 2 ค่านี้
+            # ป้องกัน VisaIOError: Timeout เมื่อใช้ LONG aperture + avg จำนวนมาก
+            lcr.set_measurement_timeout(time_mode, avg)
 
             # ต้องตั้งค่านี้ก่อนวัดเสมอ เพราะมีผลกับทุกการวัดทันที (ไม่เกี่ยวกับ OPEN/SHORT Correction)
             cable_text = self.settings.get('cable', '0 m')
@@ -115,8 +120,8 @@ class MeasurementWorker(QThread):
         - Discard First: ทิ้งค่าแรก discard_single ครั้ง เฉพาะตอนเริ่ม session ใหม่
           (ตรวจจากการที่ยังไม่มีข้อมูลใน graph_x_data ก่อนกด Start ครั้งนี้)
         """
-        n_single      = max(1, int(self.settings.get('n_single', 1)))
-        discard_single = max(0, int(self.settings.get('discard_single', 0)))
+        n_single         = max(1, int(self.settings.get('n_single', 1)))
+        discard_single   = max(0, int(self.settings.get('discard_single', 0)))
         is_first_session = self.settings.get('is_first_single_session', True)
 
         total_rounds = (discard_single if is_first_session else 0) + n_single
@@ -152,8 +157,8 @@ class MeasurementWorker(QThread):
     def _run_sweep_measurement(self, lcr):
         """ตรรกะการวัดค่าแบบสแกนความถี่ (Linear sweep ด้วย Step size)"""
         start_f = self.settings.get('start_freq', 100.0)
-        stop_f = self.settings.get('stop_freq', 1000000.0)
-        step_f = self.settings.get('step_freq', 20000.0)
+        stop_f  = self.settings.get('stop_freq', 1000000.0)
+        step_f  = self.settings.get('step_freq', 20000.0)
 
         if step_f <= 0:
             step_f = 1.0
@@ -180,12 +185,11 @@ class MeasurementWorker(QThread):
             self.progress_updated.emit(percent)
 
             if stat == "SUCCESS":
-                real_result = {
-                    'freq': current_freq,
-                    'primary': float(pri),
+                self.data_ready.emit({
+                    'freq':      current_freq,
+                    'primary':   float(pri),
                     'secondary': float(sec)
-                }
-                self.data_ready.emit(real_result)
+                })
             else:
                 self._handle_hardware_status(stat, current_freq)
 
@@ -236,8 +240,8 @@ class MeasurementWorker(QThread):
         (ไม่นำไปคำนวณสถิติ/ไม่ขึ้นกราฟ) เหลือใช้คำนวณสถิติครบตามจำนวน samples
         ที่ผู้ใช้ตั้งใจไว้จริงๆ
         """
-        raw_text = self.settings.get('freq_list_raw', '')
-        samples = max(1, int(self.settings.get('samples_per_freq', 1)))
+        raw_text      = self.settings.get('freq_list_raw', '')
+        samples       = max(1, int(self.settings.get('samples_per_freq', 1)))
         discard_first = max(0, int(self.settings.get('discard_first', 0)))
 
         total_rounds_per_freq = discard_first + samples
@@ -249,7 +253,7 @@ class MeasurementWorker(QThread):
             return
 
         total_points = len(frequencies) * total_rounds_per_freq
-        done_points = 0
+        done_points  = 0
 
         for current_freq in frequencies:
             if not self.is_running:
@@ -276,13 +280,12 @@ class MeasurementWorker(QThread):
                 if stat == "SUCCESS":
                     if not is_discarded:
                         usable_sample_index = round_index - discard_first + 1  # 1..samples
-                        real_result = {
-                            'freq': current_freq,
+                        self.data_ready.emit({
+                            'freq':         current_freq,
                             'sample_index': usable_sample_index,
-                            'primary': float(pri),
-                            'secondary': float(sec)
-                        }
-                        self.data_ready.emit(real_result)
+                            'primary':      float(pri),
+                            'secondary':    float(sec)
+                        })
                 elif not is_discarded:
                     self._handle_hardware_status(stat, current_freq)
 

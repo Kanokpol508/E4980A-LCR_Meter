@@ -29,21 +29,21 @@ class E4980A:
         """เชื่อมต่อกับเครื่อง LCR Meter"""
         try:
             self.inst = self.rm.open_resource(resource_address)
-            self.inst.timeout = 5000                # ตั้งเวลารอ (มิลลิวินาที)
-            
+            self.inst.timeout = 5000                # ค่า timeout เริ่มต้น (ms) — จะถูกปรับโดย set_measurement_timeout() ก่อนวัดจริง
+
             # เคลียร์ Error ค้างเก่า
             self.inst.write("*CLS")
-            
+
             # ป้องกัน Trigger หลุด: ตั้ง Source เป็น BUS และเปิดโหมดรับ Trigger ต่อเนื่อง
             self.inst.write(":TRIGger:SOURce BUS")
             self.inst.write(":INITiate:CONTinuous ON")
-            
+
             idn = self.inst.query("*IDN?")
-            
+
             self.is_connected = True
             print(f"✅ เชื่อมต่อสำเร็จ: {idn.strip()}")
             return True, idn.strip()
-            
+
         except Exception as e:
             self.is_connected = False
             error_msg = f"❌ ไม่สามารถเชื่อมต่อได้: {str(e)}"
@@ -56,7 +56,7 @@ class E4980A:
             try:
                 # ปิด DC Bias ทุกครั้งก่อนตัดการเชื่อมต่อเพื่อความปลอดภัย
                 self.inst.write(":BIAS:STAT OFF")
-                
+
                 # คืนค่า Trigger กลับสู่สถานะมาตรฐาน (Preset)
                 self.inst.write(":INITiate:CONTinuous OFF")
                 self.inst.write(":TRIGger:SOURce INTernal")
@@ -78,6 +78,49 @@ class E4980A:
         except pyvisa.errors.VisaIOError:
             pass
 
+    # ตาราง base time (ms) ต่อ 1 reading สำหรับแต่ละ time_mode
+    # อ้างอิงจาก Keysight E4980A Datasheet (Measurement Speed):
+    #   SHORT  ≈   7 ms/reading
+    #   MEDIUM ≈  20 ms/reading
+    #   LONG   ≈  80 ms/reading
+    _BASE_TIME_MS = {
+        "SHORT": 7,
+        "SHOR":  7,
+        "MED":   20,
+        "MEDIUM":20,
+        "LONG":  80,
+    }
+    # overhead ของ VISA I/O + jitter + processing บน host + margin ความปลอดภัย
+    _OVERHEAD_MS = 2000   # 2 วินาที สำหรับ VISA roundtrip + UI overhead
+    _MARGIN_MULT = 1.5    # คูณ safety factor 1.5× กันกรณีเครื่องช้ากว่า spec ทั่วไป
+
+    def set_measurement_timeout(self, time_mode: str, averaging: int = 1):
+        """
+        ปรับ VISA timeout แบบไดนามิกให้เหมาะกับ time_mode และ averaging ที่ใช้จริง
+        ป้องกัน VisaIOError: Timeout เมื่อใช้ LONG aperture ร่วมกับ averaging จำนวนมาก
+
+        สูตร:  timeout = (_BASE_TIME_MS[mode] × avg × _MARGIN_MULT) + _OVERHEAD_MS
+        ตัวอย่าง:
+            LONG + avg=256 → (80 × 256 × 1.5) + 2000 ≈ 32,720 ms (~33 วินาที)
+            SHORT + avg=1  → (7  × 1   × 1.5) + 2000 ≈  2,011 ms (~2 วินาที)
+
+        เรียกหลัง connect() และหลัง set_aperture() เสมอ
+        ค่า timeout ไม่ต่ำกว่า 5,000 ms (ค่าเริ่มต้น) เพื่อรองรับ overhead พื้นฐาน
+        """
+        if not self.is_connected:
+            return
+
+        avg_clamped = max(1, min(256, int(averaging)))
+        mode_key    = str(time_mode).upper()
+        base_ms     = self._BASE_TIME_MS.get(mode_key, 20)   # fallback เป็น MEDIUM ถ้า key ไม่พบ
+
+        calculated  = int(base_ms * avg_clamped * self._MARGIN_MULT) + self._OVERHEAD_MS
+        new_timeout = max(5000, calculated)
+
+        self.inst.timeout = new_timeout
+        print(f"⏱ Timeout ปรับเป็น {new_timeout} ms "
+              f"(mode={mode_key}, avg={avg_clamped}, base={base_ms}ms/reading)")
+
     def apply_dc_bias(self, enable: bool, level: float, is_voltage: bool):
         """ตั้งค่า DC Bias อย่างปลอดภัย (ปิดก่อน เปลี่ยนค่า แล้วค่อยเปิด) ป้องกัน Spike"""
         if not self.is_connected:
@@ -93,7 +136,7 @@ class E4980A:
             else:
                 self.inst.write(f":BIAS:CURRent:LEVel {level}")
             self.wait_until_ready()
-            
+
             self.inst.write(":BIAS:STAT ON")
             self.wait_until_ready()
 
@@ -104,15 +147,15 @@ class E4980A:
         """สั่งเครื่องทำ OPEN หรือ SHORT Correction แบบเต็มรูปแบบ"""
         if not self.is_connected:
             return False, "⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด"
-        
+
         # ป้องกัน NameError ใน finally
-        original_timeout = 5000 
-        
+        original_timeout = 5000
+
         try:
             # 1. การทำ Correction ใช้เวลานาน ต้องเพิ่ม Timeout
             original_timeout = self.inst.timeout
-            self.inst.timeout = 60000 
-            
+            self.inst.timeout = 60000
+
             # 2. เปิดโหมด Correction ให้เป็น ON ก่อน แล้วสั่ง Execute
             if corr_type.upper() == "OPEN":
                 self.inst.write(":CORR:OPEN:STAT ON")
@@ -122,12 +165,12 @@ class E4980A:
                 self.inst.write(":CORR:SHOR:EXEC")
             else:
                 return False, "ประเภท Correction ไม่ถูกต้อง"
-            
+
             # 3. ใช้ wait_until_ready รอสถานะ OPC แทนการใส่ ;*OPC? ต่อท้าย
             self.wait_until_ready()
-            
+
             return True, f"ทำ {corr_type.upper()} Correction สำเร็จเรียบร้อย!"
-            
+
         except pyvisa.errors.VisaIOError as e:
             return False, f"หมดเวลารอ (Timeout) เครื่องใช้เวลาประมวลผลนานเกินไป\n{str(e)}"
         except Exception as e:
@@ -252,19 +295,19 @@ class E4980A:
         """สั่งทริกเกอร์และอ่านค่าวัด คืนค่าเป็น (primary, secondary, status)"""
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
-        
+
         try:
             raw_data = self.inst.query(":FETCh?")
             parts = raw_data.strip().split(',')
-            
+
             # รองรับ 3 ค่า (ตอนปิด Comparator) หรือ 4 ค่า (ตอนเปิด Comparator)
             if len(parts) not in [3, 4]:
                 return None, None, f"PARSE_ERROR: ข้อมูลผิดรูปแบบ ({raw_data})"
-                
-            primary = float(parts[0])
+
+            primary   = float(parts[0])
             secondary = float(parts[1])
-            status = int(float(parts[2])) 
-            
+            status    = int(float(parts[2]))
+
             # ตรวจสอบ Status โค้ดตามคู่มือ
             if status == -1:
                 return None, None, "NO_DATA"
@@ -276,12 +319,12 @@ class E4980A:
                 return None, None, "ALC_FAIL"
             elif status != 0:
                 return None, None, f"UNKNOWN_ERROR_CODE_{status}"
-            
+
             # ดักจับค่า Overload สำรอง (กรณี status เป็น 0 แต่ค่าท่วมไปที่ 9.9e37)
             if primary >= self.OVERLOAD_LIMIT or secondary >= self.OVERLOAD_LIMIT:
                 return None, None, "OVERLOAD"
-                
+
             return primary, secondary, "SUCCESS"
-            
+
         except pyvisa.errors.VisaIOError as e:
             return None, None, f"TIMEOUT/IO_ERROR: {str(e)}"

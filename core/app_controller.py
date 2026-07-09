@@ -113,6 +113,17 @@ class AppController(QObject):
         # ตรวจสอบ Frequency List ทุกครั้งที่มีการแก้ไข (เฉพาะมีผลตอนอยู่โหมด List)
         v.input_panel.input_freq_list.freq_changed.connect(self.validate_freq_list)
 
+        # รีเซ็ตสถานะปุ่ม Correction เมื่อเปลี่ยนค่าที่ทำให้ Correction ใช้ไม่ได้
+        # อ้างอิงจากคู่มือ E4980A หน้า 117: "after correction, different length cable/
+        # different fixture is connected or settings of frequency/level is changed"
+        # → Cable Length: ส่งผลโดยตรงต่อ phase compensation ของ correction
+        # → Meas Mode (เช่น CPD→ZTD): เปลี่ยนฟังก์ชันวัด correction data ไม่ตรงกัน
+        # → Signal Level/หน่วย: คู่มือระบุตรงๆ ว่า level เปลี่ยนแล้ว correction ไม่ valid
+        v.input_panel.combo_cable.currentIndexChanged.connect(self._reset_correction_status)
+        v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._reset_correction_status)
+        v.input_panel.input_volt.valueChanged.connect(self._reset_correction_status)
+        v.input_panel.combo_level_mode.currentIndexChanged.connect(self._reset_correction_status)
+
     # ========================================================
     # Logic Methods
     # ========================================================
@@ -303,6 +314,37 @@ class AppController(QObject):
             QMessageBox.critical(self.view, "Correction ล้มเหลว", f"❌ {msg}")
 
         self.current_corr_type = None
+
+    def _reset_correction_status(self):
+        """
+        รีเซ็ตปุ่ม OPEN/SHORT Correction กลับสู่สถานะเริ่มต้น (สีเทา / ไม่มี OK)
+        เรียกอัตโนมัติเมื่อผู้ใช้เปลี่ยนค่าที่ทำให้ Correction data ที่ทำไว้ไม่ valid อีกต่อไป
+        ได้แก่: Cable Length, Meas Mode, Signal Level, Signal Level Unit
+        (อ้างอิงคู่มือ E4980A หน้า 117)
+
+        หมายเหตุ: method นี้รีเซ็ตเฉพาะ label/style บนปุ่ม GUI เพื่อแจ้งเตือนผู้ใช้
+        ข้อมูล Correction ที่อยู่ในตัวเครื่อง (hardware) ไม่ถูกลบ — ผู้ใช้ต้องกด
+        OPEN/SHORT Correction ใหม่เองเพื่อให้ข้อมูลตรงกับการตั้งค่าปัจจุบัน
+        """
+        adv = self.view.adv_panel
+        default_style = ""  # คืน stylesheet เป็นค่าว่าง -> ใช้ style จาก QSS ของโปรแกรม
+
+        open_is_ok  = adv.btn_open_corr.text()  == "OPEN Correction (OK)"
+        short_is_ok = adv.btn_short_corr.text() == "SHORT Correction (OK)"
+
+        if open_is_ok:
+            adv.btn_open_corr.setStyleSheet(default_style)
+            adv.btn_open_corr.setText("OPEN Correction")
+            self.log.warning(
+                "⚠️ การตั้งค่าเปลี่ยน — OPEN Correction อาจไม่ valid แล้ว กรุณาทำ Correction ใหม่"
+            )
+
+        if short_is_ok:
+            adv.btn_short_corr.setStyleSheet(default_style)
+            adv.btn_short_corr.setText("SHORT Correction")
+            self.log.warning(
+                "⚠️ การตั้งค่าเปลี่ยน — SHORT Correction อาจไม่ valid แล้ว กรุณาทำ Correction ใหม่"
+            )
 
     def handle_clear_graph(self):
         reply = QMessageBox.question(

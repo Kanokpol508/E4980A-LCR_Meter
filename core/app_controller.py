@@ -182,12 +182,50 @@ class AppController(QObject):
         self.validate_visa()
 
     def set_ui_locked(self, locked: bool):
+        """
+        ล็อก/ปลดล็อก UI ระหว่างการวัด เพื่อป้องกันผู้ใช้เปลี่ยนค่าจนโปรแกรมพัง
+
+        ล็อกระหว่างวัด (locked=True):
+          - conn_panel  : VISA dropdown + ปุ่ม Refresh (ห้ามเปลี่ยนเครื่องกลางวัด)
+          - input_panel : ทุก widget (Meas mode, ความถี่, Signal Level,
+                          Hardware/Timing, DC Bias, Freq List, Run mode)
+          - adv_panel   : Correction buttons + Deviation inputs/checkboxes
+                          (ห้ามทำ Correction หรือเปลี่ยน Ref กลางวัด)
+          - ctrl_panel  : ปุ่ม Verify & Apply + ปุ่ม Clear Data
+        ไม่ล็อก:
+          - btn_stop    : ต้องกดหยุดได้เสมอ
+          - log_display : ผู้ใช้ต้องอ่าน log ระหว่างวัดได้
+
+        เมื่อปลดล็อก (locked=False):
+          - คืนสถานะ Start button ตาม error flags ปัจจุบัน
+          - คืนสถานะ session lock ตามโหมดและข้อมูลในกราฟ
+        """
         v = self.view
-        v.left_content.setEnabled(not locked)
+
+        # --- Connection Panel ---
+        v.conn_panel.combo_visa.setEnabled(not locked)
+        v.conn_panel.btn_refresh.setEnabled(not locked)
+
+        # --- Input Panel (ทุก group) ---
+        # ล็อก group ระดับบนด้วย setEnabled ครอบคลุมทุก widget ใน group นั้นทันที
+        v.input_panel.group_prop.setEnabled(not locked)   # Meas mode group
+        v.input_panel.group_mode.setEnabled(not locked)   # ความถี่ / Sweep / List group
+        v.input_panel.group_signal.setEnabled(not locked) # Signal Level + ALC
+        v.input_panel.group_dc.setEnabled(not locked)     # DC Bias
+        v.input_panel.group_hw.setEnabled(not locked)     # Hardware & Timing
         v.input_panel.combo_run_mode.setEnabled(not locked)
 
+        # --- Advanced Panel ---
+        v.adv_panel.btn_open_corr.setEnabled(not locked)
+        v.adv_panel.btn_short_corr.setEnabled(not locked)
+        v.adv_panel.chk_dev_graph_enable.setEnabled(not locked)
+        v.adv_panel.chk_dev_ppm_enable.setEnabled(not locked)
+        v.adv_panel.widget_dev_inner.setEnabled(not locked)
+
+        # --- Control Panel ---
+        v.ctrl_panel.btn_verify.setEnabled(not locked)
         v.ctrl_panel.btn_clear.setEnabled(not locked)
-        v.ctrl_panel.btn_stop.setEnabled(locked)
+        v.ctrl_panel.btn_stop.setEnabled(locked)   # ต้องกดได้เสมอตอนวัด
 
         if locked:
             v.ctrl_panel.btn_start.setEnabled(False)
@@ -197,7 +235,7 @@ class AppController(QObject):
             v.ctrl_panel.btn_stop.setText("STOP")
             self.update_start_button_state()
             self.update_session_lock()
-
+            
     def handle_verify_apply(self):
         v = self.view
         visa_address = v.conn_panel.combo_visa.currentText()

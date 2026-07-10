@@ -3,6 +3,7 @@
 # ทำงานได้ปลอดภัยข้าม Thread เพราะใช้ QMetaObject.invokeMethod แทนการเรียก UI ตรงๆ
 
 import logging
+from collections import deque
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                               QPushButton, QTextEdit, QLabel, QComboBox,
                               QMessageBox)
@@ -60,6 +61,9 @@ class LogDisplay(QWidget):
         "ERROR":    "#f87171",   # แดง
         "CRITICAL": "#ff4444",   # แดงสด
     }
+
+    # จำนวน record สูงสุดที่เก็บไว้ใน buffer (ใช้ร่วมกับ deque maxlen)
+    _MAX_RECORDS = 2000
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -143,8 +147,10 @@ class LogDisplay(QWidget):
         )
         layout.addWidget(self.text_area)
 
-        # เก็บ log records ทั้งหมดไว้เพื่อ re-render ตอนเปลี่ยน filter
-        self._all_records: list[tuple[str, str]] = []  # [(msg, level), ...]
+        # [จุดที่ 5] เปลี่ยนจาก list เป็น deque(maxlen=_MAX_RECORDS)
+        # เดิม: self._all_records = self._all_records[-2000:] ทุก append → O(n) ต่อครั้ง
+        # ใหม่: deque จัดการตัดทิ้งอัตโนมัติเมื่อเกิน maxlen → O(1) ต่อครั้ง
+        self._all_records: deque[tuple[str, str]] = deque(maxlen=self._MAX_RECORDS)
 
     def _setup_logger(self):
         """สร้าง Logger ชื่อ 'LCR' และผูก QtLogHandler เข้ากับ text_area"""
@@ -169,12 +175,11 @@ class LogDisplay(QWidget):
         """
         รับ log message จาก QtLogHandler (เรียกผ่าน invokeMethod เสมอ จึงอยู่ใน GUI Thread)
         เก็บไว้ใน _all_records แล้วแสดงถ้าผ่าน filter ปัจจุบัน
+
+        [จุดที่ 5] deque.append() เป็น O(1) และตัดทิ้งอัตโนมัติเมื่อเกิน maxlen
+        ไม่ต้องเช็ค len() และสร้าง list ใหม่ทุกครั้งเหมือนเดิมอีกต่อไป
         """
         self._all_records.append((message, level))
-
-        # ตัด record เก่าสุดทิ้งถ้าเกิน 2000 บรรทัด (กัน memory bloat)
-        if len(self._all_records) > 2000:
-            self._all_records = self._all_records[-2000:]
 
         if self._passes_filter(level):
             self._append_colored_line(message, level)
@@ -216,18 +221,35 @@ class LogDisplay(QWidget):
                 .replace(">", "&gt;"))
 
     def _on_filter_changed(self, _text: str):
-        """Re-render ข้อความทั้งหมดใหม่เมื่อเปลี่ยน Level filter"""
-        self.text_area.clear()
+        """
+        Re-render ข้อความทั้งหมดใหม่เมื่อเปลี่ยน Level filter
+
+        [จุดที่ 5] รวม HTML ทั้งหมดเป็น string เดียวแล้ว setHtml() ครั้งเดียว
+        แทนการเรียก insertHtml() ทีละบรรทัด ลด DOM reflow จาก O(n) ครั้ง
+        เหลือ 1 ครั้ง ทำให้การเปลี่ยน filter เร็วขึ้นมากเมื่อมี record จำนวนมาก
+        """
+        font_style = "font-family:'Courier New',monospace; font-size:11pt;"
+        html_parts = []
         for msg, level in self._all_records:
             if self._passes_filter(level):
-                self._append_colored_line(msg, level)
+                color = self.LEVEL_COLORS.get(level, "#e2e8f0")
+                html_parts.append(
+                    f'<span style="color:{color}; {font_style}">'
+                    f'{self._escape_html(msg)}</span><br>'
+                )
+
+        # setHtml() ล้างและเขียนใหม่ทั้งหมดใน 1 ครั้ง
+        self.text_area.setHtml("".join(html_parts))
+
+        # เลื่อนไปที่ท้ายสุดหลัง re-render
+        self.text_area.moveCursor(QTextCursor.MoveOperation.End)
+        self.text_area.ensureCursorVisible()
 
     def copy_log(self):
         """
         คัดลอก log ที่แสดงอยู่บนหน้าจอ (ที่ผ่าน filter แล้ว) ลง Clipboard
         แล้วแสดง popup แจ้งผู้ใช้
         """
-        # รวบรวมเฉพาะบรรทัดที่ผ่าน filter ในรูปแบบ plain text
         visible_lines = [
             msg for msg, level in self._all_records
             if self._passes_filter(level)

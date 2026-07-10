@@ -205,6 +205,26 @@ class AppController(QObject):
             QMessageBox.warning(v, "ตรวจสอบล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการตรวจสอบการตั้งค่า")
             return
 
+        # [จุดที่ 4] Verify & Apply ส่งความถี่จาก input_freq (Single Point) เสมอ
+        # ถ้าผู้ใช้อยู่ใน SWEEP/LIST mode ความถี่ที่ส่งไปอาจไม่ตรงกับที่ใช้วัดจริง
+        # แจ้งเตือนเพื่อให้รับทราบก่อนดำเนินการ (ไม่บล็อก เพราะยังมีประโยชน์สำหรับ
+        # เช็คค่าตั้งอื่นๆ เช่น Signal Level, Aperture, Cable, DC Bias ที่ใช้ร่วมกันทุกโหมด)
+        run_mode = self.get_current_run_mode()
+        if run_mode in ("SWEEP", "LIST"):
+            mode_name = "Sweep" if run_mode == "SWEEP" else "List"
+            reply = QMessageBox.question(
+                v,
+                "แจ้งเตือน — โหมด Verify ในขณะอยู่โหมด " + mode_name,
+                f"ขณะนี้อยู่ในโหมด {mode_name} ซึ่งวัดหลายความถี่\n\n"
+                f"Verify & Apply จะส่งและเช็คค่าที่ความถี่ {v.input_panel.input_freq.value():.2f} Hz\n"
+                f"(จาก Single Point Frequency ไม่ใช่ช่วงความถี่ใน {mode_name})\n\n"
+                "ต้องการดำเนินการ Verify & Apply ต่อหรือไม่?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
         settings = {
             'visa_resource': visa_address,
             'freq': v.input_panel.input_freq.value(),
@@ -327,7 +347,7 @@ class AppController(QObject):
         OPEN/SHORT Correction ใหม่เองเพื่อให้ข้อมูลตรงกับการตั้งค่าปัจจุบัน
         """
         adv = self.view.adv_panel
-        default_style = ""  # คืน stylesheet เป็นค่าว่าง -> ใช้ style จาก QSS ของโปรแกรม
+        default_style = ""
 
         open_is_ok  = adv.btn_open_corr.text()  == "OPEN Correction (OK)"
         short_is_ok = adv.btn_short_corr.text() == "SHORT Correction (OK)"
@@ -364,7 +384,6 @@ class AppController(QObject):
         pri_label = "Primary"
         sec_label = "Secondary"
 
-        # --- Primary label ---
         if scpi_mode.startswith("CP"):
             pri_label = "Capacitance, Cp (F)"
         elif scpi_mode.startswith("CS"):
@@ -380,7 +399,6 @@ class AppController(QObject):
         elif scpi_mode.startswith("Y") or scpi_mode == "GB":
             pri_label = "Admittance, Y (S)"
 
-        # --- Secondary label ---
         # ต้องเช็ค "TD"/"TR" ก่อน "D" เพราะ ZTD/YTD ลงท้ายด้วย D ด้วย
         if scpi_mode.endswith("TD"):
             sec_label = "Phase Angle, θd (°)"
@@ -397,7 +415,6 @@ class AppController(QObject):
         elif scpi_mode.endswith("RS") or scpi_mode.endswith("RP") or scpi_mode == "RX":
             sec_label = "Resistance (Ω)"
 
-        # --- Deviation mode ปรับชื่อแกนตามประเภท deviation ---
         if v.adv_panel.chk_dev_graph_enable.isChecked():
             has_pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) is not None
             has_sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) is not None
@@ -429,8 +446,6 @@ class AppController(QObject):
 
     def start_measurement(self):
         # [จุดที่ 1] Guard: ป้องกัน edge case ที่ปุ่ม Start เปิดได้ทั้งที่มี error ค้างอยู่
-        # (เช่น state ไม่ sync กัน หรือ race condition ระหว่าง signal)
-        # เป็น safety net ชั้นที่ 2 ถัดจาก update_start_button_state() ที่ disable ปุ่มไว้
         if self.is_dc_error or self.is_dev_error or self.is_visa_error or self.is_freqlist_error:
             self.log.warning("⚠️ ไม่สามารถเริ่มวัดได้ — ยังมีข้อผิดพลาดค้างอยู่ กรุณาตรวจสอบและแก้ไขก่อน")
             return
@@ -451,7 +466,7 @@ class AppController(QObject):
             self.setup_graph_labels()
 
         settings = {
-            'run_mode': run_mode,  # 'SINGLE' / 'SWEEP' / 'LIST'
+            'run_mode': run_mode,
             'visa_resource': v.conn_panel.combo_visa.currentText(),
             'freq': v.input_panel.input_freq.value(),
             'start_freq': v.input_panel.input_start_freq.value(),
@@ -461,8 +476,6 @@ class AppController(QObject):
             'samples_per_freq': v.input_panel.input_samples.value(),
             'discard_first': v.input_panel.input_discard_first.value(),
             # [จุดที่ 2] เพิ่ม 3 keys ที่ขาดหายไปสำหรับ SINGLE mode
-            # _run_single_measurement() ใช้ทั้ง 3 ค่านี้ — ถ้าไม่ส่งมา
-            # จะ fallback เป็น n=1, discard=0 ทำให้การตั้งค่าใน UI ไม่มีผลเลย
             'n_single':                v.input_panel.input_n_single.value(),
             'discard_single':          v.input_panel.input_discard_single.value(),
             'is_first_single_session': len(self.graph_x_data) == 0,
@@ -518,15 +531,12 @@ class AppController(QObject):
     def handle_data_ready(self, data):
         v = self.view
 
-        # 1. ค่าดิบจากฮาร์ดแวร์
         raw_pri = data.get('primary', 0.0)
         raw_sec = data.get('secondary', 0.0)
 
-        # เก็บค่าดิบลง Array ไว้คำนวณ Type A Uncertainty
         self.graph_raw_pri_y.append(raw_pri)
         self.graph_raw_sec_y.append(raw_sec)
 
-        # 2. ค่าที่จะนำไปแสดงบนกราฟและจอ LCD (อาจถูกปรับด้วย Deviation)
         disp_pri = raw_pri
         disp_sec = raw_sec
 
@@ -562,11 +572,8 @@ class AppController(QObject):
         self.graph_pri_y.append(disp_pri)
         self.graph_sec_y.append(disp_sec)
 
-        # อัปเดตทั้งกราฟ และ Panel สถิติ (โยน raw เข้าไปคำนวณ)
         v.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
         v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, is_single)
-
-        # อัปเดต Statistics Table ทุกโหมด
         self.update_statistics_table()
 
     def update_statistics_table(self):
@@ -583,7 +590,6 @@ class AppController(QObject):
         pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if v.adv_panel.chk_dev_ppm_enable.isChecked() else None
         sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if v.adv_panel.chk_dev_ppm_enable.isChecked() else None
 
-        # ส่ง step_size เข้าไปด้วยสำหรับโหมด SWEEP เพื่อแสดงคอลัมน์ "ค่าเพิ่มต่อจุด"
         step_size = v.input_panel.input_step_freq.value() if run_mode == "SWEEP" else None
 
         v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode, step_size=step_size)
@@ -686,6 +692,18 @@ class AppController(QObject):
             v.ctrl_panel.btn_start.setEnabled(True)
 
     def validate_freq_list(self):
+        """
+        เช็คว่ารายการความถี่ (Frequency List) ถูกกรอกและ parse ได้จริงหรือไม่
+        มีผลเฉพาะตอนอยู่โหมด LIST เท่านั้น — ใช้ parser ตัวเดียวกับที่
+        measurement_thread.py ใช้จริงตอนวัด (MeasurementWorker._parse_freq_list)
+        เพื่อไม่ให้ผลการเช็คที่นี่กับตอนวัดจริงไม่ตรงกัน
+
+        เงื่อนไขที่บล็อกปุ่ม Start:
+        1. parse แล้วได้ความถี่ 0 จุด (ว่างหรือกรอกผิดทั้งหมด)
+        2. FrequencyListWidget.is_valid() ไม่ผ่าน (กรอกไม่ครบ / เกินสเปค)
+        3. [จุดที่ 3] มีความถี่ซ้ำกัน — calculate_frequency_stats() จะรวม record
+           ของสองความถี่นั้นเป็นกลุ่มเดียว ทำให้ผลสถิติและจำนวน n_samples ผิดเพี้ยน
+        """
         v = self.view
         run_mode = self.get_current_run_mode()
 
@@ -696,10 +714,22 @@ class AppController(QObject):
 
         raw_text = v.input_panel.input_freq_list.text()
         frequencies = MeasurementWorker._parse_freq_list(raw_text)
-
         list_widget_ok = v.input_panel.input_freq_list.is_valid()
 
-        self.is_freqlist_error = (len(frequencies) == 0) or (not list_widget_ok)
+        # [จุดที่ 3] ตรวจสอบความถี่ซ้ำ โดยปัดเศษ 6 ตำแหน่งเหมือนกับที่
+        # calculate_frequency_stats() ใช้จัดกลุ่ม (round(freq, 6) เป็น key)
+        # เพื่อให้ผลการเช็คตรงกับพฤติกรรมจริงตอนประมวลผลสถิติ
+        has_duplicate = len(frequencies) != len(set(round(f, 6) for f in frequencies))
+        if has_duplicate:
+            # แสดงข้อความเตือนซ้อนทับใน FrequencyListWidget โดยตรง
+            # (ใช้ lbl_incomplete ที่มีอยู่แล้ว ไม่ต้องเพิ่ม widget ใหม่)
+            v.input_panel.input_freq_list.lbl_incomplete.setText(
+                "⚠️ มีความถี่ซ้ำกันในรายการ — กรุณาแก้ไขให้แต่ละความถี่ไม่ซ้ำกัน\n"
+                "(ความถี่ซ้ำจะทำให้ผลสถิติของกลุ่มนั้นรวมกัน จำนวน n_samples ผิด)"
+            )
+            v.input_panel.input_freq_list.lbl_incomplete.setVisible(True)
+
+        self.is_freqlist_error = (len(frequencies) == 0) or (not list_widget_ok) or has_duplicate
         self.update_start_button_state()
 
     def toggle_run_mode(self):

@@ -71,6 +71,10 @@ class AppController(QObject):
     def _connect_signals(self):
         v = self.view
         v.input_panel.combo_prop_group.currentIndexChanged.connect(self.update_scpi_modes)
+        # อัปเดตชื่อแกนกราฟแบบ real-time เมื่อเปลี่ยนพารามิเตอร์หรือโหมดวัด
+        # (เฉพาะตอนยังไม่มีข้อมูลในกราฟ — ป้องกันชื่อแกนเปลี่ยนกลางคันขณะวัด)
+        v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._refresh_graph_labels)
+        v.input_panel.combo_run_mode.currentIndexChanged.connect(self._refresh_graph_labels)
         v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._reset_correction_status)
         v.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
@@ -433,8 +437,10 @@ class AppController(QObject):
             pri_label = "Resistance, R (Ω)"
         elif scpi_mode.startswith("Z"):
             pri_label = "Impedance, Z (Ω)"
-        elif scpi_mode.startswith("Y") or scpi_mode == "GB":
+        elif scpi_mode.startswith("Y"):
             pri_label = "Admittance, Y (S)"
+        elif scpi_mode == "GB":
+            pri_label = "Conductance, G (S)"
 
         # --- Secondary label ---
         # ต้องเช็ค "TD"/"TR" ก่อน "D" เพราะ ZTD/YTD ลงท้ายด้วย D ด้วย
@@ -467,8 +473,17 @@ class AppController(QObject):
             is_single_mode=(is_single or is_list)
         )
 
+    def _refresh_graph_labels(self):
+        """
+        อัปเดตชื่อแกนกราฟแบบ real-time เมื่อผู้ใช้เปลี่ยน scpi_mode หรือ run_mode
+        เรียกเฉพาะตอนยังไม่มีข้อมูลในกราฟ เพื่อป้องกันชื่อแกนเปลี่ยนกลางคันขณะวัด
+        (ถ้ามีข้อมูลแล้ว ชื่อแกนจะถูกล็อกตามที่ตั้งไว้ตอนกด Start)
+        """
+        if len(self.graph_x_data) == 0:
+            self.setup_graph_labels()
+
     def start_measurement(self):
-        # [จุดที่ 1] Guard: ป้องกัน edge case ที่ปุ่ม Start เปิดได้ทั้งที่มี error ค้างอยู่
+        # ป้องกัน edge case ที่ปุ่ม Start เปิดได้ทั้งที่มี error ค้างอยู่
         # (เช่น state ไม่ sync กัน หรือ race condition ระหว่าง signal)
         # เป็น safety net ชั้นที่ 2 ถัดจาก update_start_button_state() ที่ disable ปุ่มไว้
         if self.is_dc_error or self.is_ppm_error or self.is_visa_error or self.is_freqlist_error:
@@ -500,7 +515,6 @@ class AppController(QObject):
             'freq_list_raw': v.input_panel.input_freq_list.text(),
             'samples_per_freq': v.input_panel.input_samples.value(),
             'discard_first': v.input_panel.input_discard_first.value(),
-            # [จุดที่ 2] เพิ่ม 3 keys ที่ขาดหายไปสำหรับ SINGLE mode
             # _run_single_measurement() ใช้ทั้ง 3 ค่านี้ — ถ้าไม่ส่งมา
             # จะ fallback เป็น n=1, discard=0 ทำให้การตั้งค่าใน UI ไม่มีผลเลย
             'n_single':               v.input_panel.input_n_single.value(),
@@ -723,7 +737,7 @@ class AppController(QObject):
         frequencies = MeasurementWorker._parse_freq_list(raw_text)
         list_widget_ok = v.input_panel.input_freq_list.is_valid()
 
-        # [จุดที่ 3] ตรวจสอบความถี่ซ้ำ โดยปัดเศษ 6 ตำแหน่งเหมือนกับที่
+        # ตรวจสอบความถี่ซ้ำ โดยปัดเศษ 6 ตำแหน่งเหมือนกับที่
         # calculate_frequency_stats() ใช้จัดกลุ่ม (round(freq, 6) เป็น key)
         # เพื่อให้ผลการเช็คตรงกับพฤติกรรมจริงตอนประมวลผลสถิติ
         has_duplicate = len(frequencies) != len(set(round(f, 6) for f in frequencies))

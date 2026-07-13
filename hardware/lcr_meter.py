@@ -320,8 +320,9 @@ class E4980A:
             elif status != 0:
                 return None, None, f"UNKNOWN_ERROR_CODE_{status}"
 
-            # ดักจับค่า Overload สำรอง (กรณี status เป็น 0 แต่ค่าท่วมไปที่ 9.9e37)
-            if primary >= self.OVERLOAD_LIMIT or secondary >= self.OVERLOAD_LIMIT:
+            # ดักจับ Overload ทั้งบวก (+9.9e37) และลบ (-9.9e37)
+            # กรณีลบเกิดเมื่อวัด C/L ที่ขาดหรือช็อตแบบมีขั้ว
+            if abs(primary) >= self.OVERLOAD_LIMIT or abs(secondary) >= self.OVERLOAD_LIMIT:
                 return None, None, "OVERLOAD"
 
             return primary, secondary, "SUCCESS"

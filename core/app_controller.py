@@ -243,7 +243,7 @@ class AppController(QObject):
             QMessageBox.warning(v, "ตรวจสอบล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการตรวจสอบการตั้งค่า")
             return
 
-        # [จุดที่ 4] Verify & Apply ส่งความถี่จาก input_freq (Single Point) เสมอ
+        # Verify & Apply ส่งความถี่จาก input_freq (Single Point) เสมอ
         # ถ้าผู้ใช้อยู่ใน SWEEP/LIST mode ความถี่ที่ส่งไปอาจไม่ตรงกับที่ใช้วัดจริง
         # แจ้งเตือนเพื่อให้รับทราบก่อนดำเนินการ (ไม่บล็อก เพราะยังมีประโยชน์สำหรับ
         # เช็คค่าตั้งอื่นๆ เช่น Signal Level, Aperture, Cable, DC Bias ที่ใช้ร่วมกันทุกโหมด)
@@ -473,17 +473,22 @@ class AppController(QObject):
 
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
-        x_label = "Measurement Count (Points)" if is_single else "Frequency (Hz)"
+        is_list = (run_mode == "LIST")
+        
+        if is_single or is_list:
+            x_label = "Measurement Count (Points)"
+        else:
+            x_label = "Frequency (Hz)"
 
         v.graph_display.set_axis_labels(
             x_label=x_label,
             pri_y_label=pri_label,
             sec_y_label=sec_label,
-            is_single_mode=is_single
+            is_single_mode=(is_single or is_list)
         )
 
     def start_measurement(self):
-        # [จุดที่ 1] Guard: ป้องกัน edge case ที่ปุ่ม Start เปิดได้ทั้งที่มี error ค้างอยู่
+        # ป้องกัน edge case ที่ปุ่ม Start เปิดได้ทั้งที่มี error ค้างอยู่
         if self.is_dc_error or self.is_dev_error or self.is_visa_error or self.is_freqlist_error:
             self.log.warning("⚠️ ไม่สามารถเริ่มวัดได้ — ยังมีข้อผิดพลาดค้างอยู่ กรุณาตรวจสอบและแก้ไขก่อน")
             return
@@ -513,7 +518,6 @@ class AppController(QObject):
             'freq_list_raw': v.input_panel.input_freq_list.text(),
             'samples_per_freq': v.input_panel.input_samples.value(),
             'discard_first': v.input_panel.input_discard_first.value(),
-            # [จุดที่ 2] เพิ่ม 3 keys ที่ขาดหายไปสำหรับ SINGLE mode
             'n_single':                v.input_panel.input_n_single.value(),
             'discard_single':          v.input_panel.input_discard_single.value(),
             'is_first_single_session': len(self.graph_x_data) == 0,
@@ -602,6 +606,9 @@ class AppController(QObject):
 
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
+        is_list = (run_mode == "LIST")
+
+        # graph_x_data เก็บค่าที่ใช้คำนวณสถิติ (freq จริงสำหรับ SWEEP/LIST, ลำดับสำหรับ SINGLE)
         if is_single:
             self.graph_x_data.append(len(self.graph_x_data) + 1)
         else:
@@ -610,7 +617,15 @@ class AppController(QObject):
         self.graph_pri_y.append(disp_pri)
         self.graph_sec_y.append(disp_sec)
 
-        v.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
+        # plot_x แยกต่างหากสำหรับวาดกราฟ
+        # LIST: ใช้ลำดับ 1,2,3... แทนความถี่ซ้ำ กันกราฟซิกแซก
+        # SWEEP/SINGLE: ใช้ graph_x_data ตรงๆ
+        if is_list:
+            plot_x = list(range(1, len(self.graph_x_data) + 1))
+        else:
+            plot_x = self.graph_x_data
+
+        v.graph_display.update_plots(plot_x, self.graph_pri_y, self.graph_sec_y)
         v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, is_single)
         self.update_statistics_table()
 
@@ -739,7 +754,7 @@ class AppController(QObject):
         เงื่อนไขที่บล็อกปุ่ม Start:
         1. parse แล้วได้ความถี่ 0 จุด (ว่างหรือกรอกผิดทั้งหมด)
         2. FrequencyListWidget.is_valid() ไม่ผ่าน (กรอกไม่ครบ / เกินสเปค)
-        3. [จุดที่ 3] มีความถี่ซ้ำกัน — calculate_frequency_stats() จะรวม record
+        3. มีความถี่ซ้ำกัน — calculate_frequency_stats() จะรวม record
            ของสองความถี่นั้นเป็นกลุ่มเดียว ทำให้ผลสถิติและจำนวน n_samples ผิดเพี้ยน
         """
         v = self.view
@@ -754,7 +769,7 @@ class AppController(QObject):
         frequencies = MeasurementWorker._parse_freq_list(raw_text)
         list_widget_ok = v.input_panel.input_freq_list.is_valid()
 
-        # [จุดที่ 3] ตรวจสอบความถี่ซ้ำ โดยปัดเศษ 6 ตำแหน่งเหมือนกับที่
+        # ตรวจสอบความถี่ซ้ำ โดยปัดเศษ 6 ตำแหน่งเหมือนกับที่
         # calculate_frequency_stats() ใช้จัดกลุ่ม (round(freq, 6) เป็น key)
         # เพื่อให้ผลการเช็คตรงกับพฤติกรรมจริงตอนประมวลผลสถิติ
         has_duplicate = len(frequencies) != len(set(round(f, 6) for f in frequencies))

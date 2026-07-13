@@ -154,7 +154,7 @@ class E4980A:
         try:
             # 1. การทำ Correction ใช้เวลานาน ต้องเพิ่ม Timeout
             original_timeout = self.inst.timeout
-            self.inst.timeout = 60000
+            self.inst.timeout = 180000
 
             # 2. เปิดโหมด Correction ให้เป็น ON ก่อน แล้วสั่ง Execute
             if corr_type.upper() == "OPEN":

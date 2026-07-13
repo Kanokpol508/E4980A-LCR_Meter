@@ -87,18 +87,19 @@ def _fmt_ppm(val) -> str:
 # SINGLE mode
 # ==========================================================
 
-def calculate_single_stats(raw_records: list) -> dict | None:
+def calculate_single_stats(raw_records: list, pri_ref=None, sec_ref=None) -> dict | None:
     """
     SINGLE mode — คำนวณสถิติ Overall ของทั้ง session
     raw_records: [{'freq': <fixed Hz>, 'primary': float, 'secondary': float}, ...]
+    pri_ref / sec_ref: ค่าอ้างอิงสำหรับคำนวณ PPM Deviation (None = ไม่คำนวณ)
 
     คืน dict เดี่ยว (1 session = 1 แถว) หรือ None ถ้าไม่มีข้อมูล
     รวม Frequency ที่ใช้วัดด้วย (ดึงจาก record แรก)
 
     Keys ที่คืน:
         freq, n,
-        pri_mean, pri_sd, pri_min, pri_max, pri_rsd_pct, pri_type_a_ppm,
-        sec_mean, sec_sd, sec_min, sec_max, sec_rsd_pct, sec_type_a_ppm
+        pri_mean, pri_sd, pri_min, pri_max, pri_rsd_pct, pri_ppm, pri_type_a_ppm,
+        sec_mean, sec_sd, sec_min, sec_max, sec_rsd_pct, sec_ppm, sec_type_a_ppm
     """
     if not raw_records:
         return None
@@ -109,8 +110,8 @@ def calculate_single_stats(raw_records: list) -> dict | None:
     if not pri_vals:
         return None
 
-    pri = _calc_stats_block(pri_vals)
-    sec = _calc_stats_block(sec_vals)
+    pri = _calc_stats_block(pri_vals, ref=pri_ref)
+    sec = _calc_stats_block(sec_vals, ref=sec_ref)
 
     # ดึงความถี่จาก record แรก (SINGLE ใช้ความถี่เดียวตลอด session)
     freq = raw_records[0].get('freq', None)
@@ -124,6 +125,7 @@ def calculate_single_stats(raw_records: list) -> dict | None:
         'pri_min':        pri['min'],
         'pri_max':        pri['max'],
         'pri_rsd_pct':    pri['rsd_pct'],
+        'pri_ppm':        pri['ppm'],
         'pri_type_a_ppm': pri['type_a_ppm'],
 
         'sec_mean':       sec['mean'],
@@ -131,6 +133,7 @@ def calculate_single_stats(raw_records: list) -> dict | None:
         'sec_min':        sec['min'],
         'sec_max':        sec['max'],
         'sec_rsd_pct':    sec['rsd_pct'],
+        'sec_ppm':        sec['ppm'],
         'sec_type_a_ppm': sec['type_a_ppm'],
     }
 
@@ -148,12 +151,14 @@ def format_single_row_for_table(stat: dict) -> dict:
         'pri_min':        _fmt(stat['pri_min']),
         'pri_max':        _fmt(stat['pri_max']),
         'pri_rsd_pct':    _fmt(stat['pri_rsd_pct'],    sci=False),
+        'pri_ppm':        _fmt_ppm(stat['pri_ppm']),
         'pri_type_a_ppm': _fmt_ppm(stat['pri_type_a_ppm']),
         'sec_mean':       _fmt(stat['sec_mean']),
         'sec_sd':         _fmt(stat['sec_sd']),
         'sec_min':        _fmt(stat['sec_min']),
         'sec_max':        _fmt(stat['sec_max']),
         'sec_rsd_pct':    _fmt(stat['sec_rsd_pct'],    sci=False),
+        'sec_ppm':        _fmt_ppm(stat['sec_ppm']),
         'sec_type_a_ppm': _fmt_ppm(stat['sec_type_a_ppm']),
     }
 

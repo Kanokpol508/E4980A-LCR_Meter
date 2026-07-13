@@ -21,11 +21,13 @@ _COLS_SINGLE = [
     ("pri_sd",         "Primary SD"),
     ("pri_min",        "Primary Min"),
     ("pri_max",        "Primary Max"),
+    ("pri_ppm",        "Primary PPM Dev"),
     ("pri_type_a_ppm", "Primary Type A (ppm)"),
     ("sec_mean",       "Secondary Mean"),
     ("sec_sd",         "Secondary SD"),
     ("sec_min",        "Secondary Min"),
     ("sec_max",        "Secondary Max"),
+    ("sec_ppm",        "Secondary PPM Dev"),
     ("sec_type_a_ppm", "Secondary Type A (ppm)"),
 ]
 

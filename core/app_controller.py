@@ -14,7 +14,7 @@ class AppController(QObject):
 
         # ตัวแปรสถานะ
         self.is_dc_error = False
-        self.is_dev_error = False
+        self.is_ppm_error = False               # ป้องกัน AttributeError: เปิด PPM แต่ไม่กรอก Ref
         self.is_visa_error = True
         self.is_freqlist_error = False          # ป้องกัน AttributeError
 
@@ -24,7 +24,7 @@ class AppController(QObject):
         self.progress_dialog = None
         self.current_corr_type = None
 
-        # ตัวแปรสำหรับเก็บข้อมูลวาดกราฟ (อาจถูกดัดแปลงโดย Deviation)
+        # ตัวแปรสำหรับเก็บข้อมูลวาดกราฟ (ค่าดิบเสมอ)
         self.graph_x_data = []
         self.graph_pri_y = []
         self.graph_sec_y = []
@@ -64,7 +64,6 @@ class AppController(QObject):
         # ตั้งค่า UI เริ่มต้น
         self.view.input_panel.widget_dc_inner.setEnabled(False)
         self.view.adv_panel.widget_dev_inner.setEnabled(False)
-        self.view.adv_panel.combo_dev_type.setEnabled(False)
 
         # ตั้งค่า visibility ของเนื้อหาย่อยใน group_mode ตามโหมดเริ่มต้น (Sweep)
         self.toggle_run_mode()
@@ -72,20 +71,17 @@ class AppController(QObject):
     def _connect_signals(self):
         v = self.view
         v.input_panel.combo_prop_group.currentIndexChanged.connect(self.update_scpi_modes)
-        v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._refresh_deviation_preview)
+        v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._reset_correction_status)
         v.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
         v.input_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
         v.input_panel.combo_dc_level.valueChanged.connect(self.validate_dc_bias)
 
-        v.adv_panel.chk_dev_graph_enable.stateChanged.connect(self.toggle_deviation)
-        v.adv_panel.chk_dev_ppm_enable.stateChanged.connect(self.toggle_deviation)
-        v.adv_panel.input_dev_pri.textChanged.connect(self.validate_deviation)
-        v.adv_panel.input_dev_pri.textChanged.connect(self._refresh_deviation_preview)
-        v.adv_panel.input_dev_sec.textChanged.connect(self.validate_deviation)
-        v.adv_panel.input_dev_sec.textChanged.connect(self._refresh_deviation_preview)
-        v.adv_panel.combo_dev_type.currentIndexChanged.connect(self._refresh_deviation_preview)
+        # PPM Reference: เปิด/ปิด checkbox และ validate ค่า Ref ที่กรอก
+        v.adv_panel.chk_dev_ppm_enable.stateChanged.connect(self.toggle_ppm)
+        v.adv_panel.input_dev_pri.textChanged.connect(self.validate_ppm_ref)
+        v.adv_panel.input_dev_sec.textChanged.connect(self.validate_ppm_ref)
 
         v.adv_panel.btn_open_corr.clicked.connect(lambda: self.start_correction("OPEN"))
         v.adv_panel.btn_short_corr.clicked.connect(lambda: self.start_correction("SHORT"))
@@ -218,7 +214,6 @@ class AppController(QObject):
         # --- Advanced Panel ---
         v.adv_panel.btn_open_corr.setEnabled(not locked)
         v.adv_panel.btn_short_corr.setEnabled(not locked)
-        v.adv_panel.chk_dev_graph_enable.setEnabled(not locked)
         v.adv_panel.chk_dev_ppm_enable.setEnabled(not locked)
         v.adv_panel.widget_dev_inner.setEnabled(not locked)
 
@@ -235,7 +230,7 @@ class AppController(QObject):
             v.ctrl_panel.btn_stop.setText("STOP")
             self.update_start_button_state()
             self.update_session_lock()
-            
+
     def handle_verify_apply(self):
         v = self.view
         visa_address = v.conn_panel.combo_visa.currentText()
@@ -243,7 +238,7 @@ class AppController(QObject):
             QMessageBox.warning(v, "ตรวจสอบล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการตรวจสอบการตั้งค่า")
             return
 
-        # Verify & Apply ส่งความถี่จาก input_freq (Single Point) เสมอ
+        # [จุดที่ 4] Verify & Apply ส่งความถี่จาก input_freq (Single Point) เสมอ
         # ถ้าผู้ใช้อยู่ใน SWEEP/LIST mode ความถี่ที่ส่งไปอาจไม่ตรงกับที่ใช้วัดจริง
         # แจ้งเตือนเพื่อให้รับทราบก่อนดำเนินการ (ไม่บล็อก เพราะยังมีประโยชน์สำหรับ
         # เช็คค่าตั้งอื่นๆ เช่น Signal Level, Aperture, Cable, DC Bias ที่ใช้ร่วมกันทุกโหมด)
@@ -385,7 +380,7 @@ class AppController(QObject):
         OPEN/SHORT Correction ใหม่เองเพื่อให้ข้อมูลตรงกับการตั้งค่าปัจจุบัน
         """
         adv = self.view.adv_panel
-        default_style = ""
+        default_style = ""  # คืน stylesheet เป็นค่าว่าง -> ใช้ style จาก QSS ของโปรแกรม
 
         open_is_ok  = adv.btn_open_corr.text()  == "OPEN Correction (OK)"
         short_is_ok = adv.btn_short_corr.text() == "SHORT Correction (OK)"
@@ -416,12 +411,16 @@ class AppController(QObject):
         v = self.view
         scpi_mode = v.input_panel.combo_scpi_mode.currentData()
 
+        # ป้องกัน AttributeError ตอน combo_scpi_mode ถูก .clear() ชั่วขณะ
+        # (เช่นระหว่าง update_scpi_modes() กำลังล้าง dropdown ก่อนเติมรายการใหม่)
+        # ตอนนั้น currentData() จะคืนค่า None -> ยังไม่มีโหมดจริงให้ตั้งชื่อแกน จึงข้ามไปก่อน
         if scpi_mode is None:
             return
 
         pri_label = "Primary"
         sec_label = "Secondary"
 
+        # --- Primary label ---
         if scpi_mode.startswith("CP"):
             pri_label = "Capacitance, Cp (F)"
         elif scpi_mode.startswith("CS"):
@@ -437,48 +436,29 @@ class AppController(QObject):
         elif scpi_mode.startswith("Y") or scpi_mode == "GB":
             pri_label = "Admittance, Y (S)"
 
+        # --- Secondary label ---
         # ต้องเช็ค "TD"/"TR" ก่อน "D" เพราะ ZTD/YTD ลงท้ายด้วย D ด้วย
         if scpi_mode.endswith("TD"):
-            sec_label = "Phase Angle, θd (°)"
+            sec_label = "Phase Angle, θd (°)"        # ZTD, YTD
         elif scpi_mode.endswith("TR"):
-            sec_label = "Phase Angle, θr (rad)"
+            sec_label = "Phase Angle, θr (rad)"      # ZTR, YTR
         elif scpi_mode.endswith("D"):
-            sec_label = "Dissipation Factor, D"
+            sec_label = "Dissipation Factor, D"      # CPD, CSD, LPD, LSD
         elif scpi_mode.endswith("Q"):
-            sec_label = "Quality Factor, Q"
+            sec_label = "Quality Factor, Q"          # CPQ, CSQ, LPQ, LSQ
         elif scpi_mode.endswith("G"):
-            sec_label = "Conductance, G (S)"
+            sec_label = "Conductance, G (S)"         # CPG, LPG
         elif scpi_mode == "GB":
-            sec_label = "Susceptance, B (S)"
+            sec_label = "Susceptance, B (S)"         # GB
         elif scpi_mode.endswith("RS") or scpi_mode.endswith("RP") or scpi_mode == "RX":
-            sec_label = "Resistance (Ω)"
-
-        if v.adv_panel.chk_dev_graph_enable.isChecked():
-            has_pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) is not None
-            has_sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) is not None
-
-            dev_type = v.adv_panel.combo_dev_type.currentText()
-            is_pct = "PCT" in dev_type or "เปอร์เซ็นต์" in dev_type
-
-            if is_pct:
-                if has_pri_ref:
-                    pri_label = f"Δ {pri_label.split(',')[0]} (%)"
-                if has_sec_ref:
-                    sec_label = f"Δ {sec_label.split(',')[0]} (%)"
-            else:
-                if has_pri_ref:
-                    pri_label = f"Δ {pri_label}"
-                if has_sec_ref:
-                    sec_label = f"Δ {sec_label}"
+            sec_label = "Resistance (Ω)"             # CSRS, LSRS, CPRP, LPRP, RX
 
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
-        is_list = (run_mode == "LIST")
-        
-        if is_single or is_list:
-            x_label = "Measurement Count (Points)"
-        else:
-            x_label = "Frequency (Hz)"
+        is_list   = (run_mode == "LIST")
+
+        # LIST ใช้แกน X เป็นลำดับจุดเหมือน SINGLE (กันกราฟซิกแซกเมื่อ samples > 1)
+        x_label = "Measurement Count (Points)" if (is_single or is_list) else "Frequency (Hz)"
 
         v.graph_display.set_axis_labels(
             x_label=x_label,
@@ -488,8 +468,10 @@ class AppController(QObject):
         )
 
     def start_measurement(self):
-        # ป้องกัน edge case ที่ปุ่ม Start เปิดได้ทั้งที่มี error ค้างอยู่
-        if self.is_dc_error or self.is_dev_error or self.is_visa_error or self.is_freqlist_error:
+        # [จุดที่ 1] Guard: ป้องกัน edge case ที่ปุ่ม Start เปิดได้ทั้งที่มี error ค้างอยู่
+        # (เช่น state ไม่ sync กัน หรือ race condition ระหว่าง signal)
+        # เป็น safety net ชั้นที่ 2 ถัดจาก update_start_button_state() ที่ disable ปุ่มไว้
+        if self.is_dc_error or self.is_ppm_error or self.is_visa_error or self.is_freqlist_error:
             self.log.warning("⚠️ ไม่สามารถเริ่มวัดได้ — ยังมีข้อผิดพลาดค้างอยู่ กรุณาตรวจสอบและแก้ไขก่อน")
             return
 
@@ -509,7 +491,7 @@ class AppController(QObject):
             self.setup_graph_labels()
 
         settings = {
-            'run_mode': run_mode,
+            'run_mode': run_mode,  # 'SINGLE' / 'SWEEP' / 'LIST'
             'visa_resource': v.conn_panel.combo_visa.currentText(),
             'freq': v.input_panel.input_freq.value(),
             'start_freq': v.input_panel.input_start_freq.value(),
@@ -518,13 +500,16 @@ class AppController(QObject):
             'freq_list_raw': v.input_panel.input_freq_list.text(),
             'samples_per_freq': v.input_panel.input_samples.value(),
             'discard_first': v.input_panel.input_discard_first.value(),
-            'n_single':                v.input_panel.input_n_single.value(),
-            'discard_single':          v.input_panel.input_discard_single.value(),
+            # [จุดที่ 2] เพิ่ม 3 keys ที่ขาดหายไปสำหรับ SINGLE mode
+            # _run_single_measurement() ใช้ทั้ง 3 ค่านี้ — ถ้าไม่ส่งมา
+            # จะ fallback เป็น n=1, discard=0 ทำให้การตั้งค่าใน UI ไม่มีผลเลย
+            'n_single':               v.input_panel.input_n_single.value(),
+            'discard_single':         v.input_panel.input_discard_single.value(),
             'is_first_single_session': len(self.graph_x_data) == 0,
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
             'level_mode': v.input_panel.combo_level_mode.currentData(),
-            'alc_enabled': v.input_panel.chk_alc.isChecked(),
+            'alc_enabled': v.input_panel.chk_alc.isChecked(),           
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
@@ -573,59 +558,29 @@ class AppController(QObject):
     def handle_data_ready(self, data):
         v = self.view
 
+        # 1. ค่าดิบจากฮาร์ดแวร์
         raw_pri = data.get('primary', 0.0)
         raw_sec = data.get('secondary', 0.0)
 
+        # เก็บค่าดิบลง Array ไว้คำนวณ Type A Uncertainty
         self.graph_raw_pri_y.append(raw_pri)
         self.graph_raw_sec_y.append(raw_sec)
 
-        disp_pri = raw_pri
-        disp_sec = raw_sec
-
-        if v.adv_panel.chk_dev_graph_enable.isChecked():
-            dev_type = v.adv_panel.combo_dev_type.currentText()
-            is_pct = "PCT" in dev_type or "เปอร์เซ็นต์" in dev_type
-
-            pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text())
-            sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text())
-
-            if pri_ref is not None:
-                if is_pct:
-                    disp_pri = ((raw_pri - pri_ref) / abs(pri_ref)) * 100 if pri_ref != 0 else 0.0
-                else:
-                    disp_pri = raw_pri - pri_ref
-
-            if sec_ref is not None:
-                if is_pct:
-                    disp_sec = ((raw_sec - sec_ref) / abs(sec_ref)) * 100 if sec_ref != 0 else 0.0
-                else:
-                    disp_sec = raw_sec - sec_ref
-
-        v.lcd_display.lbl_pri_val.setText(f"{disp_pri:.5e}")
-        v.lcd_display.lbl_sec_val.setText(f"{disp_sec:.5e}")
+        # กราฟและ LCD แสดงค่าดิบเสมอ (ไม่มี Graph Deviation แล้ว)
+        v.lcd_display.lbl_pri_val.setText(f"{raw_pri:.5e}")
+        v.lcd_display.lbl_sec_val.setText(f"{raw_sec:.5e}")
 
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
-        is_list = (run_mode == "LIST")
-
-        # graph_x_data เก็บค่าที่ใช้คำนวณสถิติ (freq จริงสำหรับ SWEEP/LIST, ลำดับสำหรับ SINGLE)
         if is_single:
             self.graph_x_data.append(len(self.graph_x_data) + 1)
         else:
             self.graph_x_data.append(data.get('freq', 0))
 
-        self.graph_pri_y.append(disp_pri)
-        self.graph_sec_y.append(disp_sec)
+        self.graph_pri_y.append(raw_pri)
+        self.graph_sec_y.append(raw_sec)
 
-        # plot_x แยกต่างหากสำหรับวาดกราฟ
-        # LIST: ใช้ลำดับ 1,2,3... แทนความถี่ซ้ำ กันกราฟซิกแซก
-        # SWEEP/SINGLE: ใช้ graph_x_data ตรงๆ
-        if is_list:
-            plot_x = list(range(1, len(self.graph_x_data) + 1))
-        else:
-            plot_x = self.graph_x_data
-
-        v.graph_display.update_plots(plot_x, self.graph_pri_y, self.graph_sec_y)
+        v.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
         v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, is_single)
         self.update_statistics_table()
 
@@ -640,9 +595,12 @@ class AppController(QObject):
             for f, p, s in zip(self.graph_x_data, self.graph_raw_pri_y, self.graph_raw_sec_y)
         ]
 
-        pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if v.adv_panel.chk_dev_ppm_enable.isChecked() else None
-        sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if v.adv_panel.chk_dev_ppm_enable.isChecked() else None
+        # ส่ง Ref เฉพาะตอน checkbox PPM เปิด — ใช้ได้ทั้ง SINGLE และ LIST
+        ppm_enabled = v.adv_panel.chk_dev_ppm_enable.isChecked()
+        pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if ppm_enabled else None
+        sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if ppm_enabled else None
 
+        # ส่ง step_size เข้าไปด้วยสำหรับโหมด SWEEP เพื่อแสดงคอลัมน์ "ค่าเพิ่มต่อจุด"
         step_size = v.input_panel.input_step_freq.value() if run_mode == "SWEEP" else None
 
         v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode, step_size=step_size)
@@ -691,14 +649,9 @@ class AppController(QObject):
         v.input_panel.combo_scpi_mode.setEnabled(not should_lock)
         v.input_panel.combo_run_mode.setEnabled(not should_lock)
 
-        v.adv_panel.chk_dev_graph_enable.setEnabled(not should_lock)
         v.adv_panel.chk_dev_ppm_enable.setEnabled(not should_lock)
-        dev_enabled = (
-            (v.adv_panel.chk_dev_graph_enable.isChecked() or v.adv_panel.chk_dev_ppm_enable.isChecked())
-            and not should_lock
-        )
-        v.adv_panel.widget_dev_inner.setEnabled(dev_enabled)
-        v.adv_panel.combo_dev_type.setEnabled(v.adv_panel.chk_dev_graph_enable.isChecked() and not should_lock)
+        ppm_inner_enabled = v.adv_panel.chk_dev_ppm_enable.isChecked() and not should_lock
+        v.adv_panel.widget_dev_inner.setEnabled(ppm_inner_enabled)
 
         if not should_lock:
             v.input_panel.input_start_freq.setEnabled(run_mode == "SWEEP")
@@ -715,6 +668,7 @@ class AppController(QObject):
             v.input_panel.input_samples.setEnabled(False)
             v.input_panel.input_discard_first.setEnabled(False)
 
+        # [restored] เช็คใหม่ทุกครั้งที่ session lock เปลี่ยน (เผื่อ mode เปลี่ยนระหว่างล็อก/ปลดล็อก)
         self.validate_freq_list()
 
     def validate_visa(self):
@@ -731,10 +685,10 @@ class AppController(QObject):
 
     def update_start_button_state(self):
         v = self.view
-        is_blocked = self.is_dc_error or self.is_dev_error or self.is_visa_error or self.is_freqlist_error
+        is_blocked = self.is_dc_error or self.is_ppm_error or self.is_visa_error or self.is_freqlist_error
         v.ctrl_panel.lbl_warn_visa.setVisible(self.is_visa_error)
         v.ctrl_panel.lbl_warn_dc_start.setVisible(self.is_dc_error)
-        v.ctrl_panel.lbl_warn_dev_start.setVisible(self.is_dev_error)
+        v.ctrl_panel.lbl_warn_dev_start.setVisible(self.is_ppm_error)
         v.ctrl_panel.lbl_warn_freqlist_start.setVisible(self.is_freqlist_error)
 
         if is_blocked:
@@ -754,7 +708,7 @@ class AppController(QObject):
         เงื่อนไขที่บล็อกปุ่ม Start:
         1. parse แล้วได้ความถี่ 0 จุด (ว่างหรือกรอกผิดทั้งหมด)
         2. FrequencyListWidget.is_valid() ไม่ผ่าน (กรอกไม่ครบ / เกินสเปค)
-        3. มีความถี่ซ้ำกัน — calculate_frequency_stats() จะรวม record
+        3. [จุดที่ 3] มีความถี่ซ้ำกัน — calculate_frequency_stats() จะรวม record
            ของสองความถี่นั้นเป็นกลุ่มเดียว ทำให้ผลสถิติและจำนวน n_samples ผิดเพี้ยน
         """
         v = self.view
@@ -769,7 +723,7 @@ class AppController(QObject):
         frequencies = MeasurementWorker._parse_freq_list(raw_text)
         list_widget_ok = v.input_panel.input_freq_list.is_valid()
 
-        # ตรวจสอบความถี่ซ้ำ โดยปัดเศษ 6 ตำแหน่งเหมือนกับที่
+        # [จุดที่ 3] ตรวจสอบความถี่ซ้ำ โดยปัดเศษ 6 ตำแหน่งเหมือนกับที่
         # calculate_frequency_stats() ใช้จัดกลุ่ม (round(freq, 6) เป็น key)
         # เพื่อให้ผลการเช็คตรงกับพฤติกรรมจริงตอนประมวลผลสถิติ
         has_duplicate = len(frequencies) != len(set(round(f, 6) for f in frequencies))
@@ -804,6 +758,8 @@ class AppController(QObject):
                 self.clear_graph_data()
             else:
                 v.input_panel.combo_run_mode.blockSignals(True)
+                # หมายเหตุ: ยังไม่ได้เก็บ "โหมดก่อนหน้า" ไว้ย้อนกลับแบบแม่นยำ
+                # (แนะนำเพิ่ม self._last_run_mode ในอนาคตถ้าต้องการย้อนกลับ index เป๊ะๆ)
                 v.input_panel.combo_run_mode.blockSignals(False)
                 return
 
@@ -822,14 +778,18 @@ class AppController(QObject):
         v.input_panel.input_samples.setEnabled(is_list)
         v.input_panel.input_discard_first.setEnabled(is_list)
 
-        if not is_list:
+        # ซ่อน group PPM ทั้งกลุ่มเมื่ออยู่โหมด SWEEP
+        # เพราะ SWEEP วัดครั้งเดียวต่อความถี่ ไม่มี Mean จากการวัดซ้ำ จึงคำนวณ PPM Dev ไม่ได้
+        # SINGLE และ LIST ใช้ PPM ได้ → แสดง group ปกติ
+        if is_sweep:
             v.adv_panel.chk_dev_ppm_enable.setChecked(False)
-        v.adv_panel.chk_dev_ppm_enable.setVisible(is_list)
+        v.adv_panel.group_ppm.setVisible(not is_sweep)
 
-        self.toggle_deviation()
+        # Sync สถานะ widget_dev_inner หลังเปลี่ยน visibility/checked state
+        self.toggle_ppm()
 
         self.update_hardware_limits()
-        self.validate_freq_list()
+        self.validate_freq_list()      
         self.update_start_button_state()
         self.view.stats_table.set_mode(run_mode)
 
@@ -855,31 +815,27 @@ class AppController(QObject):
         v.input_panel.lbl_dc_warning.setText(warning_msg)
         self.update_start_button_state()
 
-    def _refresh_deviation_preview(self):
-        """เรียกใช้ทุกครั้งที่ Ref/ประเภทกราฟ Δ เปลี่ยน เพื่ออัปเดตชื่อแกนแบบสด"""
-        if len(self.graph_x_data) == 0:
-            self.setup_graph_labels()
-
-    def toggle_deviation(self):
+    def toggle_ppm(self):
+        """เปิด/ปิด widget กรอก PPM Reference ตาม checkbox สถานะ"""
         v = self.view
-        is_enabled = v.adv_panel.chk_dev_graph_enable.isChecked() or v.adv_panel.chk_dev_ppm_enable.isChecked()
+        is_enabled = v.adv_panel.chk_dev_ppm_enable.isChecked()
         v.adv_panel.widget_dev_inner.setEnabled(is_enabled)
 
-        v.adv_panel.combo_dev_type.setEnabled(v.adv_panel.chk_dev_graph_enable.isChecked())
-
         if is_enabled:
-            self.validate_deviation()
+            self.validate_ppm_ref()
         else:
             v.adv_panel.lbl_dev_warning.setText("")
-            self.is_dev_error = False
+            self.is_ppm_error = False
             self.update_start_button_state()
 
-        self._refresh_deviation_preview()
-
-    def validate_deviation(self):
+    def validate_ppm_ref(self):
+        """
+        ตรวจสอบว่ากรอก Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่าเมื่อเปิด PPM
+        ถ้าเปิด PPM แล้วไม่กรอกค่าใดเลย จะบล็อกปุ่ม Start เพราะผล PPM Dev จะเป็น '-' ทั้งหมด
+        """
         v = self.view
-        if not (v.adv_panel.chk_dev_graph_enable.isChecked() or v.adv_panel.chk_dev_ppm_enable.isChecked()):
-            self.is_dev_error = False
+        if not v.adv_panel.chk_dev_ppm_enable.isChecked():
+            self.is_ppm_error = False
             self.update_start_button_state()
             return
 
@@ -890,8 +846,8 @@ class AppController(QObject):
             v.adv_panel.lbl_dev_warning.setText(
                 "⚠️ ต้องระบุ Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่า ก่อนเริ่มวัด"
             )
-            self.is_dev_error = True
+            self.is_ppm_error = True
         else:
             v.adv_panel.lbl_dev_warning.setText("")
-            self.is_dev_error = False
+            self.is_ppm_error = False
         self.update_start_button_state()

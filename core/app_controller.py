@@ -861,6 +861,10 @@ class AppController(QObject):
         self.validate_freq_list()
         self.update_start_button_state()
         self.view.stats_table.set_mode(run_mode)
+        # ซ่อน Statistics Table ใน SWEEP mode เพราะข้อมูลซ้ำกับ Raw Data Table ทั้งหมด
+        # (SWEEP วัดครั้งเดียวต่อความถี่ N=1 ไม่มีสถิติสรุปที่มีความหมาย)
+        stats_tab_index = self.view.right_tabs.indexOf(self.view.stats_table)
+        self.view.right_tabs.setTabVisible(stats_tab_index, not is_sweep)
         # อัปเดตหัวคอลัมน์ Raw Data Table แบบ real-time เมื่อเปลี่ยนโหมด
         # set_mode() จะเปลี่ยนคอลัมน์ที่ 2 จาก "Samples (N)" เป็น "Step Size" ตอนอยู่โหมด SWEEP
         self.view.raw_table.set_mode(run_mode)

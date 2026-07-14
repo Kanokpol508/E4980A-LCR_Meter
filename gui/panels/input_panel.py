@@ -342,7 +342,7 @@ class InputPanel(QWidget):
         grid_single.addWidget(self.input_freq, 0, 1)
         grid_single.addWidget(QLabel("Hz"), 0, 2)
 
-        grid_single.addWidget(QLabel("จำนวนครั้งที่วัด (Readings Count):"), 1, 0)
+        grid_single.addWidget(QLabel("จำนวนครั้งที่วัด (Samples Count):"), 1, 0)
         grid_single.addWidget(self.input_n_single, 1, 1)
         grid_single.addWidget(QLabel("ครั้ง"), 1, 2)
 

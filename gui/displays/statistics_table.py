@@ -16,7 +16,7 @@ from data.data_processor import (
 # ==========================================
 _COLS_SINGLE = [
     ("freq",           "Frequency (Hz)"),
-    ("n",              "Readings (Count)"),
+    ("n",              "Samples (N)"),
     ("pri_mean",       "Primary Mean"),
     ("pri_sd",         "Primary SD"),
     ("pri_ppm",        "Primary PPM Dev"),
@@ -37,7 +37,7 @@ _COLS_SWEEP = [
 
 _COLS_LIST = [
     ("freq",           "Frequency (Hz)"),
-    ("n_samples",      "Samples (Count)"),
+    ("n_samples",      "Samples (N)"),
     ("pri_mean",       "Primary Mean"),
     ("pri_sd",         "Primary SD"),
     ("pri_ppm",        "Primary PPM Dev"),

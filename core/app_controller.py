@@ -74,6 +74,7 @@ class AppController(QObject):
         # อัปเดตชื่อแกนกราฟแบบ real-time เมื่อเปลี่ยนพารามิเตอร์หรือโหมดวัด
         # (เฉพาะตอนยังไม่มีข้อมูลในกราฟ — ป้องกันชื่อแกนเปลี่ยนกลางคันขณะวัด)
         v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._refresh_graph_labels)
+        v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._refresh_raw_table_headers)
         v.input_panel.combo_run_mode.currentIndexChanged.connect(self._refresh_graph_labels)
         v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._reset_correction_status)
         v.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
@@ -482,6 +483,13 @@ class AppController(QObject):
         if len(self.graph_x_data) == 0:
             self.setup_graph_labels()
 
+    def _refresh_raw_table_headers(self):
+        """อัปเดตชื่อคอลัมน์ Primary/Secondary ใน Raw Data Table
+        เมื่อผู้ใช้เปลี่ยน SCPI Mode เช่น CPD → Cp, D หรือ ZTD → Z, θd"""
+        self.view.raw_table.update_headers(
+            self.view.input_panel.combo_scpi_mode.currentData()
+        )
+
     def start_measurement(self):
         # ป้องกัน edge case ที่ปุ่ม Start เปิดได้ทั้งที่มี error ค้างอยู่
         # (เช่น state ไม่ sync กัน หรือ race condition ระหว่าง signal)
@@ -494,6 +502,10 @@ class AppController(QObject):
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
 
+        # [NEW] เตรียมตาราง Raw Data ก่อนเริ่มวัด
+        v.raw_table.set_mode(run_mode)
+        v.raw_table.update_headers(v.input_panel.combo_scpi_mode.currentData())
+
         if not is_single:
             self.graph_x_data = []
             self.graph_pri_y = []
@@ -501,6 +513,7 @@ class AppController(QObject):
             self.graph_raw_pri_y = []
             self.graph_raw_sec_y = []
             v.graph_display.clear_plots()
+            v.raw_table.clear_table()  # ล้างข้อมูลดิบเก่าเมื่อเริ่มวัดใหม่
 
         if len(self.graph_x_data) == 0:
             self.setup_graph_labels()
@@ -523,7 +536,7 @@ class AppController(QObject):
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
             'level_mode': v.input_panel.combo_level_mode.currentData(),
-            'alc_enabled': v.input_panel.chk_alc.isChecked(),           
+            'alc_enabled': v.input_panel.chk_alc.isChecked(),
             'time_mode': v.input_panel.combo_time.currentText(),
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
@@ -575,6 +588,7 @@ class AppController(QObject):
         # 1. ค่าดิบจากฮาร์ดแวร์
         raw_pri = data.get('primary', 0.0)
         raw_sec = data.get('secondary', 0.0)
+        status  = data.get('status', 'SUCCESS')  # [NEW] รับค่า status ที่มาจาก Thread
 
         # เก็บค่าดิบลง Array ไว้คำนวณ Type A Uncertainty
         self.graph_raw_pri_y.append(raw_pri)
@@ -586,15 +600,55 @@ class AppController(QObject):
 
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
+        is_list = (run_mode == "LIST")
+
+        # --- [NEW] ลอจิกเตรียมข้อมูลให้ Raw Data Table ---
+        no_val = len(self.graph_x_data) + 1  # ลำดับที่ของการวัด (1, 2, 3...)
+        current_freq = data.get('freq', 0)
+
+        # จัดรูปแบบข้อความ "Samples (N)" ให้ตรงกับโหมด
+        if is_single:
+            n_single = v.input_panel.input_n_single.value()
+            sample_text = f"{no_val}/{n_single}"  # ตัวอย่าง: 1/5, 2/5
+            freq_val = v.input_panel.input_freq.value()
+        elif is_list:
+            n_samples = v.input_panel.input_samples.value()
+            current_sample = data.get('sample_index', 1)
+            sample_text = f"{current_sample}/{n_samples}"  # ตัวอย่าง: 1/3, 2/3
+            freq_val = current_freq
+        else:  # SWEEP
+            step_size = v.input_panel.input_step_freq.value()
+            sample_text = f"{step_size:,.2f}"     # โชว์ Step Size แทน
+            freq_val = current_freq
+
+        # ส่งให้ Raw Data Table แสดงผล
+        v.raw_table.append_row({
+            'no': no_val,
+            'freq': freq_val,
+            'sample_text': sample_text,
+            'primary': raw_pri,
+            'secondary': raw_sec,
+            'status': status
+        })
+        # ----------------------------------------
+
         if is_single:
             self.graph_x_data.append(len(self.graph_x_data) + 1)
         else:
-            self.graph_x_data.append(data.get('freq', 0))
+            self.graph_x_data.append(current_freq)
 
         self.graph_pri_y.append(raw_pri)
         self.graph_sec_y.append(raw_sec)
 
-        v.graph_display.update_plots(self.graph_x_data, self.graph_pri_y, self.graph_sec_y)
+        # ถ้าเป็น LIST mode ให้ส่งแกน X เป็นลำดับ 1, 2, 3... ไปวาดกราฟ
+        # (กันกราฟซิกแซกเมื่อ samples > 1 ต่อความถี่ — สอดคล้องกับ label แกน X
+        # ที่ตั้งไว้ใน setup_graph_labels ว่าเป็น "Measurement Count (Points)")
+        if is_list:
+            plot_x = list(range(1, len(self.graph_x_data) + 1))
+        else:
+            plot_x = self.graph_x_data
+
+        v.graph_display.update_plots(plot_x, self.graph_pri_y, self.graph_sec_y)
         v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, is_single)
         self.update_statistics_table()
 
@@ -649,6 +703,7 @@ class AppController(QObject):
         self.graph_raw_sec_y = []
         self.view.graph_display.clear_plots()
         self.view.stats_table.clear_table()
+        self.view.raw_table.clear_table()  # [NEW] ล้างตารางข้อมูลดิบด้วย
         self.log.info("🗑 ล้างข้อมูลกราฟและตารางสถิติเรียบร้อย")
         self.update_session_lock()
 
@@ -803,9 +858,15 @@ class AppController(QObject):
         self.toggle_ppm()
 
         self.update_hardware_limits()
-        self.validate_freq_list()      
+        self.validate_freq_list()
         self.update_start_button_state()
         self.view.stats_table.set_mode(run_mode)
+        # อัปเดตหัวคอลัมน์ Raw Data Table แบบ real-time เมื่อเปลี่ยนโหมด
+        # set_mode() จะเปลี่ยนคอลัมน์ที่ 2 จาก "Samples (N)" เป็น "Step Size" ตอนอยู่โหมด SWEEP
+        self.view.raw_table.set_mode(run_mode)
+        self.view.raw_table.update_headers(
+            self.view.input_panel.combo_scpi_mode.currentData()
+        )
 
     def toggle_dc_bias(self):
         is_enabled = self.view.input_panel.chk_dc_enable.isChecked()

@@ -1,0 +1,155 @@
+# แสดงผลข้อมูลดิบ (Raw Data) จากเครื่องวัด LCR Meter แบบ Real-time เพื่อใช้ตรวจสอบความถูกต้องของข้อมูล
+
+
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTableWidget, 
+                             QTableWidgetItem, QHeaderView, QLabel)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QBrush
+
+class RawDataTable(QWidget):
+    """
+    ตารางแสดงข้อมูลดิบ (Raw Data) ที่อ่านได้จากเครื่องแบบ Real-time
+    - แสดงค่าเรียงตามลำดับการวัด (No.)
+    - แสดงสถานะ (Status) ของแต่ละจุด เพื่อตรวจสอบ Error/Overload
+    - เปลี่ยนหัวคอลัมน์แบบไดนามิกตามโหมดการวัดและ SCPI Mode
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._current_mode = "LIST"
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
+
+        self.lbl_hint = QLabel("ตารางข้อมูลดิบ (Raw Data) — แสดงค่าที่รับมาจากเครื่องแบบ Real-time")
+        self.lbl_hint.setStyleSheet("color: #94a3b8; font-size: 11px;")
+        layout.addWidget(self.lbl_hint)
+
+        self.table = QTableWidget()
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents) # คอลัมน์ No. ให้พอดีเนื้อหา
+        self.table.verticalHeader().setVisible(False)
+        self.table.setStyleSheet("""
+            QTableWidget::item { padding: 4px; }
+            QHeaderView::section { padding: 6px; font-weight: bold; }
+        """)
+        layout.addWidget(self.table)
+        
+        self.set_mode("LIST") # ค่าเริ่มต้น
+
+    def set_mode(self, mode: str):
+        """ปรับหัวคอลัมน์ตามโหมดการวัด (SINGLE, SWEEP, LIST)"""
+        self._current_mode = mode
+        self.table.setColumnCount(6)
+        
+        # คอลัมน์พื้นฐาน
+        headers = ["No.", "Frequency (Hz)", "Samples (N)", "Primary", "Secondary", "Status"]
+        
+        # แก้ไขคอลัมน์ที่ 3 (Index 2) ตามโหมด
+        if mode == "SWEEP":
+            headers[2] = "Step Size"
+            
+        self.table.setHorizontalHeaderLabels(headers)
+        self.clear_table()
+
+    def update_headers(self, scpi_mode: str):
+        """แปลง SCPI Mode เป็นชื่อแกนแบบย่อ เช่น CPD -> Primary [Cp], Secondary [D]"""
+        if not scpi_mode:
+            return
+            
+        pri, sec = "Primary", "Secondary"
+        
+        # แปลง Primary
+        if scpi_mode.startswith("CP"): pri = "Cp"
+        elif scpi_mode.startswith("CS"): pri = "Cs"
+        elif scpi_mode.startswith("LP"): pri = "Lp"
+        elif scpi_mode.startswith("LS"): pri = "Ls"
+        elif scpi_mode.startswith("Z"): pri = "Z"
+        elif scpi_mode.startswith("Y"): pri = "Y"
+        elif scpi_mode.startswith("R"): pri = "R"
+        elif scpi_mode == "GB": pri = "G"
+        
+        # แปลง Secondary
+        if scpi_mode.endswith("D") and not scpi_mode.endswith("TD"): sec = "D"
+        elif scpi_mode.endswith("Q"): sec = "Q"
+        elif scpi_mode.endswith("G"): sec = "G"
+        elif scpi_mode.endswith("RS"): sec = "Rs"
+        elif scpi_mode.endswith("RP"): sec = "Rp"
+        elif scpi_mode.endswith("TD"): sec = "θd"
+        elif scpi_mode.endswith("TR"): sec = "θr"
+        elif scpi_mode.endswith("X"): sec = "X"
+        elif scpi_mode == "GB": sec = "B"
+
+        # ตั้งชื่อ Header คอลัมน์ 3 และ 4 ใหม่
+        item_pri = self.table.horizontalHeaderItem(3)
+        item_sec = self.table.horizontalHeaderItem(4)
+        if item_pri: item_pri.setText(f"Primary [{pri}]")
+        if item_sec: item_sec.setText(f"Secondary [{sec}]")
+
+    def append_row(self, data: dict):
+        """
+        เพิ่ม 1 แถวในตาราง
+        data ต้องมี keys: no, freq, sample_text, primary, secondary, status
+        """
+        row_idx = self.table.rowCount()
+        self.table.insertRow(row_idx)
+
+        # 0: No.
+        item_no = QTableWidgetItem(str(data.get('no', '')))
+        item_no.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row_idx, 0, item_no)
+
+        # 1: Frequency
+        freq = data.get('freq')
+        freq_str = f"{freq:.2f}" if isinstance(freq, (int, float)) else str(freq)
+        item_freq = QTableWidgetItem(freq_str)
+        item_freq.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row_idx, 1, item_freq)
+
+        # 2: Samples (N) หรือ Step Size
+        item_sample = QTableWidgetItem(str(data.get('sample_text', '-')))
+        item_sample.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row_idx, 2, item_sample)
+
+        # 3: Primary
+        pri = data.get('primary')
+        pri_str = f"{pri:.5e}" if isinstance(pri, (int, float)) else str(pri)
+        item_pri = QTableWidgetItem(pri_str)
+        item_pri.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row_idx, 3, item_pri)
+
+        # 4: Secondary
+        sec = data.get('secondary')
+        sec_str = f"{sec:.5e}" if isinstance(sec, (int, float)) else str(sec)
+        item_sec = QTableWidgetItem(sec_str)
+        item_sec.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row_idx, 4, item_sec)
+
+        # 5: Status
+        status = str(data.get('status', 'SUCCESS'))
+        item_status = QTableWidgetItem(status)
+        item_status.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # ใส่สีแดงให้ตัวอักษรถ้า Status ไม่ใช่ SUCCESS
+        if status.upper() != "SUCCESS":
+            item_status.setForeground(QBrush(QColor("#ef4444"))) # สีแดง Tailwind
+            item_status.setFont(self._get_bold_font())
+        else:
+            item_status.setForeground(QBrush(QColor("#10b981"))) # สีเขียว Tailwind
+            
+        self.table.setItem(row_idx, 5, item_status)
+        
+        # เลื่อนหน้าจอลงมาแถวล่าสุด
+        self.table.scrollToBottom()
+
+    def _get_bold_font(self):
+        font = self.table.font()
+        font.setBold(True)
+        return font
+
+    def clear_table(self):
+        self.table.setRowCount(0)

@@ -150,6 +150,7 @@ class MeasurementWorker(QThread):
                     'freq':      freq,
                     'primary':   float(pri),
                     'secondary': float(sec),
+                    'status':    stat
                 })
             else:
                 self._handle_hardware_status(stat, current_freq=freq)
@@ -188,7 +189,8 @@ class MeasurementWorker(QThread):
                 self.data_ready.emit({
                     'freq':      current_freq,
                     'primary':   float(pri),
-                    'secondary': float(sec)
+                    'secondary': float(sec),
+                    'status':    stat
                 })
             else:
                 self._handle_hardware_status(stat, current_freq)
@@ -284,7 +286,8 @@ class MeasurementWorker(QThread):
                             'freq':         current_freq,
                             'sample_index': usable_sample_index,
                             'primary':      float(pri),
-                            'secondary':    float(sec)
+                            'secondary':    float(sec),
+                            'status':       stat
                         })
                 elif not is_discarded:
                     self._handle_hardware_status(stat, current_freq)

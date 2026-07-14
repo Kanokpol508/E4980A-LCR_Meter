@@ -10,8 +10,8 @@ from gui.panels.control_panel import ControlPanel
 from gui.displays.graph_display import GraphDisplay
 from gui.displays.lcd_display import LcdDisplay
 from gui.displays.statistics_table import StatisticsTable
-from gui.displays.log_display import LogDisplay 
-
+from gui.displays.log_display import LogDisplay
+from gui.displays.raw_data_table import RawDataTable 
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -54,16 +54,18 @@ class MainWindow(QMainWindow):
 
         main_layout.addWidget(left_panel_container)
 
-        # ─────────────── ฝั่งขวา: กราฟ / ตารางสถิติ / Log และจอ LCD ──────────────────
+        # ─────────────── ฝั่งขวา: กราฟ / ตารางสถิติ / ข้อมูลดิบ / Log และจอ LCD ──────────────────
         right_layout = QVBoxLayout()
 
         self.graph_display = GraphDisplay()
         self.stats_table   = StatisticsTable()
+        self.raw_table     = RawDataTable()
         self.log_display   = LogDisplay() 
 
         self.right_tabs = QTabWidget()
         self.right_tabs.addTab(self.graph_display, "กราฟ (Graph)")
         self.right_tabs.addTab(self.stats_table,   "ตารางสถิติ (Statistics Table)")
+        self.right_tabs.addTab(self.raw_table,     "ข้อมูลดิบ (Raw Data)")
         self.right_tabs.addTab(self.log_display,   "บันทึกเหตุการณ์ (Log)")
 
         self.lcd_display = LcdDisplay()

@@ -291,10 +291,10 @@ class InputPanel(QWidget):
         # --- Dropdown เลือกโหมดการวัด ---
         v_mode.addWidget(QLabel("เลือกโหมดการวัด (Select Measurement Mode):"))
         self.combo_run_mode = QComboBox()
-        self.combo_run_mode.addItem("วัดจุดเดียว (Single)", userData="SINGLE")
-        self.combo_run_mode.addItem("สแกนความถี่ (Sweep)", userData="SWEEP")
-        self.combo_run_mode.addItem("รายการความถี่ (List)", userData="LIST")
-        self.combo_run_mode.setCurrentIndex(1)  # ค่าเริ่มต้น = Sweep
+        self.combo_run_mode.addItem("วัดจุดเดียว (Single Frequency)", userData="SINGLE")
+        self.combo_run_mode.addItem("สแกนความถี่ (Sweep Frequency)", userData="SWEEP")
+        self.combo_run_mode.addItem("รายการความถี่ (Frequency List)", userData="LIST")
+        self.combo_run_mode.setCurrentIndex(0)  # ค่าเริ่มต้น = Single
         v_mode.addWidget(self.combo_run_mode)
 
         # --- เนื้อหาย่อย: วัดจุดเดียว (SINGLE) ---
@@ -567,6 +567,7 @@ class InputPanel(QWidget):
 
         self.combo_time = QComboBox()
         self.combo_time.addItems(["SHORT", "MEDIUM", "LONG"])
+        self.combo_time.setCurrentText("LONG")  # ค่าเริ่มต้น = LONG (ความแม่นยำสูงสุด)
 
         self.input_avg = QSpinBox()
         self.input_avg.setRange(1, 256)

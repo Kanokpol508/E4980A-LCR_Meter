@@ -150,6 +150,15 @@ class GraphDisplay(QWidget):
             axis_pri.setTicks(None) 
             axis_sec.setTicks(None)
 
+    def set_stats_visible(self, visible: bool):
+        """
+        แสดง/ซ่อน StatPanel ทั้งสองข้างกราฟ
+        ซ่อนเมื่ออยู่โหมด SWEEP เพราะ N=1 ไม่มีสถิติที่มีความหมาย
+        ทำให้พื้นที่กราฟขยายเต็มความกว้างแทน
+        """
+        self.stat_primary.setVisible(visible)
+        self.stat_secondary.setVisible(visible)
+
     def update_plots(self, x_data: list, pri_y_data: list, sec_y_data: list):
         """อัปเดตเส้นกราฟ"""
         self.curve_primary.setData(x_data, pri_y_data)

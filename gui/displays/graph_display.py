@@ -17,7 +17,7 @@ class StatPanel(QGroupBox):
         layout.setSpacing(2)
         layout.setContentsMargins(15, 10, 15, 15)
         
-        # 1. SD (ลบ Last Value ออกแล้ว ขยับ SD ขึ้นมาแทน)
+        # 1. SD
         lbl_title_sd = QLabel("Standard Deviation (SD):")
         lbl_title_sd.setObjectName("lblStatTitle")
         layout.addWidget(lbl_title_sd)
@@ -87,6 +87,8 @@ class GraphDisplay(QWidget):
         self.plot_primary = pg.PlotWidget(title="Primary Parameter")
         self.plot_primary.showGrid(x=True, y=True, alpha=0.3)
         self.plot_primary.getViewBox().enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
+        self.plot_primary.getViewBox().setLimits(xMin=0) # ล็อคไม่ให้เลื่อนซ้ายทะลุเลข 0 ไปติดลบ
+        self.plot_primary.setXRange(0, 10)               # เปิดโปรแกรมมาให้โชว์สเกล 0 ถึง 10
         self.curve_primary = self.plot_primary.plot(pen=pg.mkPen('c', width=2), symbol='o', symbolSize=6, symbolBrush='c')
         
         # ใส่ชื่อแกนเริ่มต้น (Default Labels) ทันทีที่เปิดโปรแกรม
@@ -107,6 +109,8 @@ class GraphDisplay(QWidget):
         self.plot_secondary = pg.PlotWidget(title="Secondary Parameter")
         self.plot_secondary.showGrid(x=True, y=True, alpha=0.3)
         self.plot_secondary.getViewBox().enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
+        self.plot_secondary.getViewBox().setLimits(xMin=0) # ล็อคไม่ให้เลื่อนซ้ายทะลุเลข 0 ไปติดลบ
+        self.plot_secondary.setXRange(0, 10)               # เปิดโปรแกรมมาให้โชว์สเกล 0 ถึง 10
         self.curve_secondary = self.plot_secondary.plot(pen=pg.mkPen('m', width=2), symbol='o', symbolSize=6, symbolBrush='m')
         
         # ใส่ชื่อแกนเริ่มต้น (Default Labels) ทันทีที่เปิดโปรแกรม
@@ -127,15 +131,10 @@ class GraphDisplay(QWidget):
         self.plot_secondary.setLabel('bottom', x_label, **self.label_style)
         self.plot_secondary.setLabel('left', sec_y_label, **self.label_style)
 
-        axis_pri = self.plot_primary.getAxis('bottom')
-        axis_sec = self.plot_secondary.getAxis('bottom')
-        
-        if is_single_mode:
-            axis_pri.setTickSpacing(major=1, minor=1)
-            axis_sec.setTickSpacing(major=1, minor=1)
-        else:
-            axis_pri.setTicks(None) 
-            axis_sec.setTicks(None)
+        # ลบการบังคับขีดทีละ 1 ทิ้ง เพื่อให้ pyqtgraph คำนวณ 5, 10, 15 อัตโนมัติเมื่อซูมออก
+        # ป้องกันตัวเลขทับกันจนอ่านไม่ออก
+        self.plot_primary.getAxis('bottom').setTicks(None)
+        self.plot_secondary.getAxis('bottom').setTicks(None)
 
     def set_stats_visible(self, visible: bool):
         """
@@ -165,3 +164,7 @@ class GraphDisplay(QWidget):
         self.curve_primary.setData([], [])
         self.curve_secondary.setData([], [])
         self.update_statistics([], [], True)
+        
+        # รีเซ็ตกราฟกลับไปที่ระยะ 0-10 เหมือนตอนเปิดโปรแกรมใหม่
+        self.plot_primary.setXRange(0, 10)
+        self.plot_secondary.setXRange(0, 10)

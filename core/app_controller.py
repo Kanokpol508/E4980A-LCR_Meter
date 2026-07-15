@@ -81,7 +81,7 @@ class AppController(QObject):
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
         v.input_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
-        v.input_panel.combo_dc_level.valueChanged.connect(self.validate_dc_bias)
+        v.input_panel.combo_dc_level.currentIndexChanged.connect(self.validate_dc_bias)
 
         # [NEW] ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก Vrms เป็น Arms ให้ไปปรับเพดานตัวเลขทันที
         v.input_panel.combo_level_mode.currentIndexChanged.connect(self.update_hardware_limits)
@@ -292,7 +292,7 @@ class AppController(QObject):
             'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.input_panel.chk_dc_enable.isChecked(),
             'dc_is_voltage': True,
-            'dc_bias_level': v.input_panel.combo_dc_level.value(),
+            'dc_bias_level': v.input_panel.combo_dc_level.currentData(),
         }
 
         self.set_ui_locked(True)
@@ -559,7 +559,7 @@ class AppController(QObject):
             'imp_range': v.input_panel.combo_range.currentData(),
             'dc_bias_enabled': v.input_panel.chk_dc_enable.isChecked(),
             'dc_is_voltage': True,
-            'dc_bias_level': v.input_panel.combo_dc_level.value(),
+            'dc_bias_level': v.input_panel.combo_dc_level.currentData(),
         }
 
         self.worker = MeasurementWorker(settings)

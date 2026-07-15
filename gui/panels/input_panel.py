@@ -527,19 +527,21 @@ class InputPanel(QWidget):
         v_dc_inner.setContentsMargins(0, 0, 0, 0)
         v_dc_inner.setSpacing(8)
 
-        # SpinBox รับค่า DC Bias ได้อิสระ 0–2 V (E4980A standard) แทน Dropdown แบบตายตัว
+        # [แก้ไข] เปลี่ยนเป็น Dropdown เลือกค่า DC Bias แบบตายตัว (E4980A standard: 1.5V, 2.0V)
         v_dc_inner.addWidget(QLabel("ระดับไฟ (Level):"))
         h_dc_level = QHBoxLayout()
-        self.combo_dc_level = QDoubleSpinBox()
-        self.combo_dc_level.setRange(0.0, 2.0)
-        self.combo_dc_level.setDecimals(3)
-        self.combo_dc_level.setSingleStep(0.1)
-        self.combo_dc_level.setValue(1.5)
+        
+        self.combo_dc_level = QComboBox()
+        self.combo_dc_level.addItem("1.5 V", userData=1.5)
+        self.combo_dc_level.addItem("2.0 V", userData=2.0)
         self.combo_dc_level.setFixedWidth(120)
+        
         h_dc_level.addWidget(self.combo_dc_level)
-        h_dc_level.addWidget(QLabel("V"))
         h_dc_level.addStretch()
         v_dc_inner.addLayout(h_dc_level)
+
+        self.lbl_dc_warning = QLabel("")
+        self.lbl_dc_warning.setWordWrap(True)
 
         self.lbl_dc_warning = QLabel("")
         self.lbl_dc_warning.setWordWrap(True)

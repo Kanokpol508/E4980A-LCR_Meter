@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt
 import pyqtgraph as pg
 
 class StatPanel(QGroupBox):
-    """คอมโพเนนต์ย่อยสำหรับแสดงสถิติข้างกราฟ (Last Value, SD, Type A)"""
+    """คอมโพเนนต์ย่อยสำหรับแสดงสถิติข้างกราฟ (SD, Type A)"""
     def __init__(self, title, parent=None):
         super().__init__(title, parent)
         self.setFixedWidth(240)  
@@ -17,17 +17,7 @@ class StatPanel(QGroupBox):
         layout.setSpacing(2)
         layout.setContentsMargins(15, 10, 15, 15)
         
-        # 1. Last Value
-        lbl_title_last = QLabel("Last Value:")
-        lbl_title_last.setObjectName("lblStatTitle")
-        layout.addWidget(lbl_title_last)
-        
-        self.lbl_last = QLabel("-")
-        self.lbl_last.setObjectName("lblStatValue")
-        self.lbl_last.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(self.lbl_last)
-        
-        # 2. SD
+        # 1. SD (ลบ Last Value ออกแล้ว ขยับ SD ขึ้นมาแทน)
         lbl_title_sd = QLabel("Standard Deviation (SD):")
         lbl_title_sd.setObjectName("lblStatTitle")
         layout.addWidget(lbl_title_sd)
@@ -37,7 +27,7 @@ class StatPanel(QGroupBox):
         self.lbl_sd.setAlignment(Qt.AlignmentFlag.AlignRight)
         layout.addWidget(self.lbl_sd)
         
-        # 3. Type A
+        # 2. Type A
         lbl_title_type_a = QLabel("Type A (ppm):")
         lbl_title_type_a.setObjectName("lblStatTitle")
         layout.addWidget(lbl_title_type_a)
@@ -52,13 +42,10 @@ class StatPanel(QGroupBox):
     def update_stats(self, raw_data: list, is_single_mode: bool):
         """คำนวณและอัปเดตสถิติจากค่าดิบ"""
         if not is_single_mode or not raw_data:
-            self.lbl_last.setText("-")
             self.lbl_sd.setText("-")
             self.lbl_type_a.setText("-")
             return
             
-        self.lbl_last.setText(f"{raw_data[-1]:.5e}")
-        
         n = len(raw_data)
         if n < 2:
             self.lbl_sd.setText("-")
@@ -163,6 +150,10 @@ class GraphDisplay(QWidget):
         """อัปเดตเส้นกราฟ"""
         self.curve_primary.setData(x_data, pri_y_data)
         self.curve_secondary.setData(x_data, sec_y_data)
+        
+        # บังคับให้ขยับสเกลอัตโนมัติตลอดเวลา (Force Auto-Scale)
+        self.plot_primary.getViewBox().autoRange()
+        self.plot_secondary.getViewBox().autoRange()
 
     def update_statistics(self, raw_pri_data: list, raw_sec_data: list, is_single_mode: bool):
         """ส่งค่าดิบไปให้ Panel สถิติคำนวณ"""

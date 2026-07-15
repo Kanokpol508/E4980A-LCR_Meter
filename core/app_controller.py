@@ -83,6 +83,9 @@ class AppController(QObject):
         v.input_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
         v.input_panel.combo_dc_level.valueChanged.connect(self.validate_dc_bias)
 
+        # [NEW] ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก Vrms เป็น Arms ให้ไปปรับเพดานตัวเลขทันที
+        v.input_panel.combo_level_mode.currentIndexChanged.connect(self.update_hardware_limits)
+
         # PPM Reference: เปิด/ปิด checkbox และ validate ค่า Ref ที่กรอก
         v.adv_panel.chk_dev_ppm_enable.stateChanged.connect(self.toggle_ppm)
         v.adv_panel.input_dev_pri.textChanged.connect(self.validate_ppm_ref)
@@ -167,9 +170,22 @@ class AppController(QObject):
         v.input_panel.lbl_total_rounds_list.setText(f"{total} ครั้ง/ความถี่ \n (ทิ้ง {d} + วัด {s})")
 
     def update_hardware_limits(self):
+        """อัปเดตเพดานสูงสุดของกล่องกรอกระดับสัญญาณ ตามโหมด V/I ที่ผู้ใช้เลือก"""
         v = self.view
-        v.input_panel.input_volt.setMaximum(2.0)
-        v.input_panel.input_volt.setToolTip("เครื่องรุ่นมาตรฐาน (ไม่มี Option 001) จ่ายสัญญาณทดสอบได้สูงสุด 2.0 Vrms")
+        level_mode = v.input_panel.combo_level_mode.currentData()
+        
+        # สมมติฐาน: เป็นเครื่องรุ่นมาตรฐาน (ไม่มี Option 001)
+        if level_mode == "Voltage":
+            v.input_panel.input_volt.setMaximum(2.0)
+            v.input_panel.input_volt.setToolTip("โหมดแรงดัน: จ่ายสัญญาณได้สูงสุด 2.0 Vrms (เครื่องรุ่นมาตรฐาน)")
+        else: # โหมด Current (Arms)
+            v.input_panel.input_volt.setMaximum(0.02) # 20 mArms
+            v.input_panel.input_volt.setToolTip("โหมดกระแส: จ่ายสัญญาณได้สูงสุด 0.02 Arms หรือ 20 mArms (เครื่องรุ่นมาตรฐาน)")
+            
+            # ป้องกันกรณีผู้ใช้กรอก 1.0 Vrms ทิ้งไว้ พอสลับเป็น Arms ค่าจะเกินสเปค
+            # ให้ปัดตัวเลขลงมาที่ 0.02 อัตโนมัติ
+            if v.input_panel.input_volt.value() > 0.02:
+                v.input_panel.input_volt.setValue(0.02)
 
     def scan_visa_ports(self):
         self.view.conn_panel.combo_visa.clear()

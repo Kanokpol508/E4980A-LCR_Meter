@@ -362,11 +362,17 @@ class InputPanel(QWidget):
         v_mode.addWidget(self.widget_freq_single)
 
         # --- เนื้อหาย่อย: สแกนความถี่ Linear (SWEEP) ---
-        # ใช้ QGridLayout เหมือนกลุ่มฮาร์ดแวร์ฯ เพื่อให้ label คอลัมน์ 0
-        # ความกว้างเท่ากันทุกแถว -> ช่องกรอก (คอลัมน์ 1) เริ่มต้นตำแหน่งเดียวกันเป๊ะ
+        # แยกเป็น 2 QGridLayout อิสระจากกัน:
+        # 1) ความถี่เริ่มต้น/สิ้นสุด/ค่าเพิ่มต่อจุด/จำนวนจุดที่ได้ (คอลัมน์ชิดกันเอง)
+        # 2) จำนวนรอบวัดซ้ำ/ทิ้งค่าตัวอย่างแรก/รวมรอบวัด (คอลัมน์ชิดกันเอง แยกจากกลุ่มบน)
+        # เพื่อไม่ให้ความกว้างคอลัมน์ของทั้งสองกลุ่มต้องเท่ากันเหมือนตอนอยู่ grid เดียวกัน
         self.widget_sweep = QWidget()
-        grid_sweep = QGridLayout(self.widget_sweep)
-        grid_sweep.setContentsMargins(0, 0, 0, 0)
+        v_sweep = QVBoxLayout(self.widget_sweep)
+        v_sweep.setContentsMargins(0, 0, 0, 0)
+        v_sweep.setSpacing(14)
+
+        # --- กลุ่ม 1: ความถี่เริ่มต้น / สิ้นสุด / ค่าเพิ่มต่อจุด / จำนวนจุดที่ได้ ---
+        grid_sweep = QGridLayout()
         grid_sweep.setVerticalSpacing(8)
 
         self.input_start_freq = CleanDoubleSpinBox()
@@ -409,6 +415,46 @@ class InputPanel(QWidget):
         grid_sweep.addWidget(self.lbl_calculated_points, 3, 1)
 
         grid_sweep.setColumnStretch(3, 1)  # เผื่อพื้นที่ว่างด้านขวาสุด
+
+        v_sweep.addLayout(grid_sweep)
+
+        # --- กลุ่ม 2: จำนวนรอบวัดซ้ำต่อความถี่ + ทิ้งค่าตัวอย่างแรกสุด (เหมือนโหมด LIST) ---
+        grid_sweep_samples = QGridLayout()
+        grid_sweep_samples.setVerticalSpacing(8)
+
+        self.input_samples_sweep = QSpinBox()
+        self.input_samples_sweep.setRange(1, 999)
+        self.input_samples_sweep.setValue(10)
+        self.input_samples_sweep.setFixedWidth(105)
+
+        self.input_discard_first_sweep = QSpinBox()
+        self.input_discard_first_sweep.setRange(0, 5)
+        self.input_discard_first_sweep.setValue(1)
+        self.input_discard_first_sweep.setFixedWidth(105)
+        self.input_discard_first_sweep.setToolTip(
+            "จำนวนตัวอย่างแรกสุดของแต่ละความถี่ที่จะไม่นำไปคำนวณสถิติ\n"
+            "(ค่าที่วัดได้ทันทีหลังเปลี่ยนความถี่มักยังไม่นิ่ง)\n"
+            "โปรแกรมจะวัดเพิ่มจากจำนวน Samples per Sweep โดยอัตโนมัติ\n"
+            "เช่น Samples=5 + Discard=3 -> วัดจริง 8 ครั้ง เหลือใช้คำนวณสถิติครบ 5 ค่า"
+        )
+
+        self.lbl_total_rounds_sweep = QLabel("-")
+        self.lbl_total_rounds_sweep.setStyleSheet("color: #38bdf8; font-weight: bold;")
+
+        grid_sweep_samples.addWidget(QLabel("จำนวนรอบวัดซ้ำต่อความถี่ (Samples per Sweep):"), 0, 0)
+        grid_sweep_samples.addWidget(self.input_samples_sweep, 0, 1)
+        grid_sweep_samples.addWidget(QLabel("ครั้ง"), 0, 2)
+
+        grid_sweep_samples.addWidget(QLabel("ทิ้งค่าตัวอย่างแรกสุด (Discard First Reading):"), 1, 0)
+        grid_sweep_samples.addWidget(self.input_discard_first_sweep, 1, 1)
+        grid_sweep_samples.addWidget(QLabel("ครั้ง"), 1, 2)
+
+        grid_sweep_samples.addWidget(QLabel("รวมรอบวัดทั้งหมด/ความถี่:"), 2, 0)
+        grid_sweep_samples.addWidget(self.lbl_total_rounds_sweep, 2, 1)
+
+        grid_sweep_samples.setColumnStretch(3, 1)  # เผื่อพื้นที่ว่างด้านขวาสุด
+
+        v_sweep.addLayout(grid_sweep_samples)
 
         v_mode.addWidget(self.widget_sweep)
 

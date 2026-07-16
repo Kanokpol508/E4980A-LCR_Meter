@@ -164,43 +164,7 @@ def format_single_row_for_table(stat: dict) -> dict:
 
 
 # ==========================================================
-# SWEEP mode
-# ==========================================================
-
-def calculate_sweep_rows(raw_records: list, step_size: float = None) -> list:
-    """
-    SWEEP mode — ไม่มีการวัดซ้ำ แต่ละ record คือ 1 ความถี่ × 1 ครั้ง
-    คืน list ของ dict เรียงตามลำดับที่วัด พร้อมแสดงเป็น row ในตาราง
-
-    Keys ที่คืน: point_num, step_size, freq, primary, secondary
-    """
-    return [
-        {
-            'point_num':  i + 1,
-            'step_size':  step_size,
-            'freq':       r.get('freq', 0),
-            'primary':    r.get('primary'),
-            'secondary':  r.get('secondary'),
-        }
-        for i, r in enumerate(raw_records)
-    ]
-
-
-def format_sweep_row_for_table(row: dict) -> dict:
-    """แปลงผลจาก calculate_sweep_rows() เป็น string"""
-    step = row.get('step_size')
-    step_str = f"{step:,.2f}" if step is not None else "-"
-    return {
-        'point_num':  str(row['point_num']),
-        'step_size':  step_str,
-        'freq':       f"{row['freq']:.2f}",
-        'primary':    _fmt(row['primary']),
-        'secondary':  _fmt(row['secondary']),
-    }
-
-
-# ==========================================================
-# LIST mode
+# LIST mode (SWEEP ใช้ฟังก์ชันชุดเดียวกันนี้ทั้งหมด)
 # ==========================================================
 
 def calculate_frequency_stats(raw_records: list, pri_ref=None, sec_ref=None) -> list:

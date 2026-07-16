@@ -7,7 +7,6 @@ from PyQt6.QtCore import Qt
 
 from data.data_processor import (
     calculate_single_stats,    format_single_row_for_table,
-    calculate_sweep_rows,      format_sweep_row_for_table,
     calculate_frequency_stats, format_stats_row_for_table,
 )
 
@@ -27,14 +26,7 @@ _COLS_SINGLE = [
     ("sec_type_a_ppm", "Secondary Type A (ppm)"),
 ]
 
-_COLS_SWEEP = [
-    ("point_num",  "Point No."),
-    ("step_size",  "Step Size (Hz)"),
-    ("freq",       "Frequency (Hz)"),
-    ("primary",    "Primary"),
-    ("secondary",  "Secondary"),
-]
-
+# SWEEP ใช้ column set เดียวกับ LIST ทุกประการ (วัดซ้ำได้หลายครั้ง/ความถี่เหมือนกันแล้ว)
 _COLS_LIST = [
     ("freq",           "Frequency (Hz)"),
     ("n_samples",      "Samples (N)"),
@@ -47,6 +39,7 @@ _COLS_LIST = [
     ("sec_ppm",        "Secondary PPM Dev"),
     ("sec_type_a_ppm", "Secondary Type A (ppm)"),
 ]
+_COLS_SWEEP = _COLS_LIST
 
 _HINTS = {
     "SINGLE": (
@@ -54,8 +47,8 @@ _HINTS = {
         "(Type A ppm = ความไม่แน่นอนจากการวัดซ้ำ)"
     ),
     "SWEEP": (
-        "โหมดสแกนความถี่ — แสดงค่าที่วัดได้ต่อความถี่ "
-        "(วัด 1 ครั้ง/จุด จึงไม่มีสถิติซ้ำ)"
+        "โหมดสแกนความถี่ — สถิติเต็มรูปแบบแยกตามความถี่ "
+        "(PPM Dev ต้องเปิด Deviation PPM และกรอกค่า Reference)"
     ),
     "LIST": (
         "โหมดรายการความถี่ — สถิติเต็มรูปแบบแยกตามความถี่ "
@@ -121,21 +114,19 @@ class StatisticsTable(QWidget):
         if mode != self._current_mode:
             self._apply_columns(mode)
 
-    def update_table(self, raw_records: list, pri_ref=None, sec_ref=None, mode: str = None, step_size: float = None):
+    def update_table(self, raw_records: list, pri_ref=None, sec_ref=None, mode: str = None):
         """
         อัปเดตตารางใหม่ทั้งหมดจากข้อมูลดิบ
         raw_records: [{'freq':.., 'primary':.., 'secondary':..}, ...]
-        step_size: ค่า Step Size (Hz) สำหรับโหมด SWEEP — ใช้แสดงในคอลัมน์ "ค่าเพิ่มต่อจุด"
         สูตรทั้งหมดอยู่ใน data_processor.py — ที่นี่แค่แสดงผล
+        (SWEEP ใช้สูตรและการแสดงผลเดียวกับ LIST ทุกประการ)
         """
         if mode and mode != self._current_mode:
             self._apply_columns(mode)
 
         if self._current_mode == "SINGLE":
             self._render_single(raw_records)
-        elif self._current_mode == "SWEEP":
-            self._render_sweep(raw_records, step_size=step_size)
-        else:
+        else:  # SWEEP หรือ LIST
             self._render_list(raw_records, pri_ref, sec_ref)
 
     def _render_single(self, raw_records: list):
@@ -146,13 +137,6 @@ class StatisticsTable(QWidget):
         fmt = format_single_row_for_table(stat)
         self.table.setRowCount(1)
         self._set_row(0, [fmt[key] for key, _ in _COLS_SINGLE])
-
-    def _render_sweep(self, raw_records: list, step_size: float = None):
-        rows = calculate_sweep_rows(raw_records, step_size=step_size)
-        self.table.setRowCount(len(rows))
-        for i, row in enumerate(rows):
-            fmt = format_sweep_row_for_table(row)
-            self._set_row(i, [fmt[key] for key, _ in _COLS_SWEEP])
 
     def _render_list(self, raw_records: list, pri_ref=None, sec_ref=None):
         stats = calculate_frequency_stats(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)

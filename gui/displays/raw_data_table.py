@@ -46,12 +46,8 @@ class RawDataTable(QWidget):
         self._current_mode = mode
         self.table.setColumnCount(6)
         
-        # คอลัมน์พื้นฐาน
+        # คอลัมน์พื้นฐาน (ทุกโหมดใช้ "Samples (N)" เหมือนกันแล้ว)
         headers = ["No.", "Frequency (Hz)", "Samples (N)", "Primary", "Secondary", "Status"]
-        
-        # แก้ไขคอลัมน์ที่ 3 (Index 2) ตามโหมด
-        if mode == "SWEEP":
-            headers[2] = "Step Size"
             
         self.table.setHorizontalHeaderLabels(headers)
         self.clear_table()
@@ -110,7 +106,7 @@ class RawDataTable(QWidget):
         item_freq.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setItem(row_idx, 1, item_freq)
 
-        # 2: Samples (N) หรือ Step Size
+        # 2: Samples (N)
         item_sample = QTableWidgetItem(str(data.get('sample_text', '-')))
         item_sample.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setItem(row_idx, 2, item_sample)

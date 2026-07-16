@@ -37,7 +37,7 @@ class AdvancedPanel(QWidget):
         group_corr.setLayout(v_corr)
 
         # --- PPM Reference ---
-        # ใช้สำหรับคำนวณ PPM Deviation ในตารางสถิติทุกโหมดที่รองรับ (SINGLE และ LIST)
+        # ใช้สำหรับคำนวณ PPM Deviation ในตารางสถิติทุกโหมดการวัด (SINGLE, SWEEP, LIST)
         # กราฟแสดงค่าดิบเสมอ — ไม่มี Graph Deviation แล้ว
         self.group_ppm = QGroupBox("ค่าอ้างอิง PPM (PPM Reference)")
         v_ppm = QVBoxLayout()
@@ -51,7 +51,7 @@ class AdvancedPanel(QWidget):
         lbl_ppm_hint.setWordWrap(True)
         v_ppm.addWidget(lbl_ppm_hint)
 
-        # checkbox เปิด/ปิด PPM — แสดงทุกโหมด แต่มีผลเฉพาะ SINGLE และ LIST
+        # checkbox เปิด/ปิด PPM — ใช้งานได้ทุกโหมดการวัด (SINGLE, SWEEP, LIST)
         self.chk_dev_ppm_enable = QCheckBox("เปิดใช้งานการคำนวณ PPM Deviation")
         v_ppm.addWidget(self.chk_dev_ppm_enable)
 

@@ -59,6 +59,7 @@ class AppController(QObject):
         self.update_calculated_points()
         self.update_single_total()
         self.update_list_total()
+        self.update_sweep_total()
 
         # ตั้งค่า UI เริ่มต้น
         self.view.adv_panel.widget_dev_inner.setEnabled(False)
@@ -108,6 +109,10 @@ class AppController(QObject):
         # LIST: อัปเดต label รวมรอบวัดทั้งหมด/ความถี่ เมื่อ Samples หรือ Discard เปลี่ยน
         v.input_panel.input_samples.valueChanged.connect(self.update_list_total)
         v.input_panel.input_discard_first.valueChanged.connect(self.update_list_total)
+
+        # SWEEP: อัปเดต label รวมรอบวัดทั้งหมด/ความถี่ เมื่อ Samples หรือ Discard เปลี่ยน
+        v.input_panel.input_samples_sweep.valueChanged.connect(self.update_sweep_total)
+        v.input_panel.input_discard_first_sweep.valueChanged.connect(self.update_sweep_total)
 
         # ตรวจสอบ Frequency List ทุกครั้งที่มีการแก้ไข (เฉพาะมีผลตอนอยู่โหมด List)
         v.input_panel.input_freq_list.freq_changed.connect(self.validate_freq_list)
@@ -163,6 +168,16 @@ class AppController(QObject):
         d = v.input_panel.input_discard_first.value()
         total = s + d
         v.input_panel.lbl_total_rounds_list.setText(f"{total} ครั้ง/ความถี่ \n (ทิ้ง {d} + วัด {s})")
+
+    def update_sweep_total(self):
+        """คำนวณและแสดงรวมรอบวัดทั้งหมดต่อความถี่ของโหมด SWEEP
+        รวมรอบ/ความถี่ = Discard First + Samples per Sweep
+        (เหมือน LIST — ใช้ widget แยกกันเพราะ SWEEP กับ LIST แสดงพร้อมกันไม่ได้อยู่แล้ว)"""
+        v = self.view
+        s = v.input_panel.input_samples_sweep.value()
+        d = v.input_panel.input_discard_first_sweep.value()
+        total = s + d
+        v.input_panel.lbl_total_rounds_sweep.setText(f"{total} ครั้ง/ความถี่ \n (ทิ้ง {d} + วัด {s})")
 
     def update_hardware_limits(self):
         """อัปเดตเพดานสูงสุดของกล่องกรอกระดับสัญญาณ ตามโหมด V/I ที่ผู้ใช้เลือก"""
@@ -470,15 +485,16 @@ class AppController(QObject):
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
         is_list   = (run_mode == "LIST")
+        is_sweep  = (run_mode == "SWEEP")
 
-        # LIST ใช้แกน X เป็นลำดับจุดเหมือน SINGLE (กันกราฟซิกแซกเมื่อ samples > 1)
-        x_label = "Measurement Count (Points)" if (is_single or is_list) else "Frequency (Hz)"
+        # LIST และ SWEEP ใช้แกน X เป็นลำดับจุดเหมือน SINGLE (กันกราฟซิกแซกเมื่อ samples > 1)
+        x_label = "Measurement Count (Points)" if (is_single or is_list or is_sweep) else "Frequency (Hz)"
 
         v.graph_display.set_axis_labels(
             x_label=x_label,
             pri_y_label=pri_label,
             sec_y_label=sec_label,
-            is_single_mode=(is_single or is_list)
+            is_single_mode=(is_single or is_list or is_sweep)
         )
 
     def _refresh_graph_labels(self):
@@ -525,6 +541,15 @@ class AppController(QObject):
         if len(self.graph_x_data) == 0:
             self.setup_graph_labels()
 
+        # SWEEP และ LIST มีช่องกรอก Samples/Discard แยกกันคนละ widget
+        # (ใช้ค่าตาม widget ของโหมดที่กำลังทำงานอยู่จริง)
+        if run_mode == "SWEEP":
+            samples_val = v.input_panel.input_samples_sweep.value()
+            discard_val = v.input_panel.input_discard_first_sweep.value()
+        else:
+            samples_val = v.input_panel.input_samples.value()
+            discard_val = v.input_panel.input_discard_first.value()
+
         settings = {
             'run_mode': run_mode,  # 'SINGLE' / 'SWEEP' / 'LIST'
             'visa_resource': v.conn_panel.combo_visa.currentText(),
@@ -533,8 +558,8 @@ class AppController(QObject):
             'stop_freq': v.input_panel.input_stop_freq.value(),
             'step_freq': v.input_panel.input_step_freq.value(),
             'freq_list_raw': v.input_panel.input_freq_list.text(),
-            'samples_per_freq': v.input_panel.input_samples.value(),
-            'discard_first': v.input_panel.input_discard_first.value(),
+            'samples_per_freq': samples_val,
+            'discard_first': discard_val,
             # _run_single_measurement() ใช้ทั้ง 3 ค่านี้ — ถ้าไม่ส่งมา
             # จะ fallback เป็น n=1, discard=0 ทำให้การตั้งค่าใน UI ไม่มีผลเลย
             'n_single':               v.input_panel.input_n_single.value(),
@@ -605,6 +630,7 @@ class AppController(QObject):
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
         is_list = (run_mode == "LIST")
+        is_sweep = (run_mode == "SWEEP")
 
         # --- [NEW] ลอจิกเตรียมข้อมูลให้ Raw Data Table ---
         no_val = len(self.graph_x_data) + 1  # ลำดับที่ของการวัด (1, 2, 3...)
@@ -620,9 +646,10 @@ class AppController(QObject):
             current_sample = data.get('sample_index', 1)
             sample_text = f"{current_sample}/{n_samples}"  # ตัวอย่าง: 1/3, 2/3
             freq_val = current_freq
-        else:  # SWEEP
-            step_size = v.input_panel.input_step_freq.value()
-            sample_text = f"{step_size:,.2f}"     # โชว์ Step Size แทน
+        else:  # SWEEP (เหมือน LIST — วัดซ้ำได้หลายครั้งต่อความถี่)
+            n_samples = v.input_panel.input_samples_sweep.value()
+            current_sample = data.get('sample_index', 1)
+            sample_text = f"{current_sample}/{n_samples}"
             freq_val = current_freq
 
         # ส่งให้ Raw Data Table แสดงผล
@@ -644,10 +671,10 @@ class AppController(QObject):
         self.graph_pri_y.append(raw_pri)
         self.graph_sec_y.append(raw_sec)
 
-        # ถ้าเป็น LIST mode ให้ส่งแกน X เป็นลำดับ 1, 2, 3... ไปวาดกราฟ
+        # ถ้าเป็น LIST หรือ SWEEP mode ให้ส่งแกน X เป็นลำดับ 1, 2, 3... ไปวาดกราฟ
         # (กันกราฟซิกแซกเมื่อ samples > 1 ต่อความถี่ — สอดคล้องกับ label แกน X
         # ที่ตั้งไว้ใน setup_graph_labels ว่าเป็น "Measurement Count (Points)")
-        if is_list:
+        if is_list or is_sweep:
             plot_x = list(range(1, len(self.graph_x_data) + 1))
         else:
             plot_x = self.graph_x_data
@@ -666,15 +693,12 @@ class AppController(QObject):
             for f, p, s in zip(self.graph_x_data, self.graph_raw_pri_y, self.graph_raw_sec_y)
         ]
 
-        # ส่ง Ref เฉพาะตอน checkbox PPM เปิด — ใช้ได้ทั้ง SINGLE และ LIST
+        # ส่ง Ref เฉพาะตอน checkbox PPM เปิด — ใช้ได้ทั้ง SINGLE, SWEEP และ LIST
         ppm_enabled = v.adv_panel.chk_dev_ppm_enable.isChecked()
         pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if ppm_enabled else None
         sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if ppm_enabled else None
 
-        # ส่ง step_size เข้าไปด้วยสำหรับโหมด SWEEP เพื่อแสดงคอลัมน์ "ค่าเพิ่มต่อจุด"
-        step_size = v.input_panel.input_step_freq.value() if run_mode == "SWEEP" else None
-
-        v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode, step_size=step_size)
+        v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode)
 
     @staticmethod
     def _safe_float(text: str):
@@ -729,6 +753,8 @@ class AppController(QObject):
             v.input_panel.input_start_freq.setEnabled(run_mode == "SWEEP")
             v.input_panel.input_stop_freq.setEnabled(run_mode == "SWEEP")
             v.input_panel.input_step_freq.setEnabled(run_mode == "SWEEP")
+            v.input_panel.input_samples_sweep.setEnabled(run_mode == "SWEEP")
+            v.input_panel.input_discard_first_sweep.setEnabled(run_mode == "SWEEP")
             v.input_panel.input_freq_list.setEnabled(run_mode == "LIST")
             v.input_panel.input_samples.setEnabled(run_mode == "LIST")
             v.input_panel.input_discard_first.setEnabled(run_mode == "LIST")
@@ -736,6 +762,8 @@ class AppController(QObject):
             v.input_panel.input_start_freq.setEnabled(False)
             v.input_panel.input_stop_freq.setEnabled(False)
             v.input_panel.input_step_freq.setEnabled(False)
+            v.input_panel.input_samples_sweep.setEnabled(False)
+            v.input_panel.input_discard_first_sweep.setEnabled(False)
             v.input_panel.input_freq_list.setEnabled(False)
             v.input_panel.input_samples.setEnabled(False)
             v.input_panel.input_discard_first.setEnabled(False)
@@ -845,16 +873,15 @@ class AppController(QObject):
         v.input_panel.input_start_freq.setEnabled(is_sweep)
         v.input_panel.input_stop_freq.setEnabled(is_sweep)
         v.input_panel.input_step_freq.setEnabled(is_sweep)
+        v.input_panel.input_samples_sweep.setEnabled(is_sweep)
+        v.input_panel.input_discard_first_sweep.setEnabled(is_sweep)
         v.input_panel.input_freq_list.setEnabled(is_list)
         v.input_panel.input_samples.setEnabled(is_list)
         v.input_panel.input_discard_first.setEnabled(is_list)
 
-        # ซ่อน group PPM ทั้งกลุ่มเมื่ออยู่โหมด SWEEP
-        # เพราะ SWEEP วัดครั้งเดียวต่อความถี่ ไม่มี Mean จากการวัดซ้ำ จึงคำนวณ PPM Dev ไม่ได้
-        # SINGLE และ LIST ใช้ PPM ได้ → แสดง group ปกติ
-        if is_sweep:
-            v.adv_panel.chk_dev_ppm_enable.setChecked(False)
-        v.adv_panel.group_ppm.setVisible(not is_sweep)
+        # PPM Reference ใช้ได้ทุกโหมด (SINGLE, SWEEP, LIST)
+        # เพราะทุกโหมดวัดซ้ำได้แล้ว (SWEEP มี Samples per Sweep + Discard First เหมือน LIST)
+        # จึงมี Mean ให้คำนวณ PPM Deviation ได้เสมอ — ไม่ต้องซ่อน group นี้อีกต่อไป
 
         # Sync สถานะ widget_dev_inner หลังเปลี่ยน visibility/checked state
         self.toggle_ppm()
@@ -863,11 +890,8 @@ class AppController(QObject):
         self.validate_freq_list()
         self.update_start_button_state()
         self.view.stats_table.set_mode(run_mode)
-        # ซ่อน Statistics Table ใน SWEEP mode เพราะข้อมูลซ้ำกับ Raw Data Table ทั้งหมด
-        stats_tab_index = self.view.right_tabs.indexOf(self.view.stats_table)
-        self.view.right_tabs.setTabVisible(stats_tab_index, not is_sweep)
         # อัปเดตหัวคอลัมน์ Raw Data Table แบบ real-time เมื่อเปลี่ยนโหมด
-        # set_mode() จะเปลี่ยนคอลัมน์ที่ 2 จาก "Samples (N)" เป็น "Step Size" ตอนอยู่โหมด SWEEP
+        # set_mode() ปรับหัวคอลัมน์ตามโหมด (ทุกโหมดตอนนี้ใช้ "Samples (N)" เหมือนกัน)
         self.view.raw_table.set_mode(run_mode)
         self.view.raw_table.update_headers(
             self.view.input_panel.combo_scpi_mode.currentData()

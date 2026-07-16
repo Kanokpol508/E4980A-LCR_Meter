@@ -148,10 +148,18 @@ class MeasurementWorker(QThread):
                 self._handle_hardware_status(stat, current_freq=freq)
 
     def _run_sweep_measurement(self, lcr):
-        """ตรรกะการวัดค่าแบบสแกนความถี่ (Linear sweep ด้วย Step size)"""
+        """
+        ตรรกะการวัดค่าแบบสแกนความถี่ (Linear sweep ด้วย Step size)
+        วัดซ้ำ N ครั้ง (samples_per_freq) ต่อความถี่ 1 จุดก่อนขยับไปความถี่ถัดไป
+        เหมือนกับโหมด LIST ทุกประการ (รวม Discard First Reading)
+        """
         start_f = self.settings.get('start_freq', 100.0)
         stop_f  = self.settings.get('stop_freq', 1000000.0)
         step_f  = self.settings.get('step_freq', 20000.0)
+
+        samples       = max(1, int(self.settings.get('samples_per_freq', 1)))
+        discard_first = max(0, int(self.settings.get('discard_first', 0)))
+        total_rounds_per_freq = discard_first + samples
 
         if step_f <= 0:
             step_f = 1.0
@@ -162,30 +170,43 @@ class MeasurementWorker(QThread):
         frequencies = [start_f + i * step_f for i in range(n_points)]
         frequencies = [min(f, stop_f) for f in frequencies]
 
-        points = len(frequencies)
+        total_points = len(frequencies) * total_rounds_per_freq
+        done_points  = 0
 
-        for i, current_freq in enumerate(frequencies):
+        for current_freq in frequencies:
             if not self.is_running:
                 break
 
             lcr.set_frequency(current_freq)
             lcr.wait_until_ready()
 
-            lcr.trigger()
-            pri, sec, stat = lcr.fetch_measurement()
+            for round_index in range(total_rounds_per_freq):
+                if not self.is_running:
+                    break
 
-            percent = int(((i + 1) / points) * 100)
-            self.progress_updated.emit(percent)
+                lcr.trigger()
+                pri, sec, stat = lcr.fetch_measurement()
 
-            if stat == "SUCCESS":
-                self.data_ready.emit({
-                    'freq':      current_freq,
-                    'primary':   float(pri),
-                    'secondary': float(sec),
-                    'status':    stat
-                })
-            else:
-                self._handle_hardware_status(stat, current_freq)
+                done_points += 1
+                percent = int((done_points / total_points) * 100)
+                self.progress_updated.emit(percent)
+
+                # รอบแรกสุด (round_index < discard_first) คือรอบที่ "วัดเพิ่ม" เพื่อทิ้ง
+                # ไม่นับเป็นส่วนหนึ่งของ samples_per_freq ที่ผู้ใช้ตั้งใจไว้
+                is_discarded = round_index < discard_first
+
+                if stat == "SUCCESS":
+                    if not is_discarded:
+                        usable_sample_index = round_index - discard_first + 1  # 1..samples
+                        self.data_ready.emit({
+                            'freq':         current_freq,
+                            'sample_index': usable_sample_index,
+                            'primary':      float(pri),
+                            'secondary':    float(sec),
+                            'status':       stat
+                        })
+                elif not is_discarded:
+                    self._handle_hardware_status(stat, current_freq)
 
     # ========================================================
     # [ใหม่] โหมด Frequency List + Samples per Sweep

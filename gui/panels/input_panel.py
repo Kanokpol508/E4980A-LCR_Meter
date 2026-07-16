@@ -471,10 +471,8 @@ class InputPanel(QWidget):
         self.group_mode.setLayout(v_mode)
 
         # ==========================================================
-        # 3. สัญญาณทดสอบ (Test Signal) + DC Bias (วางข้างกัน)
+        # 3. สัญญาณทดสอบ (Test Signal)
         # ==========================================================
-
-        # --- 3a. Test Signal ---
         self.group_signal = QGroupBox("สัญญาณทดสอบ (Test Signal)")
         v_signal = QVBoxLayout()
         v_signal.setSpacing(8)
@@ -512,50 +510,6 @@ class InputPanel(QWidget):
         v_signal.addWidget(self.chk_alc)
         v_signal.addStretch()
         self.group_signal.setLayout(v_signal)
-
-        # --- 3b. DC Bias ---
-        self.group_dc = QGroupBox("ไฟเลี้ยงกระแสตรง (DC Bias)")
-        v_dc = QVBoxLayout()
-
-        h_dc_enable = QHBoxLayout()
-        self.chk_dc_enable = QCheckBox("เปิดใช้งาน (Enable)")
-        h_dc_enable.addWidget(self.chk_dc_enable)
-        v_dc.addLayout(h_dc_enable)
-
-        self.widget_dc_inner = QWidget()
-        v_dc_inner = QVBoxLayout(self.widget_dc_inner)
-        v_dc_inner.setContentsMargins(0, 0, 0, 0)
-        v_dc_inner.setSpacing(8)
-
-        # [แก้ไข] เปลี่ยนเป็น Dropdown เลือกค่า DC Bias แบบตายตัว (E4980A standard: 1.5V, 2.0V)
-        v_dc_inner.addWidget(QLabel("ระดับไฟ (Level):"))
-        h_dc_level = QHBoxLayout()
-        
-        self.combo_dc_level = QComboBox()
-        self.combo_dc_level.addItem("1.5 V", userData=1.5)
-        self.combo_dc_level.addItem("2.0 V", userData=2.0)
-        self.combo_dc_level.setFixedWidth(120)
-        
-        h_dc_level.addWidget(self.combo_dc_level)
-        h_dc_level.addStretch()
-        v_dc_inner.addLayout(h_dc_level)
-
-        self.lbl_dc_warning = QLabel("")
-        self.lbl_dc_warning.setWordWrap(True)
-
-        self.lbl_dc_warning = QLabel("")
-        self.lbl_dc_warning.setWordWrap(True)
-        self.lbl_dc_warning.setMaximumWidth(190)
-        self.lbl_dc_warning.setStyleSheet("color: #FF9900; font-weight: bold; font-size: 11px;")
-        v_dc_inner.addWidget(self.lbl_dc_warning)
-
-        v_dc.addWidget(self.widget_dc_inner)
-        v_dc.addStretch()
-        self.group_dc.setLayout(v_dc)
-
-        h_signal_dc = QHBoxLayout()
-        h_signal_dc.addWidget(self.group_signal, stretch=1)
-        h_signal_dc.addWidget(self.group_dc, stretch=1)
 
         # ==========================================================
         # 4. ฮาร์ดแวร์และเวลา (Hardware & Timing)
@@ -607,7 +561,7 @@ class InputPanel(QWidget):
         # ==========================================================
         layout.addWidget(self.group_prop)
         layout.addWidget(self.group_mode)
-        layout.addLayout(h_signal_dc)
+        layout.addWidget(self.group_signal)
         layout.addWidget(self.group_hw)
 
         layout.addStretch()

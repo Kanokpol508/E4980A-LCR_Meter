@@ -54,9 +54,6 @@ class E4980A:
         """ตัดการเชื่อมต่อเพื่อคืนทรัพยากรให้ระบบ"""
         if self.inst:
             try:
-                # ปิด DC Bias ทุกครั้งก่อนตัดการเชื่อมต่อเพื่อความปลอดภัย
-                self.inst.write(":BIAS:STAT OFF")
-
                 # คืนค่า Trigger กลับสู่สถานะมาตรฐาน (Preset)
                 self.inst.write(":INITiate:CONTinuous OFF")
                 self.inst.write(":TRIGger:SOURce INTernal")
@@ -120,25 +117,6 @@ class E4980A:
         self.inst.timeout = new_timeout
         print(f"⏱ Timeout ปรับเป็น {new_timeout} ms "
               f"(mode={mode_key}, avg={avg_clamped}, base={base_ms}ms/reading)")
-
-    def apply_dc_bias(self, enable: bool, level: float, is_voltage: bool):
-        """ตั้งค่า DC Bias อย่างปลอดภัย (ปิดก่อน เปลี่ยนค่า แล้วค่อยเปิด) ป้องกัน Spike"""
-        if not self.is_connected:
-            raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
-
-        # ปิดไฟเลี้ยงก่อนเสมอ ป้องกันไฟกระชากเข้าชิ้นงาน
-        self.inst.write(":BIAS:STAT OFF")
-        self.wait_until_ready()
-
-        if enable:
-            if is_voltage:
-                self.inst.write(f":BIAS:VOLTage:LEVel {level}")
-            else:
-                self.inst.write(f":BIAS:CURRent:LEVel {level}")
-            self.wait_until_ready()
-
-            self.inst.write(":BIAS:STAT ON")
-            self.wait_until_ready()
 
     # ==========================================
     # ระบบชดเชยค่าสายวัด (Correction) - OPEN / SHORT

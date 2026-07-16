@@ -59,15 +59,6 @@ class VerifyWorker(QThread):
                 # เครื่องจะปิด AUTO ให้เองอัตโนมัติตามคู่มือ
                 inst.write(f":FUNCtion:IMPedance:RANGe {s['imp_range']}")
             
-            # ใช้ apply_dc_bias() ที่ปลอดภัยแทนการ inst.write() ตรงๆ
-            # (ปิดก่อน -> ตั้งค่า -> เปิด) ป้องกันไฟกระชากเข้าชิ้นงานจากค่า Bias
-            # เดิมที่อาจค้างอยู่ในเครื่องจาก session ก่อนหน้า
-            lcr.apply_dc_bias(
-                enable=s.get('dc_bias_enabled', False),
-                level=s.get('dc_bias_level', 0.0),
-                is_voltage=s.get('dc_is_voltage', True)
-            )
-
             inst.query("*OPC?")
 
             # ==========================================
@@ -119,20 +110,6 @@ class VerifyWorker(QThread):
             else:
                 act_range_val = inst.query(":FUNCtion:IMPedance:RANGe?").strip()
                 add_res("Range Mode", f"{s['imp_range']} Ω (HOLD)", f"{act_range_val} Ω", self.check_float_match(s['imp_range'], act_range_val))
-
-            if s.get('dc_bias_enabled', False):
-                act_bias_stat = inst.query(":BIAS:STAT?").strip()
-                add_res("DC Bias State", "1", act_bias_stat, act_bias_stat == "1")
-                
-                if s.get('dc_is_voltage', True):
-                    act_bias_level = inst.query(":BIAS:VOLTage:LEVel?").strip()
-                    add_res("DC Bias Voltage (V)", s['dc_bias_level'], act_bias_level, self.check_float_match(s['dc_bias_level'], act_bias_level))
-                else:
-                    act_bias_level = inst.query(":BIAS:CURRent:LEVel?").strip()
-                    add_res("DC Bias Current (A)", s['dc_bias_level'], act_bias_level, self.check_float_match(s['dc_bias_level'], act_bias_level))
-            else:
-                act_bias_stat = inst.query(":BIAS:STAT?").strip()
-                add_res("DC Bias State", "0", act_bias_stat, act_bias_stat == "0")
 
             # ==========================================
             # 3. CHECK ERROR QUEUE

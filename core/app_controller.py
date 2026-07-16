@@ -13,7 +13,6 @@ class AppController(QObject):
         self.view = view
 
         # ตัวแปรสถานะ
-        self.is_dc_error = False
         self.is_ppm_error = False               # ป้องกัน AttributeError: เปิด PPM แต่ไม่กรอก Ref
         self.is_visa_error = True
         self.is_freqlist_error = False          # ป้องกัน AttributeError
@@ -62,7 +61,6 @@ class AppController(QObject):
         self.update_list_total()
 
         # ตั้งค่า UI เริ่มต้น
-        self.view.input_panel.widget_dc_inner.setEnabled(False)
         self.view.adv_panel.widget_dev_inner.setEnabled(False)
 
         # ตั้งค่า visibility ของเนื้อหาย่อยใน group_mode ตามโหมดเริ่มต้น (Sweep)
@@ -79,9 +77,6 @@ class AppController(QObject):
         v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._reset_correction_status)
         v.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
-
-        v.input_panel.chk_dc_enable.stateChanged.connect(self.toggle_dc_bias)
-        v.input_panel.combo_dc_level.currentIndexChanged.connect(self.validate_dc_bias)
 
         # [NEW] ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก Vrms เป็น Arms ให้ไปปรับเพดานตัวเลขทันที
         v.input_panel.combo_level_mode.currentIndexChanged.connect(self.update_hardware_limits)
@@ -205,7 +200,7 @@ class AppController(QObject):
         ล็อกระหว่างวัด (locked=True):
           - conn_panel  : VISA dropdown + ปุ่ม Refresh (ห้ามเปลี่ยนเครื่องกลางวัด)
           - input_panel : ทุก widget (Meas mode, ความถี่, Signal Level,
-                          Hardware/Timing, DC Bias, Freq List, Run mode)
+                          Hardware/Timing, Freq List, Run mode)
           - adv_panel   : Correction buttons + Deviation inputs/checkboxes
                           (ห้ามทำ Correction หรือเปลี่ยน Ref กลางวัด)
           - ctrl_panel  : ปุ่ม Verify & Apply + ปุ่ม Clear Data
@@ -228,7 +223,6 @@ class AppController(QObject):
         v.input_panel.group_prop.setEnabled(not locked)   # Meas mode group
         v.input_panel.group_mode.setEnabled(not locked)   # ความถี่ / Sweep / List group
         v.input_panel.group_signal.setEnabled(not locked) # Signal Level + ALC
-        v.input_panel.group_dc.setEnabled(not locked)     # DC Bias
         v.input_panel.group_hw.setEnabled(not locked)     # Hardware & Timing
         v.input_panel.combo_run_mode.setEnabled(not locked)
 
@@ -262,7 +256,7 @@ class AppController(QObject):
         # [จุดที่ 4] Verify & Apply ส่งความถี่จาก input_freq (Single Point) เสมอ
         # ถ้าผู้ใช้อยู่ใน SWEEP/LIST mode ความถี่ที่ส่งไปอาจไม่ตรงกับที่ใช้วัดจริง
         # แจ้งเตือนเพื่อให้รับทราบก่อนดำเนินการ (ไม่บล็อก เพราะยังมีประโยชน์สำหรับ
-        # เช็คค่าตั้งอื่นๆ เช่น Signal Level, Aperture, Cable, DC Bias ที่ใช้ร่วมกันทุกโหมด)
+        # เช็คค่าตั้งอื่นๆ เช่น Signal Level, Aperture, Cable ที่ใช้ร่วมกันทุกโหมด)
         run_mode = self.get_current_run_mode()
         if run_mode in ("SWEEP", "LIST"):
             mode_name = "Sweep" if run_mode == "SWEEP" else "List"
@@ -290,9 +284,6 @@ class AppController(QObject):
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
             'imp_range': v.input_panel.combo_range.currentData(),
-            'dc_bias_enabled': v.input_panel.chk_dc_enable.isChecked(),
-            'dc_is_voltage': True,
-            'dc_bias_level': v.input_panel.combo_dc_level.currentData(),
         }
 
         self.set_ui_locked(True)
@@ -510,7 +501,7 @@ class AppController(QObject):
         # ป้องกัน edge case ที่ปุ่ม Start เปิดได้ทั้งที่มี error ค้างอยู่
         # (เช่น state ไม่ sync กัน หรือ race condition ระหว่าง signal)
         # เป็น safety net ชั้นที่ 2 ถัดจาก update_start_button_state() ที่ disable ปุ่มไว้
-        if self.is_dc_error or self.is_ppm_error or self.is_visa_error or self.is_freqlist_error:
+        if self.is_ppm_error or self.is_visa_error or self.is_freqlist_error:
             self.log.warning("⚠️ ไม่สามารถเริ่มวัดได้ — ยังมีข้อผิดพลาดค้างอยู่ กรุณาตรวจสอบและแก้ไขก่อน")
             return
 
@@ -557,9 +548,6 @@ class AppController(QObject):
             'avg': v.input_panel.input_avg.value(),
             'cable': v.input_panel.combo_cable.currentText(),
             'imp_range': v.input_panel.combo_range.currentData(),
-            'dc_bias_enabled': v.input_panel.chk_dc_enable.isChecked(),
-            'dc_is_voltage': True,
-            'dc_bias_level': v.input_panel.combo_dc_level.currentData(),
         }
 
         self.worker = MeasurementWorker(settings)
@@ -770,9 +758,8 @@ class AppController(QObject):
 
     def update_start_button_state(self):
         v = self.view
-        is_blocked = self.is_dc_error or self.is_ppm_error or self.is_visa_error or self.is_freqlist_error
+        is_blocked = self.is_ppm_error or self.is_visa_error or self.is_freqlist_error
         v.ctrl_panel.lbl_warn_visa.setVisible(self.is_visa_error)
-        v.ctrl_panel.lbl_warn_dc_start.setVisible(self.is_dc_error)
         v.ctrl_panel.lbl_warn_dev_start.setVisible(self.is_ppm_error)
         v.ctrl_panel.lbl_warn_freqlist_start.setVisible(self.is_freqlist_error)
 
@@ -888,28 +875,6 @@ class AppController(QObject):
         self.view.raw_table.update_headers(
             self.view.input_panel.combo_scpi_mode.currentData()
         )
-
-    def toggle_dc_bias(self):
-        is_enabled = self.view.input_panel.chk_dc_enable.isChecked()
-        self.view.input_panel.widget_dc_inner.setEnabled(is_enabled)
-        if is_enabled:
-            self.validate_dc_bias()
-        else:
-            self.view.input_panel.lbl_dc_warning.setText("")
-            self.is_dc_error = False
-            self.update_start_button_state()
-
-    def validate_dc_bias(self):
-        v = self.view
-        if not v.input_panel.chk_dc_enable.isChecked():
-            self.is_dc_error = False
-            self.update_start_button_state()
-            return
-
-        warning_msg = "⚠️ ต้องต่ออุปกรณ์เข้าขั้ววัด\nก่อนเปิดสวิตช์เสมอ!"
-        self.is_dc_error = False
-        v.input_panel.lbl_dc_warning.setText(warning_msg)
-        self.update_start_button_state()
 
     def toggle_ppm(self):
         """เปิด/ปิด widget กรอก PPM Reference ตาม checkbox สถานะ"""

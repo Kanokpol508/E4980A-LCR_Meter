@@ -60,14 +60,6 @@ class MeasurementWorker(QThread):
 
             lcr.set_impedance_range(imp_range)
 
-            # --- ตั้งค่า DC Bias (แบบปลอดภัย) ---
-            if 'dc_bias_enabled' in self.settings:
-                lcr.apply_dc_bias(
-                    enable=self.settings.get('dc_bias_enabled', False),
-                    level=self.settings.get('dc_bias_level', 0.0),
-                    is_voltage=self.settings.get('dc_is_voltage', True)
-                )
-
             # รอให้ค่าที่เซ็ตเข้าไปทั้งหมดประมวลผลเสร็จสิ้น
             lcr.wait_until_ready()
 

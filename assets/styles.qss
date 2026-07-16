@@ -319,34 +319,60 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
 
 /* ==========================================
    6. ส่วนตกแต่งเพิ่มเติมสำหรับฟีเจอร์ใหม่
+   (แต่ละปุ่มแยก block ชัดเจน แก้สีทีละปุ่มได้อิสระ)
 ========================================== */
+
+/* --- ปุ่ม Verify & Apply --- */
 QPushButton#btnVerify {
-    background-color: #3b82f6;       
+    background-color: #3b82f6;
     color: white;
     border: 1px solid #2563eb;
     border-radius: 4px;
 }
-
 QPushButton#btnVerify:hover {
-    background-color: #60a5fa;       
+    background-color: #60a5fa;
 }
 
-/* ==========================================
-   7. ส่วนแสดงสถิติข้างกราฟ (Stat Panel)
-========================================== */
-QGroupBox#statGroup {
-    background-color: #172445; 
+/* --- ปุ่ม Clear Data --- */
+QPushButton#btnClearData {
+    background-color: #3b82f6;
+    color: white;
+    border: 1px solid #2563eb;
+    border-radius: 4px;
+}
+QPushButton#btnClearData:hover {
+    background-color: #60a5fa;
 }
 
-QLabel#lblStatTitle {
-    color: #ffffff; 
-    font-size: 13px;         /* ขยายขนาดหัวข้อให้อ่านง่ายขึ้น (เดิม 11px) */
-    margin-top: 16px;        /* เว้นช่องไฟด้านบนเพื่อให้แต่ละกลุ่มห่างกันชัดเจน */
+/* --- ปุ่ม Save Result --- */
+QPushButton#btnSaveResult {
+    background-color: #3b82f6;
+    color: white;
+    border: 1px solid #2563eb;
+    border-radius: 4px;
+}
+QPushButton#btnSaveResult:hover {
+    background-color: #60a5fa;
 }
 
-QLabel#lblStatValue {
-    color: #FF9900; 
-    font-size: 18px;         /* ขยายขนาดตัวเลขให้ใหญ่และชัดเจน (เดิม 14px) */
-    font-weight: bold;
-    margin-bottom: 4px;      /* เพิ่มช่องไฟเล็กน้อยด้านล่างตัวเลข */
+/* --- ปุ่ม View Save Result --- */
+QPushButton#btnViewSaveResult {
+    background-color: #3b82f6;
+    color: white;
+    border: 1px solid #2563eb;
+    border-radius: 4px;
+}
+QPushButton#btnViewSaveResult:hover {
+    background-color: #60a5fa;
+}
+
+/* --- ปุ่ม Export Excel --- */
+QPushButton#btnExportExcel {
+    background-color: #3b82f6;
+    color: white;
+    border: 1px solid #2563eb;
+    border-radius: 4px;
+}
+QPushButton#btnExportExcel:hover {
+    background-color: #60a5fa;
 }

@@ -47,7 +47,10 @@ class LcdDisplay(QWidget):
         v_tools.setContentsMargins(10, 10, 0, 0)
         
         self.btn_save = QPushButton("Save Result")
+        self.btn_save.setObjectName("btnSaveResult")
+
         self.btn_view = QPushButton("View Save Result")
+        self.btn_view.setObjectName("btnViewSaveResult")
 
         # ปุ่มเตรียมไว้สำหรับระบบ Export Excel ในอนาคต
         # (ยังไม่ผูกฟังก์ชันการทำงานจริง - เป็นปุ่มเปล่าตามที่ตั้งใจไว้ก่อน)

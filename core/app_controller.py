@@ -653,7 +653,6 @@ class AppController(QObject):
             plot_x = self.graph_x_data
 
         v.graph_display.update_plots(plot_x, self.graph_pri_y, self.graph_sec_y)
-        v.graph_display.update_statistics(self.graph_raw_pri_y, self.graph_raw_sec_y, is_single)
         self.update_statistics_table()
 
     def update_statistics_table(self):
@@ -864,8 +863,6 @@ class AppController(QObject):
         self.validate_freq_list()
         self.update_start_button_state()
         self.view.stats_table.set_mode(run_mode)
-        # ซ่อน StatPanel ข้างกราฟเมื่ออยู่โหมด SWEEP
-        self.view.graph_display.set_stats_visible(not is_sweep)
         # ซ่อน Statistics Table ใน SWEEP mode เพราะข้อมูลซ้ำกับ Raw Data Table ทั้งหมด
         stats_tab_index = self.view.right_tabs.indexOf(self.view.stats_table)
         self.view.right_tabs.setTabVisible(stats_tab_index, not is_sweep)

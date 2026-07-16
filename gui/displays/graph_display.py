@@ -1,74 +1,7 @@
-# วาดกราฟด้วย pyqtgraph (วาดแกน Y แยกอิสระ) พร้อมแสดงสถิติ
+# วาดกราฟด้วย pyqtgraph (วาดแกน Y แยกอิสระ)
 
-import math
-import statistics
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
 import pyqtgraph as pg
-
-class StatPanel(QGroupBox):
-    """คอมโพเนนต์ย่อยสำหรับแสดงสถิติข้างกราฟ (SD, Type A)"""
-    def __init__(self, title, parent=None):
-        super().__init__(title, parent)
-        self.setFixedWidth(240)  
-        self.setObjectName("statGroup") 
-        
-        layout = QVBoxLayout(self) 
-        layout.setSpacing(2)
-        layout.setContentsMargins(15, 10, 15, 15)
-        
-        # 1. SD
-        lbl_title_sd = QLabel("Standard Deviation (SD):")
-        lbl_title_sd.setObjectName("lblStatTitle")
-        layout.addWidget(lbl_title_sd)
-        
-        self.lbl_sd = QLabel("-")
-        self.lbl_sd.setObjectName("lblStatValue")
-        self.lbl_sd.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(self.lbl_sd)
-        
-        # 2. Type A
-        lbl_title_type_a = QLabel("Type A (ppm):")
-        lbl_title_type_a.setObjectName("lblStatTitle")
-        layout.addWidget(lbl_title_type_a)
-        
-        self.lbl_type_a = QLabel("-")
-        self.lbl_type_a.setObjectName("lblStatValue")
-        self.lbl_type_a.setAlignment(Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(self.lbl_type_a)
-        
-        layout.addStretch() 
-
-    def update_stats(self, raw_data: list, is_single_mode: bool):
-        """คำนวณและอัปเดตสถิติจากค่าดิบ"""
-        if not is_single_mode or not raw_data:
-            self.lbl_sd.setText("-")
-            self.lbl_type_a.setText("-")
-            return
-            
-        n = len(raw_data)
-        if n < 2:
-            self.lbl_sd.setText("-")
-            self.lbl_type_a.setText("-")
-            return
-            
-        try:
-            sd = statistics.stdev(raw_data)
-            mean = statistics.mean(raw_data)
-            
-            self.lbl_sd.setText(f"{sd:.5e}")
-            
-            if mean == 0:
-                self.lbl_type_a.setText("N/A")
-                self.lbl_type_a.setToolTip("Mean is 0, cannot calculate ppm")
-            else:
-                type_a_ppm = (sd / math.sqrt(n)) / abs(mean) * 1e6
-                self.lbl_type_a.setText(f"{type_a_ppm:.2f}")
-                
-        except Exception:
-            self.lbl_sd.setText("Error")
-            self.lbl_type_a.setText("Error")
-
 
 class GraphDisplay(QWidget):
     def __init__(self, parent=None):
@@ -80,7 +13,7 @@ class GraphDisplay(QWidget):
         self.label_style = {'color': '#cbd5e1', 'font-size': '10pt', 'font-weight': 'normal'}
         
         # ==========================================
-        # 1. กราฟพารามิเตอร์หลัก (Primary) + สถิติ
+        # 1. กราฟพารามิเตอร์หลัก (Primary)
         # ==========================================
         h_layout_pri = QHBoxLayout()
         
@@ -95,14 +28,11 @@ class GraphDisplay(QWidget):
         self.plot_primary.setLabel('left', 'Primary Value', **self.label_style)
         self.plot_primary.setLabel('bottom', 'Points / Frequency (Hz)', **self.label_style)
         
-        self.stat_primary = StatPanel("Primary Statistics")
-        
         h_layout_pri.addWidget(self.plot_primary, stretch=1)
-        h_layout_pri.addWidget(self.stat_primary)
         main_layout.addLayout(h_layout_pri, stretch=1)
 
         # ==========================================
-        # 2. กราฟพารามิเตอร์รอง (Secondary) + สถิติ
+        # 2. กราฟพารามิเตอร์รอง (Secondary)
         # ==========================================
         h_layout_sec = QHBoxLayout()
         
@@ -117,10 +47,7 @@ class GraphDisplay(QWidget):
         self.plot_secondary.setLabel('left', 'Secondary Value', **self.label_style)
         self.plot_secondary.setLabel('bottom', 'Points / Frequency (Hz)', **self.label_style)
         
-        self.stat_secondary = StatPanel("Secondary Statistics")
-        
         h_layout_sec.addWidget(self.plot_secondary, stretch=1)
-        h_layout_sec.addWidget(self.stat_secondary)
         main_layout.addLayout(h_layout_sec, stretch=1)
 
     def set_axis_labels(self, x_label: str, pri_y_label: str, sec_y_label: str, is_single_mode: bool):
@@ -136,15 +63,6 @@ class GraphDisplay(QWidget):
         self.plot_primary.getAxis('bottom').setTicks(None)
         self.plot_secondary.getAxis('bottom').setTicks(None)
 
-    def set_stats_visible(self, visible: bool):
-        """
-        แสดง/ซ่อน StatPanel ทั้งสองข้างกราฟ
-        ซ่อนเมื่ออยู่โหมด SWEEP เพราะ N=1 ไม่มีสถิติที่มีความหมาย
-        ทำให้พื้นที่กราฟขยายเต็มความกว้างแทน
-        """
-        self.stat_primary.setVisible(visible)
-        self.stat_secondary.setVisible(visible)
-
     def update_plots(self, x_data: list, pri_y_data: list, sec_y_data: list):
         """อัปเดตเส้นกราฟ"""
         self.curve_primary.setData(x_data, pri_y_data)
@@ -154,16 +72,10 @@ class GraphDisplay(QWidget):
         self.plot_primary.getViewBox().autoRange()
         self.plot_secondary.getViewBox().autoRange()
 
-    def update_statistics(self, raw_pri_data: list, raw_sec_data: list, is_single_mode: bool):
-        """ส่งค่าดิบไปให้ Panel สถิติคำนวณ"""
-        self.stat_primary.update_stats(raw_pri_data, is_single_mode)
-        self.stat_secondary.update_stats(raw_sec_data, is_single_mode)
-
     def clear_plots(self):
-        """ล้างข้อมูลบนกราฟและสถิติ"""
+        """ล้างข้อมูลบนกราฟ"""
         self.curve_primary.setData([], [])
         self.curve_secondary.setData([], [])
-        self.update_statistics([], [], True)
         
         # รีเซ็ตกราฟกลับไปที่ระยะ 0-10 เหมือนตอนเปิดโปรแกรมใหม่
         self.plot_primary.setXRange(0, 10)

@@ -89,47 +89,78 @@ class _FreqEngAxisItem(pg.AxisItem):
 
 
 class _EngAxisItem(pg.AxisItem):
-    """แกนพารามิเตอร์ (Y): รองรับค่าติดลบได้ ย่อหน่วยได้ทุกระดับ (1.2k, 1.5, 1.2m, 1.2µ ...)
-    และป้องกัน OverflowError แบบเดียวกับแกน X"""
+    """แกนพารามิเตอร์ (Y): รองรับค่าติดลบได้ ย่อหน่วยได้ทุกระดับ (k, m, µ ...)
+    และป้องกัน OverflowError แบบเดียวกับแกน X
+
+    ต่างจากเวอร์ชันก่อนหน้า: เลือก 'หน่วยเดียว' ให้ใช้ร่วมกันทั้งชุด tick ที่กำลังวาด
+    (ดูจากค่าที่มากที่สุดในชุดนั้น) แทนที่จะให้แต่ละ tick เลือกหน่วยของตัวเองอิสระ —
+    กันปัญหาแกนเดียวกันมีทั้ง '500m', '1', '1.5k' ปนกันจนอ่านยาก และคำนวณจำนวนทศนิยม
+    จาก spacing จริงของ tick กันตัวเลขงอกเป็นเศษ (เช่น 12.9999k จาก error สะสมของ float)
+    """
+
+    _SUFFIXES = [
+        (1e9, 'G'), (1e6, 'M'), (1e3, 'k'), (1, ''),
+        (1e-3, 'm'), (1e-6, 'µ'), (1e-9, 'n'), (1e-12, 'p'),
+    ]
 
     def tickStrings(self, values, scale, spacing):
-        strings = []
+        if not values:
+            return []
+
+        raw_vals = []
         for v in values:
-            # กันช่วงเดียวกับแกน X — ค่าพารามิเตอร์จริง (แม้แต่ log-space) ไม่ควรหลุดช่วงนี้
             if self.logMode and (v < -300 or v > 300):
-                strings.append("")
+                raw_vals.append(None)
                 continue
             try:
-                raw_val = (10 ** v) if self.logMode else v
-                val = raw_val * scale
-                if not math.isfinite(val):
-                    strings.append("")
+                rv = (10 ** v) if self.logMode else v
+                rv = rv * scale
+                if not math.isfinite(rv):
+                    raw_vals.append(None)
                     continue
             except (OverflowError, ValueError):
+                raw_vals.append(None)
+                continue
+            raw_vals.append(rv)
+
+        finite_vals = [rv for rv in raw_vals if rv is not None]
+        max_abs = max((abs(rv) for rv in finite_vals), default=0)
+
+        factor, suffix = 1, ''
+        for f, s in self._SUFFIXES:
+            if max_abs >= f:
+                factor, suffix = f, s
+                break
+
+        # จำนวนทศนิยมคำนวณจาก spacing จริงของ tick เทียบกับหน่วยที่เลือก
+        # กันตัวเลขงอกเป็นเศษเวลา zoom เข้าไปดูช่วงแคบๆ
+        if self.logMode and len(finite_vals) >= 2:
+            sorted_vals = sorted(set(round(rv, 12) for rv in finite_vals))
+            diffs = [b - a for a, b in zip(sorted_vals, sorted_vals[1:]) if b - a > 0]
+            step = min(diffs) if diffs else max_abs
+        else:
+            step = spacing * scale
+
+        if factor and step > 0:
+            step_in_units = step / factor
+            decimals = 0 if step_in_units >= 1 else min(4, max(0, math.ceil(-math.log10(step_in_units))))
+        else:
+            decimals = 0
+
+        strings = []
+        for rv in raw_vals:
+            if rv is None:
                 strings.append("")
                 continue
-
-            strings.append(self._format_eng(val))
+            if rv == 0:
+                strings.append("0")
+                continue
+            val = rv / factor if factor else rv
+            if decimals == 0:
+                strings.append(f"{round(val)}{suffix}")
+            else:
+                strings.append(f"{val:.{decimals}f}{suffix}")
         return strings
-
-    def _format_eng(self, val):
-        if val == 0:
-            return "0"
-        abs_val = abs(val)
-        if abs_val >= 1e9:
-            return f"{val/1e9:g}G"
-        elif abs_val >= 1e6:
-            return f"{val/1e6:g}M"
-        elif abs_val >= 1e3:
-            return f"{val/1e3:g}k"
-        elif abs_val >= 1:
-            return f"{val:g}"
-        elif abs_val >= 1e-3:
-            return f"{val*1e3:g}m"
-        elif abs_val >= 1e-6:
-            return f"{val*1e6:g}µ"
-        else:
-            return f"{val:g}"
 
 
 class FreqSummaryGraph(QWidget):

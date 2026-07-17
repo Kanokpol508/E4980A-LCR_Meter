@@ -9,6 +9,7 @@ from gui.panels.advanced_panel import AdvancedPanel
 from gui.panels.control_panel import ControlPanel
 from gui.displays.graph_display import GraphDisplay
 from gui.displays.freq_summary_graph import FreqSummaryGraph
+from gui.displays.ppm_summary_graph import PpmSummaryGraph
 from gui.displays.lcd_display import LcdDisplay
 from gui.displays.statistics_table import StatisticsTable
 from gui.displays.log_display import LogDisplay
@@ -60,6 +61,7 @@ class MainWindow(QMainWindow):
 
         self.graph_display = GraphDisplay()
         self.freq_summary_graph = FreqSummaryGraph()
+        self.ppm_summary_graph = PpmSummaryGraph()
         self.stats_table   = StatisticsTable()
         self.raw_table     = RawDataTable()
         self.log_display   = LogDisplay() 
@@ -68,6 +70,9 @@ class MainWindow(QMainWindow):
         self.right_tabs.addTab(self.graph_display, "กราฟ (Graph)")
         self.freq_graph_tab_index = self.right_tabs.addTab(
             self.freq_summary_graph, "กราฟสรุปตามความถี่ (vs Frequency)"
+        )
+        self.ppm_graph_tab_index = self.right_tabs.addTab(
+            self.ppm_summary_graph, "กราฟ PPM (PPM vs Frequency)"
         )
         self.right_tabs.addTab(self.stats_table,   "ตารางสถิติ (Statistics Table)")
         self.right_tabs.addTab(self.raw_table,     "ข้อมูลดิบ (Raw Data)")

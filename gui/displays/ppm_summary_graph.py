@@ -1,0 +1,418 @@
+# กราฟ PPM Deviation vs ความถี่ (PPM Summary Graph)
+# แกน X = ความถี่ (เรียงจากน้อยไปมาก), แกน Y = ค่าเบี่ยงเบนจากค่าอ้างอิง (PPM Deviation)
+# ใช้ pri_ppm / sec_ppm จาก calculate_frequency_stats() — ต้องเปิด "PPM Reference"
+# (chk_dev_ppm_enable + input_dev_pri/sec ใน advanced_panel) และกรอกค่านอมินอลไว้ก่อนวัด
+# Error bar = SD Error Bar (Stability, ppm) = SD / |Ref| × 1e6 (คำนวณใน app_controller._sd_to_ppm)
+# ใช้ได้เฉพาะโหมด LIST / SWEEP เท่านั้น (เหตุผลเดียวกับ freq_summary_graph.py)
+
+import os
+import re
+import math
+import numpy as np
+
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
+    QCheckBox, QLabel, QLineEdit, QComboBox, QPushButton, QFileDialog, QMessageBox
+)
+from PyQt6.QtCore import QStandardPaths
+import pyqtgraph as pg
+import pyqtgraph.exporters
+
+# แยก "ชื่อพารามิเตอร์" กับ "หน่วยในวงเล็บท้ายสุด" เช่น
+# "Resistance, R (Ω)" -> ("Resistance, R", "Ω")  — ใช้แค่ดึงชื่อออกมา ไม่สนใจหน่วยเดิม
+# เพราะกราฟนี้หน่วยของแกน Y เป็น "ppm" เสมอ ไม่ใช่หน่วยเดิมของพารามิเตอร์
+_UNIT_RE = re.compile(r"^(.*?)\s*\(([^()]+)\)\s*$")
+
+
+def _split_name_unit(label: str):
+    m = _UNIT_RE.match(label.strip())
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+    return label.strip(), None
+
+
+class _FreqEngAxisItem(pg.AxisItem):
+    """แกนความถี่ (X): ย่อ k, M, G ได้ ไม่มีทศนิยม ไม่มีค่าติดลบ
+    และจำกัดขอบเขตการวาดตัวเลขให้อยู่ในสเปคเครื่อง 0 - 2 MHz"""
+
+    def tickStrings(self, values, scale, spacing):
+        strings = []
+        for v in values:
+            raw_val = (10 ** v) if self.logMode else v
+            val = raw_val * scale
+
+            if val < 0 or val > 2_000_000:
+                strings.append("")
+                continue
+            if abs(val - round(val)) > 1e-5:
+                strings.append("")
+                continue
+
+            strings.append(self._format_eng(val))
+        return strings
+
+    def _format_eng(self, val):
+        if val == 0:
+            return "0"
+        abs_val = abs(val)
+        if abs_val >= 1e9:
+            return f"{val/1e9:g}G"
+        elif abs_val >= 1e6:
+            return f"{val/1e6:g}M"
+        elif abs_val >= 1e3:
+            return f"{val/1e3:g}k"
+        else:
+            return f"{int(round(val))}"
+
+
+class _EngAxisItem(pg.AxisItem):
+    """แกน PPM Deviation (Y): รองรับค่าติดลบได้ (deviation ต่ำ/สูงกว่านอมินอลได้ทั้งคู่)
+    และย่อหน่วยได้ทุกระดับ เช่น 1.2k ppm, 1.5 ppm, 1.2m ppm"""
+
+    def tickStrings(self, values, scale, spacing):
+        strings = []
+        for v in values:
+            raw_val = (10 ** v) if self.logMode else v
+            val = raw_val * scale
+            strings.append(self._format_eng(val))
+        return strings
+
+    def _format_eng(self, val):
+        if val == 0:
+            return "0"
+        abs_val = abs(val)
+        if abs_val >= 1e9:
+            return f"{val/1e9:g}G"
+        elif abs_val >= 1e6:
+            return f"{val/1e6:g}M"
+        elif abs_val >= 1e3:
+            return f"{val/1e3:g}k"
+        elif abs_val >= 1:
+            return f"{val:g}"
+        elif abs_val >= 1e-3:
+            return f"{val*1e3:g}m"
+        elif abs_val >= 1e-6:
+            return f"{val*1e6:g}µ"
+        else:
+            return f"{val:g}"
+
+
+class PpmSummaryGraph(QWidget):
+    # สีเดียวกับ freq_summary_graph.py เพื่อไม่ให้ผู้ใช้สับสนระหว่าง Tab
+    COLOR_PRIMARY = '#0066CC'    # น้ำเงิน
+    COLOR_SECONDARY = '#CC0066'  # แดงอมชมพู
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.label_style = {'color': '#1e293b', 'font-size': '10pt', 'font-weight': 'normal'}
+
+        # ชื่อพารามิเตอร์จริงตาม SCPI mode (อัปเดตผ่าน set_axis_labels) — ไม่รวมหน่วยเดิม
+        # เพราะกราฟนี้แกน Y เป็น ppm เสมอ
+        self.pri_name = "Primary"
+        self.sec_name = "Secondary"
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setSpacing(6)
+
+        # ==========================================
+        # แถบควบคุม: Plot Display Options
+        # ==========================================
+        group_opts = QGroupBox("Plot Display Options")
+        opts_layout = QHBoxLayout()
+        opts_layout.setSpacing(12)
+
+        self.chk_plot_pri = QCheckBox("Plot Primary")
+        self.chk_plot_pri.setChecked(True)
+        self.chk_plot_sec = QCheckBox("Plot Secondary")
+        self.chk_plot_sec.setChecked(True)
+        self.chk_error_bar = QCheckBox("Show Stability Error Bars (SD PPM)")
+        self.chk_error_bar.setChecked(True)
+        self.chk_data_labels = QCheckBox("Show Data Labels")
+        self.chk_data_labels.setChecked(False)
+        self.chk_show_legend = QCheckBox("Show Legend")
+        self.chk_show_legend.setChecked(True)
+
+        opts_layout.addWidget(self.chk_plot_pri)
+        opts_layout.addWidget(self.chk_plot_sec)
+        opts_layout.addWidget(self.chk_error_bar)
+        opts_layout.addWidget(self.chk_data_labels)
+        opts_layout.addWidget(self.chk_show_legend)
+
+        opts_layout.addStretch(1)
+
+        opts_layout.addWidget(QLabel("Frequency Scale:"))
+        self.combo_x_scale = QComboBox()
+        self.combo_x_scale.addItems(["Linear", "Log"])
+        opts_layout.addWidget(self.combo_x_scale)
+
+        group_opts.setLayout(opts_layout)
+        main_layout.addWidget(group_opts)
+
+        # คำเตือนเล็กๆ ใต้ตัวเลือก — เตือนว่ากราฟนี้ต้องเปิด PPM Reference ก่อนถึงจะมีข้อมูล
+        self.lbl_ref_hint = QLabel(
+            "* ต้องเปิด \"เปิดใช้งานการคำนวณ PPM Deviation\" และกรอกค่าอ้างอิง (Nominal) "
+            "ในแท็บ Advanced ก่อนเริ่มวัด กราฟนี้จึงจะมีข้อมูล"
+        )
+        self.lbl_ref_hint.setStyleSheet("color: #64748b; font-size: 11px; padding: 2px 4px;")
+        self.lbl_ref_hint.setWordWrap(True)
+        main_layout.addWidget(self.lbl_ref_hint)
+
+        # ==========================================
+        # แถบ Graph Title + ปุ่ม Save เป็น JPEG
+        # ==========================================
+        title_bar = QHBoxLayout()
+        title_bar.addWidget(QLabel("Graph Title:"))
+        self.input_graph_title = QLineEdit()
+        self.input_graph_title.setPlaceholderText("เช่น 10kOhm Resistor PPM Deviation vs Frequency")
+        title_bar.addWidget(self.input_graph_title, stretch=1)
+
+        self.btn_save_jpeg = QPushButton("💾 Save as JPEG")
+        title_bar.addWidget(self.btn_save_jpeg)
+        main_layout.addLayout(title_bar)
+
+        # ==========================================
+        # กราฟหลัก (Primary/Secondary รวมในแกน Y เดียวกัน หน่วย ppm)
+        # ==========================================
+        self.plot_widget = pg.PlotWidget(
+            title="PPM Deviation vs. Frequency",
+            axisItems={
+                'bottom': _FreqEngAxisItem(orientation='bottom'),
+                'left':   _EngAxisItem(orientation='left'),
+            }
+        )
+        self.plot_widget.setBackground('w')
+        self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        self._style_axes_dark(self.plot_widget)
+        self.plot_widget.setLabel('bottom', 'Frequency (Hz)', **self.label_style)
+        self.plot_widget.setLabel('left', 'PPM Deviation', **self.label_style)
+
+        # เส้นอ้างอิงที่ 0 ppm (นอมินอล) — ช่วยให้เห็นชัดว่าค่าเบี่ยงเบนไปทางบวก/ลบแค่ไหน
+        self.zero_line = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen('#94a3b8', width=1, style=pg.QtCore.Qt.PenStyle.DashLine))
+        self.plot_widget.addItem(self.zero_line)
+
+        # ตั้งช่วงเริ่มต้นให้เป็นช่วงความถี่ทั่วไปของเครื่อง LCR (20Hz - 2MHz)
+        self.plot_widget.setXRange(20, 2_000_000)
+
+        vb = self.plot_widget.getViewBox()
+        # ล็อคไม่ให้เลื่อน/ซูมแกน X หลุดช่วงความถี่ที่เครื่อง E4980A รองรับจริง (0 - 2MHz พอดี)
+        vb.setLimits(xMin=0, xMax=2_000_000)
+        vb.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
+
+        # legend มุมขวาบนของกราฟ — เพิ่ม/ลบ item เองแบบ dynamic ตามเส้นที่เปิด/ปิดจริง
+        self.legend = pg.LegendItem(offset=None)
+        self.legend.setParentItem(self.plot_widget.plotItem)
+        self.legend.anchor(itemPos=(1, 0), parentPos=(1, 0), offset=(-10, 10))
+
+        self.curve_pri = self.plot_widget.plot(
+            pen=pg.mkPen(self.COLOR_PRIMARY, width=2), symbol='o',
+            symbolSize=7, symbolBrush=self.COLOR_PRIMARY
+        )
+        self.curve_sec = self.plot_widget.plot(
+            pen=pg.mkPen(self.COLOR_SECONDARY, width=2), symbol='s',
+            symbolSize=7, symbolBrush=self.COLOR_SECONDARY
+        )
+
+        self.errbar_pri = pg.ErrorBarItem(pen=pg.mkPen(self.COLOR_PRIMARY, width=1))
+        self.plot_widget.addItem(self.errbar_pri)
+        self.errbar_sec = pg.ErrorBarItem(pen=pg.mkPen(self.COLOR_SECONDARY, width=1))
+        self.plot_widget.addItem(self.errbar_sec)
+
+        # ข้อความแจ้งเตือนกลางกราฟตอนไม่มีข้อมูล ppm (ยังไม่เปิด PPM Reference)
+        self.no_data_text = pg.TextItem(
+            "ยังไม่มีข้อมูล PPM — กรุณาเปิด PPM Reference และกรอกค่านอมินอลก่อนวัด",
+            color='#94a3b8', anchor=(0.5, 0.5)
+        )
+        self.no_data_text.setVisible(False)
+        self.plot_widget.addItem(self.no_data_text)
+
+        self._data_label_items = []  # เก็บ TextItem ไว้ลบทิ้งตอน redraw
+
+        main_layout.addWidget(self.plot_widget, stretch=1)
+
+        # ==========================================
+        # Signal เชื่อมต่อ: เปลี่ยนตัวเลือกแล้ว redraw ทันที
+        # ==========================================
+        for w in (self.chk_plot_pri, self.chk_plot_sec, self.chk_error_bar,
+                  self.chk_data_labels, self.chk_show_legend):
+            w.stateChanged.connect(self._redraw)
+        self.combo_x_scale.currentTextChanged.connect(self._redraw)
+        self.input_graph_title.textChanged.connect(self._redraw)
+        self.btn_save_jpeg.clicked.connect(self.save_as_jpeg)
+
+        self._freqs, self._pri_ppm, self._pri_err = [], [], []
+        self._sec_ppm, self._sec_err = [], []
+
+        self._redraw()
+
+    # --------------------------------------------------------
+    def _style_axes_dark(self, plot_widget):
+        for axis_name in ('left', 'bottom'):
+            axis = plot_widget.getAxis(axis_name)
+            axis.setPen(pg.mkPen('#334155'))
+            axis.setTextPen(pg.mkPen('#1e293b'))
+
+    # --------------------------------------------------------
+    def set_axis_labels(self, pri_label: str, sec_label: str):
+        """เรียกจาก app_controller ตอนเปลี่ยน SCPI mode — ใช้แค่ 'ชื่อ' พารามิเตอร์
+        (ตัดหน่วยเดิมทิ้ง เพราะกราฟนี้แกน Y เป็น ppm เสมอ ไม่ใช่หน่วยเดิม เช่น Ω, F)"""
+        self.pri_name, _ = _split_name_unit(pri_label)
+        self.sec_name, _ = _split_name_unit(sec_label)
+        self._redraw()
+
+    def update_data(self, freqs: list, pri_ppm: list, pri_err: list,
+                     sec_ppm: list, sec_err: list):
+        """freqs ต้องเรียงจากน้อยไปมากแล้ว (ผลจาก calculate_frequency_stats)
+        pri_ppm/sec_ppm อาจมีค่า None ปนอยู่ได้ (ถ้ายังไม่เปิด PPM Reference ตอนวัดความถี่นั้น)
+        pri_err/sec_err คือ SD Error Bar (Stability, ppm) = SD / |Ref| × 1e6
+        (ไม่ใช่ Type A ppm — ไม่หารด้วย √N จึงสะท้อนความกระจายของการวัดซ้ำจริงๆ)
+        — widget จะกรองจุดที่เป็น None ทิ้งให้เองก่อนวาด"""
+        self._freqs = freqs
+        self._pri_ppm, self._pri_err = pri_ppm, pri_err
+        self._sec_ppm, self._sec_err = sec_ppm, sec_err
+        self._redraw()
+
+    def clear(self):
+        self._freqs, self._pri_ppm, self._pri_err = [], [], []
+        self._sec_ppm, self._sec_err = [], []
+        self._redraw()
+        self.plot_widget.setXRange(20, 2_000_000)
+
+    # --------------------------------------------------------
+    @staticmethod
+    def _filter_none(freqs, values, errs):
+        """คัดเฉพาะจุดที่ ppm ไม่ใช่ None ออกมา (ความถี่ที่ปิด PPM ref ไว้จะไม่ถูกวาด)"""
+        fx, vy, ey = [], [], []
+        for f, v, e in zip(freqs, values, errs):
+            if v is not None:
+                fx.append(f)
+                vy.append(v)
+                ey.append(e if e is not None else 0.0)
+        return fx, vy, ey
+
+    def _group_y_label(self, show_pri: bool, show_sec: bool) -> str:
+        if show_pri and show_sec:
+            return f"{self.pri_name} & {self.sec_name} Deviation (ppm)"
+        elif show_pri:
+            return f"{self.pri_name} Deviation (ppm)"
+        elif show_sec:
+            return f"{self.sec_name} Deviation (ppm)"
+        return "PPM Deviation"
+
+    # --------------------------------------------------------
+    def _redraw(self, *args):
+        for item in self._data_label_items:
+            self.plot_widget.removeItem(item)
+        self._data_label_items.clear()
+
+        self.legend.clear()
+
+        title = self.input_graph_title.text().strip()
+        self.plot_widget.setTitle(title if title else "PPM Deviation vs. Frequency")
+
+        x_scale = self.combo_x_scale.currentText().lower()
+        is_log = (x_scale == 'log')
+        self.plot_widget.setLogMode(x=is_log, y=False)
+
+        pri_fx, pri_vy, pri_ey = self._filter_none(self._freqs, self._pri_ppm, self._pri_err)
+        sec_fx, sec_vy, sec_ey = self._filter_none(self._freqs, self._sec_ppm, self._sec_err)
+
+        show_pri = self.chk_plot_pri.isChecked() and len(pri_fx) > 0
+        show_sec = self.chk_plot_sec.isChecked() and len(sec_fx) > 0
+
+        self.plot_widget.setLabel('left', self._group_y_label(show_pri, show_sec), **self.label_style)
+
+        pri_legend_name = f"{self.pri_name} Dev (PPM)"
+        sec_legend_name = f"{self.sec_name} Dev (PPM)"
+
+        # ---- Primary ----
+        if show_pri:
+            fx = np.log10(np.array(pri_fx, dtype=float)) if is_log else np.array(pri_fx, dtype=float)
+            vy = np.array(pri_vy, dtype=float)
+            self.curve_pri.setData(fx, vy)
+            self.curve_pri.setVisible(True)
+            if self.chk_show_legend.isChecked():
+                self.legend.addItem(self.curve_pri, pri_legend_name)
+            if self.chk_error_bar.isChecked():
+                ey = np.array(pri_ey, dtype=float)
+                self.errbar_pri.setData(x=fx, y=vy, height=ey * 2)
+                self.errbar_pri.setVisible(True)
+            else:
+                self.errbar_pri.setVisible(False)
+            if self.chk_data_labels.isChecked():
+                for x, y in zip(fx, vy):
+                    t = pg.TextItem(f'{y:.4g}', color='#0a3d91', anchor=(0.5, 1.2))
+                    t.setPos(x, y)
+                    self.plot_widget.addItem(t)
+                    self._data_label_items.append(t)
+        else:
+            self.curve_pri.setVisible(False)
+            self.errbar_pri.setVisible(False)
+
+        # ---- Secondary ----
+        if show_sec:
+            fx = np.log10(np.array(sec_fx, dtype=float)) if is_log else np.array(sec_fx, dtype=float)
+            vy = np.array(sec_vy, dtype=float)
+            self.curve_sec.setData(fx, vy)
+            self.curve_sec.setVisible(True)
+            if self.chk_show_legend.isChecked():
+                self.legend.addItem(self.curve_sec, sec_legend_name)
+            if self.chk_error_bar.isChecked():
+                ey = np.array(sec_ey, dtype=float)
+                self.errbar_sec.setData(x=fx, y=vy, height=ey * 2)
+                self.errbar_sec.setVisible(True)
+            else:
+                self.errbar_sec.setVisible(False)
+            if self.chk_data_labels.isChecked():
+                for x, y in zip(fx, vy):
+                    t = pg.TextItem(f'{y:.4g}', color='#8f0050', anchor=(0.5, -0.2))
+                    t.setPos(x, y)
+                    self.plot_widget.addItem(t)
+                    self._data_label_items.append(t)
+        else:
+            self.curve_sec.setVisible(False)
+            self.errbar_sec.setVisible(False)
+
+        self.legend.setVisible(self.chk_show_legend.isChecked() and (show_pri or show_sec))
+
+        # แจ้งเตือนกลางกราฟถ้ามีความถี่ที่วัดแล้วจริง แต่ไม่มีจุด ppm เลย (ไม่ได้เปิด PPM Reference)
+        has_any_freq = len(self._freqs) > 0
+        has_any_ppm = show_pri or show_sec
+        self.no_data_text.setVisible(has_any_freq and not has_any_ppm)
+        if self.no_data_text.isVisible():
+            vb_range = self.plot_widget.getViewBox().viewRange()
+            cx = (vb_range[0][0] + vb_range[0][1]) / 2
+            cy = (vb_range[1][0] + vb_range[1][1]) / 2
+            self.no_data_text.setPos(cx, cy)
+
+        if show_pri or show_sec:
+            vb = self.plot_widget.getViewBox()
+            vb.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
+            vb.autoRange()
+
+    # --------------------------------------------------------
+    def save_as_jpeg(self):
+        """เซฟกราฟที่กำลังแสดงอยู่เป็นไฟล์ JPEG โดย default ให้เปิดที่โฟลเดอร์ Downloads
+        ของเครื่องผู้ใช้เสมอ (ใช้ QStandardPaths ซึ่งรองรับ Windows/macOS/Linux ให้เอง)"""
+        downloads_dir = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.DownloadLocation
+        )
+        if not downloads_dir or not os.path.isdir(downloads_dir):
+            downloads_dir = os.path.expanduser("~")
+
+        default_name = (self.input_graph_title.text().strip() or "ppm_summary_graph") + ".jpg"
+        default_path = os.path.join(downloads_dir, default_name)
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Graph as JPEG", default_path, "JPEG Image (*.jpg *.jpeg)"
+        )
+        if not path:
+            return
+        if not path.lower().endswith(('.jpg', '.jpeg')):
+            path += '.jpg'
+        try:
+            exporter = pg.exporters.ImageExporter(self.plot_widget.plotItem)
+            exporter.parameters()['width'] = 1600
+            exporter.export(path)
+        except Exception as e:
+            QMessageBox.warning(self, "Save Failed", f"ไม่สามารถบันทึกไฟล์ได้: {e}")

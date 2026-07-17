@@ -498,6 +498,7 @@ class AppController(QObject):
             is_single_mode=(is_single or is_list or is_sweep)
         )
         v.freq_summary_graph.set_axis_labels(pri_label=pri_label, sec_label=sec_label)
+        v.ppm_summary_graph.set_axis_labels(pri_label=pri_label, sec_label=sec_label)
 
     def _refresh_graph_labels(self):
         """
@@ -539,6 +540,7 @@ class AppController(QObject):
             self.graph_raw_sec_y = []
             v.graph_display.clear_plots()
             v.freq_summary_graph.clear()
+            v.ppm_summary_graph.clear()
             v.raw_table.clear_table()  # ล้างข้อมูลดิบเก่าเมื่อเริ่มวัดใหม่
 
         if len(self.graph_x_data) == 0:
@@ -714,8 +716,16 @@ class AppController(QObject):
                 sec_mean=[s['sec_mean'] for s in freq_stats],
                 sec_sd=[s['sec_sd'] or 0.0 for s in freq_stats],
             )
+            v.ppm_summary_graph.update_data(
+                freqs=[s['freq'] for s in freq_stats],
+                pri_ppm=[s['pri_ppm'] for s in freq_stats],
+                pri_err=[self._sd_to_ppm(s['pri_sd'], pri_ref) for s in freq_stats],
+                sec_ppm=[s['sec_ppm'] for s in freq_stats],
+                sec_err=[self._sd_to_ppm(s['sec_sd'], sec_ref) for s in freq_stats],
+            )
         else:
             v.freq_summary_graph.clear()
+            v.ppm_summary_graph.clear()
 
     @staticmethod
     def _safe_float(text: str):
@@ -724,6 +734,22 @@ class AppController(QObject):
             return float(text) if text else None
         except (ValueError, AttributeError):
             return None
+
+    @staticmethod
+    def _sd_to_ppm(sd, ref):
+        """SD Error Bar (Stability, ppm) = SD / |Ref| × 1,000,000
+        ต่างจาก Type A ppm (SD/√N/|Ref|×1e6) ตรงที่ไม่หารด้วย √N —
+        สะท้อนความกระจายตัว/เสถียรภาพของการวัดซ้ำจริงๆ ไม่ใช่ความเชื่อมั่นในค่าเฉลี่ย
+        คืน None ถ้าไม่มี SD หรือไม่มีค่าอ้างอิง (ยังไม่เปิด PPM Reference)"""
+        if sd is None or ref is None:
+            return None
+        try:
+            ref = float(ref)
+        except (TypeError, ValueError):
+            return None
+        if ref == 0:
+            return None
+        return (sd / abs(ref)) * 1_000_000
 
     def handle_worker_error(self, error_msg):
         self.log.error(f"Hardware Error: {error_msg}")
@@ -747,6 +773,7 @@ class AppController(QObject):
         self.graph_raw_sec_y = []
         self.view.graph_display.clear_plots()
         self.view.freq_summary_graph.clear()
+        self.view.ppm_summary_graph.clear()
         self.view.stats_table.clear_table()
         self.view.raw_table.clear_table()  # [NEW] ล้างตารางข้อมูลดิบด้วย
         self.log.info("🗑 ล้างข้อมูลกราฟและตารางสถิติเรียบร้อย")
@@ -897,9 +924,10 @@ class AppController(QObject):
         v.input_panel.input_samples.setEnabled(is_list)
         v.input_panel.input_discard_first.setEnabled(is_list)
 
-        # Tab "กราฟสรุปตามความถี่ (vs Frequency)" มีความหมายเฉพาะ SWEEP/LIST
+        # Tab "กราฟสรุปตามความถี่" และ "กราฟ PPM" มีความหมายเฉพาะ SWEEP/LIST
         # (SINGLE มีความถี่เดียว ไม่มีเส้นแนวโน้มให้ดู) — ซ่อน Tab ไปเลยกันผู้ใช้สับสน
         v.right_tabs.setTabVisible(v.freq_graph_tab_index, is_sweep or is_list)
+        v.right_tabs.setTabVisible(v.ppm_graph_tab_index, is_sweep or is_list)
 
         # PPM Reference ใช้ได้ทุกโหมด (SINGLE, SWEEP, LIST)
         # เพราะทุกโหมดวัดซ้ำได้แล้ว (SWEEP มี Samples per Sweep + Discard First เหมือน LIST)

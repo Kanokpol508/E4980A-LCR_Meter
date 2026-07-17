@@ -2,13 +2,91 @@
 # ไฟล์นี้เป็น UI ล้วนๆ — สูตรคำนวณทั้งหมดอยู่ใน data/data_processor.py
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTableWidget,
-                              QTableWidgetItem, QHeaderView, QLabel)
+                              QTableWidgetItem, QHeaderView, QLabel,
+                              QStyledItemDelegate, QStyle)
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QBrush
 
 from data.data_processor import (
     calculate_single_stats,    format_single_row_for_table,
     calculate_frequency_stats, format_stats_row_for_table,
 )
+
+# ==========================================
+# สีกลุ่มคอลัมน์ — ให้โทนเดียวกับสีเส้นในกราฟ (Primary=น้ำเงิน, Secondary=ชมพู/แดง)
+# เพื่อให้ผู้ใช้จับคู่ "สีในตาราง" กับ "สีเส้นในกราฟ" ได้ทันทีโดยไม่ต้องอ่านชื่อคอลัมน์
+#
+# ใช้โทน "มืด" ให้เข้ากับธีมของแอป (ดู assets/styles.qss: พื้นหลังตาราง #040814,
+# ตัวอักษรสีขาว) แต่ต้องเข้มพอที่จะตัดกับพื้นเดิมที่มืดมากอยู่แล้วให้เห็นชัด
+#
+# หมายเหตุสำคัญ: ตั้งใจไม่ใช้ item.setBackground() เพียงอย่างเดียว เพราะแอปนี้ตั้ง
+# QSS แบบ global ที่ QApplication (main.py: app.setStyleSheet(...)) — เมื่อมี QSS
+# ระดับแอป Qt จะสลับไปวาดผ่าน "style engine" แทน QPalette/BackgroundRole เฉยๆ
+# ทำให้สีพื้นหลังที่ตั้งผ่าน setBackground() ถูกทับเงียบๆ ไม่ขึ้นบนหน้าจอ (ปัญหาที่รู้จัก
+# กันดีใน Qt Style Sheets) จึงต้องบังคับวาดเองด้วย custom delegate/header ด้านล่าง
+# ==========================================
+_GROUP_COLORS = {
+    1: QColor("#1E293B"),  # กลุ่ม 1: Frequency, Samples (N) — เทาเข้มเป็นกลาง
+    2: QColor("#164E8C"),  # กลุ่ม 2: Primary (Mean/SD/Min/Max/%RSD/PPM/Type A) — น้ำเงิน (ตรงกับ COLOR_PRIMARY '#0066CC')
+    3: QColor("#8C1550"),  # กลุ่ม 3: Secondary (Mean/SD/Min/Max/%RSD/PPM/Type A) — แดงอมชมพู (ตรงกับ COLOR_SECONDARY '#CC0066')
+}
+_GROUP_HEADER_COLORS = {
+    1: QColor("#334155"),
+    2: QColor("#1D4ED8"),
+    3: QColor("#BE185D"),
+}
+
+
+def _column_group(key: str) -> int:
+    """กำหนดว่าคอลัมน์ (จาก key ใน _COLS_*) อยู่กลุ่มไหน"""
+    if key.startswith("pri_"):
+        return 2
+    if key.startswith("sec_"):
+        return 3
+    return 1  # freq, n, n_samples
+
+
+class _GroupColorDelegate(QStyledItemDelegate):
+    """วาดพื้นหลังสีกลุ่มคอลัมน์เอง 'ก่อน' ให้ style engine วาดทับ กัน QSS
+    ระดับแอปเมิน background ที่ตั้งผ่าน item.setBackground()/BackgroundRole
+    (ปัญหาที่รู้จักกันดีเมื่อมี QApplication.setStyleSheet() แบบ global)"""
+
+    def __init__(self, get_group_fn, parent=None):
+        super().__init__(parent)
+        self._get_group = get_group_fn
+
+    def paint(self, painter, option, index):
+        color = self._get_group(index.column())
+        if color is not None and not (option.state & QStyle.StateFlag.State_Selected):
+            painter.save()
+            painter.fillRect(option.rect, color)
+            painter.restore()
+        super().paint(painter, option, index)
+
+
+class _ColoredHeaderView(QHeaderView):
+    """QHeaderView ที่วาดพื้นหลังแต่ละ section เองตามกลุ่มคอลัมน์ — ต้อง subclass
+    เพราะ QSS (QHeaderView::section { background-color: ... }) กำหนดสีเดียวทั้งแถว
+    ไม่มี selector ให้ระบุสีแยกทีละ section ได้ ถ้าไม่ subclass สีกลุ่มคอลัมน์ที่ header
+    จะไม่มีทางแสดงผล ไม่ว่าจะตั้งค่าผ่าน item.setBackground() แบบไหนก็ตาม"""
+
+    def __init__(self, get_group_fn, parent=None):
+        super().__init__(Qt.Orientation.Horizontal, parent)
+        self._get_group = get_group_fn
+
+    def paintSection(self, painter, rect, logicalIndex):
+        color = self._get_group(logicalIndex)
+        if color is not None:
+            painter.save()
+            painter.fillRect(rect, color)
+            painter.restore()
+            painter.save()
+            painter.setPen(QColor("#E2E8F0"))
+            text = self.model().headerData(logicalIndex, Qt.Orientation.Horizontal) if self.model() else ""
+            painter.drawText(rect.adjusted(6, 0, -6, 0), Qt.AlignmentFlag.AlignCenter, str(text or ""))
+            painter.restore()
+        else:
+            super().paintSection(painter, rect, logicalIndex)
 
 # ==========================================
 # Column definitions แยกตามโหมด
@@ -86,9 +164,16 @@ class StatisticsTable(QWidget):
         self.table = QTableWidget()
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.table.horizontalHeader().setStretchLastSection(False)
-        self.table.horizontalHeader().setMinimumSectionSize(90)
+
+        # header/delegate ที่บังคับวาดสีกลุ่มคอลัมน์เอง (เหตุผลดูใน docstring ของคลาส
+        # ด้านบน — QSS แบบ global ของแอปจะเมิน background ที่ตั้งผ่าน setBackground() เฉยๆ)
+        colored_header = _ColoredHeaderView(self._group_color_for_header, self.table)
+        self.table.setHorizontalHeader(colored_header)
+        self.table.setItemDelegate(_GroupColorDelegate(self._group_color_for_cell, self.table))
+
+        colored_header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        colored_header.setStretchLastSection(False)
+        colored_header.setMinimumSectionSize(90)
         self.table.verticalHeader().setVisible(False)
         self.table.setStyleSheet("""
             QTableWidget::item { padding: 4px 10px; }
@@ -97,6 +182,22 @@ class StatisticsTable(QWidget):
         layout.addWidget(self.table)
 
         self._apply_columns("LIST")
+
+    # --------------------------------------------------------
+    # ให้ delegate/header เรียกกลับมาถามว่า "คอลัมน์นี้สีอะไร" แบบสด (คำนวณจาก
+    # _cols() ปัจจุบันเสมอ) แทนที่จะฝังสีไว้ใน item ตอนสร้าง — กันปัญหาสีไม่อัปเดต
+    # ตอนสลับโหมด SINGLE/LIST/SWEEP ที่ column set เปลี่ยนตำแหน่ง key
+    def _group_color_for_cell(self, col_idx: int):
+        cols = self._cols()
+        if col_idx >= len(cols):
+            return None
+        return _GROUP_COLORS[_column_group(cols[col_idx][0])]
+
+    def _group_color_for_header(self, col_idx: int):
+        cols = self._cols()
+        if col_idx >= len(cols):
+            return None
+        return _GROUP_HEADER_COLORS[_column_group(cols[col_idx][0])]
 
     # ==========================================
     # Internal helpers
@@ -108,6 +209,7 @@ class StatisticsTable(QWidget):
         self.table.setRowCount(0)
         self._current_mode = mode
         self.lbl_hint.setText(_HINTS[mode])
+        self.table.horizontalHeader().viewport().update()
 
     def _set_row(self, row_idx: int, values: list):
         for col_idx, text in enumerate(values):

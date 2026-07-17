@@ -1,0 +1,391 @@
+# กราฟสรุปผล vs ความถี่ (Frequency Summary Graph)
+# ต่างจาก graph_display.py (แกน X = ลำดับจุดที่วัดจริง / raw sequence)
+# กราฟนี้แกน X = ความถี่ (เรียงจากน้อยไปมาก) แสดงค่าเฉลี่ย (Mean) ต่อความถี่
+# ใช้ได้เฉพาะโหมด LIST / SWEEP เท่านั้น (ต้องมีหลายความถี่ถึงจะมีเส้นแนวโน้ม)
+
+import os
+import re
+import math
+import numpy as np
+
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
+    QCheckBox, QLabel, QLineEdit, QComboBox, QPushButton, QFileDialog, QMessageBox
+)
+from PyQt6.QtCore import QStandardPaths
+import pyqtgraph as pg
+import pyqtgraph.exporters
+
+# แยก "ชื่อพารามิเตอร์" กับ "หน่วยในวงเล็บท้ายสุด" เช่น
+# "Resistance, R (Ω)" -> ("Resistance, R", "Ω")
+_UNIT_RE = re.compile(r"^(.*?)\s*\(([^()]+)\)\s*$")
+
+
+def _split_name_unit(label: str):
+    m = _UNIT_RE.match(label.strip())
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+    return label.strip(), None
+
+
+class _EngAxisItem(pg.AxisItem):
+    """แกนแบบ Engineering notation: 1000 -> 1k, 1000000 -> 1M, 0.001 -> 1m ฯลฯ
+    - เลือกหน่วย (suffix) จากค่าที่ "มากที่สุด" ในชุด tick ปัจจุบัน แล้วใช้ suffix เดียวกันทั้งชุด
+      (กันไม่ให้ label สับสน เช่น '100' กับ '1k' ปนกันในแถวเดียว)
+    - จำนวนทศนิยมคำนวณจาก spacing จริงของ tick (ที่ pyqtgraph ส่งมาให้) เพื่อไม่ให้ label ซ้ำกัน
+      เมื่อ zoom เข้าไปดูช่วงแคบๆ (บั๊กเดิม: บังคับปัดเป็นจำนวนเต็มเสมอ ทำให้ tick ที่ห่างกัน
+      น้อยกว่า 1 หน่วยกลายเป็นตัวเลขซ้ำกันหมด)
+    - allow_negative=False ใช้กับแกนความถี่ (แกน X) เพราะความถี่จริงเป็นบวกเสมอ
+    """
+
+    _SUFFIXES = [
+        (1e9, 'G'), (1e6, 'M'), (1e3, 'k'), (1, ''),
+        (1e-3, 'm'), (1e-6, 'µ'), (1e-9, 'n'), (1e-12, 'p'),
+    ]
+
+    def __init__(self, *args, allow_negative=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.allow_negative = allow_negative
+
+    def tickStrings(self, values, scale, spacing):
+        if not values:
+            return []
+
+        # เมื่อ setLogMode(x=True) แกนจะทำงานใน log10-space ต้องแปลงกลับเป็นค่าจริงก่อน
+        raw_vals = [(10 ** v) if self.logMode else v for v in values]
+        raw_vals_scaled = [rv * scale for rv in raw_vals]
+
+        if not self.allow_negative and any(rv < -1e-9 for rv in raw_vals_scaled):
+            # กรอง tick ติดลบออกจากการพิจารณาหาหน่วย (แกน X ไม่ควรมีค่าติดลบอยู่แล้ว)
+            positive_vals = [rv for rv in raw_vals_scaled if rv >= 0]
+        else:
+            positive_vals = raw_vals_scaled
+
+        max_abs = max((abs(v) for v in positive_vals), default=0)
+        factor, suffix = 1, ''
+        for f, s in self._SUFFIXES:
+            if max_abs >= f:
+                factor, suffix = f, s
+                break
+
+        # หาจำนวนทศนิยมที่จำเป็น จาก spacing จริงของ tick (หลังแปลง log แล้ว) เทียบกับ factor
+        # เพื่อไม่ให้ tick ที่อยู่ใกล้กันมากถูกปัดจนกลายเป็นตัวเลขซ้ำกัน
+        if self.logMode and len(raw_vals_scaled) >= 2:
+            sorted_vals = sorted(set(round(v, 12) for v in raw_vals_scaled))
+            diffs = [b - a for a, b in zip(sorted_vals, sorted_vals[1:]) if b - a > 0]
+            step = min(diffs) if diffs else max_abs
+        else:
+            step = spacing * scale
+
+        if factor and step > 0:
+            step_in_units = step / factor
+            decimals = 0 if step_in_units >= 1 else min(4, max(0, math.ceil(-math.log10(step_in_units))))
+        else:
+            decimals = 0
+
+        strings = []
+        for rv in raw_vals_scaled:
+            if not self.allow_negative and rv < -1e-9:
+                strings.append("")
+                continue
+            val = rv / factor if factor else rv
+            if decimals == 0:
+                strings.append(f"{round(val)}{suffix}")
+            else:
+                strings.append(f"{val:.{decimals}f}{suffix}")
+        return strings
+
+
+class FreqSummaryGraph(QWidget):
+    # สี Primary/Secondary ให้ตรงกับกราฟหลัก (graph_display.py) เพื่อไม่ให้ผู้ใช้สับสน
+    COLOR_PRIMARY = '#0066CC'    # น้ำเงิน
+    COLOR_SECONDARY = '#CC0066'  # แดงอมชมพู
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.label_style = {'color': '#1e293b', 'font-size': '10pt', 'font-weight': 'normal'}
+
+        # ชื่อพารามิเตอร์จริงตาม SCPI mode (อัปเดตผ่าน set_axis_labels)
+        self.pri_name = "Primary"
+        self.sec_name = "Secondary"
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setSpacing(6)
+
+        # ==========================================
+        # แถบควบคุม: Plot Display Options
+        # เรียงลำดับ: checkbox ต่างๆ ชิดซ้าย -> stretch -> Frequency Scale ชิดขวาสุด
+        # ==========================================
+        group_opts = QGroupBox("Plot Display Options")
+        opts_layout = QHBoxLayout()
+        opts_layout.setSpacing(12)
+
+        self.chk_plot_pri = QCheckBox("Plot Primary")
+        self.chk_plot_pri.setChecked(True)
+        self.chk_plot_sec = QCheckBox("Plot Secondary")
+        self.chk_plot_sec.setChecked(True)
+        self.chk_error_bar = QCheckBox("Show SD Error Bars")
+        self.chk_error_bar.setChecked(True)
+        self.chk_data_labels = QCheckBox("Show Data Labels")
+        self.chk_data_labels.setChecked(False)
+        self.chk_show_legend = QCheckBox("Show Legend")
+        self.chk_show_legend.setChecked(True)
+
+        opts_layout.addWidget(self.chk_plot_pri)
+        opts_layout.addWidget(self.chk_plot_sec)
+        opts_layout.addWidget(self.chk_error_bar)
+        opts_layout.addWidget(self.chk_data_labels)
+        opts_layout.addWidget(self.chk_show_legend)
+
+        opts_layout.addStretch(1)
+
+        opts_layout.addWidget(QLabel("Frequency Scale:"))
+        self.combo_x_scale = QComboBox()
+        self.combo_x_scale.addItems(["Linear", "Log"])
+        opts_layout.addWidget(self.combo_x_scale)
+
+        group_opts.setLayout(opts_layout)
+        main_layout.addWidget(group_opts)
+
+        # ==========================================
+        # แถบ Graph Title + ปุ่ม Save เป็น JPEG
+        # ==========================================
+        title_bar = QHBoxLayout()
+        title_bar.addWidget(QLabel("Graph Title:"))
+        self.input_graph_title = QLineEdit()
+        self.input_graph_title.setPlaceholderText("เช่น 10kOhm Resistor vs Frequency")
+        title_bar.addWidget(self.input_graph_title, stretch=1)
+
+        self.btn_save_jpeg = QPushButton("💾 Save as JPEG")
+        title_bar.addWidget(self.btn_save_jpeg)
+        main_layout.addLayout(title_bar)
+
+        # ==========================================
+        # กราฟหลัก (Primary/Secondary รวมในแกน Y เดียวกัน)
+        # แกน X และ Y ใช้ Eng notation ทั้งคู่ (1k, 10k, 100k, 1M ...)
+        # แกน X ห้ามติดลบ (allow_negative=False) ส่วนแกน Y อนุญาตติดลบได้
+        # (ค่าพารามิเตอร์บางตัว เช่น PPM deviation หรือ phase angle ติดลบได้จริง)
+        # ==========================================
+        self.plot_widget = pg.PlotWidget(
+            title="Mean vs. Frequency",
+            axisItems={
+                'bottom': _EngAxisItem(orientation='bottom', allow_negative=False),
+                'left':   _EngAxisItem(orientation='left',   allow_negative=True),
+            }
+        )
+        self.plot_widget.setBackground('w')
+        self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
+        self._style_axes_dark(self.plot_widget)
+        self.plot_widget.setLabel('bottom', 'Frequency (Hz)', **self.label_style)
+        self.plot_widget.setLabel('left', 'Mean Value', **self.label_style)
+
+        # ตั้งช่วงเริ่มต้นให้เป็นช่วงความถี่ทั่วไปของเครื่อง LCR (20Hz - 2MHz)
+        # กันไม่ให้กราฟตอนยังไม่มีข้อมูลโชว์ช่วงแปลกๆ (pyqtgraph จะสุ่ม default เอง เช่น 0-65Hz)
+        self.plot_widget.setXRange(20, 2_000_000)
+
+        vb = self.plot_widget.getViewBox()
+        # ล็อคไม่ให้เลื่อน/ซูมแกน X หลุดช่วงความถี่ที่เครื่อง E4980A รองรับจริง (20Hz - 2MHz)
+        # เผื่อขอบไว้ที่ 2.2MHz กันกรณี auto-range ขยับเกินพอดี
+        vb.setLimits(xMin=0, xMax=2.2e6)
+        vb.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)  # ขยับ/ย่อสเกลตามข้อมูลที่เข้ามาใหม่เสมอ
+        # ตั้งช่วงเริ่มต้นให้เป็นช่วงความถี่ทั่วไปของเครื่อง LCR (20Hz - 2MHz)
+        # กันปัญหา tick ซ้ำกันตอนกราฟยังไม่มีข้อมูล (ช่วง view แคบเกินไป)
+        self.plot_widget.setXRange(20, 2_000_000)
+
+        # legend มุมขวาบนของกราฟ (เหมือนโปรแกรมรุ่นพี่) — เพิ่ม/ลบ item เองแบบ dynamic
+        # ตามเส้นที่เปิด/ปิดจริง ไม่ใช้ plotItem.legend ที่เก็บ item ตายตัวไว้ตั้งแต่ต้น
+        self.legend = pg.LegendItem(offset=None)
+        self.legend.setParentItem(self.plot_widget.plotItem)
+        self.legend.anchor(itemPos=(1, 0), parentPos=(1, 0), offset=(-10, 10))
+
+        self.curve_pri = self.plot_widget.plot(
+            pen=pg.mkPen(self.COLOR_PRIMARY, width=2), symbol='o',
+            symbolSize=7, symbolBrush=self.COLOR_PRIMARY
+        )
+        self.curve_sec = self.plot_widget.plot(
+            pen=pg.mkPen(self.COLOR_SECONDARY, width=2), symbol='s',
+            symbolSize=7, symbolBrush=self.COLOR_SECONDARY
+        )
+
+        self.errbar_pri = pg.ErrorBarItem(pen=pg.mkPen(self.COLOR_PRIMARY, width=1))
+        self.plot_widget.addItem(self.errbar_pri)
+        self.errbar_sec = pg.ErrorBarItem(pen=pg.mkPen(self.COLOR_SECONDARY, width=1))
+        self.plot_widget.addItem(self.errbar_sec)
+
+        self._data_label_items = []  # เก็บ TextItem ไว้ลบทิ้งตอน redraw
+
+        main_layout.addWidget(self.plot_widget, stretch=1)
+
+        # ==========================================
+        # Signal เชื่อมต่อ: เปลี่ยนตัวเลือกแล้ว redraw ทันที
+        # ==========================================
+        for w in (self.chk_plot_pri, self.chk_plot_sec, self.chk_error_bar,
+                  self.chk_data_labels, self.chk_show_legend):
+            w.stateChanged.connect(self._redraw)
+        self.combo_x_scale.currentTextChanged.connect(self._redraw)
+        self.input_graph_title.textChanged.connect(self._redraw)
+        self.btn_save_jpeg.clicked.connect(self.save_as_jpeg)
+
+        self._freqs, self._pri_mean, self._pri_sd = [], [], []
+        self._sec_mean, self._sec_sd = [], []
+
+        self._redraw()
+
+    # --------------------------------------------------------
+    def _style_axes_dark(self, plot_widget):
+        for axis_name in ('left', 'bottom'):
+            axis = plot_widget.getAxis(axis_name)
+            axis.setPen(pg.mkPen('#334155'))
+            axis.setTextPen(pg.mkPen('#1e293b'))
+
+    # --------------------------------------------------------
+    def set_axis_labels(self, pri_label: str, sec_label: str):
+        """เรียกจาก app_controller ตอนเปลี่ยน SCPI mode — เก็บชื่อพารามิเตอร์จริงไว้ใช้
+        เป็นทั้งชื่อแกน Y และชื่อเส้นใน Legend (แทนคำว่า Primary/Secondary เฉยๆ)"""
+        self.pri_name = pri_label
+        self.sec_name = sec_label
+        self._redraw()
+
+    def update_data(self, freqs: list, pri_mean: list, pri_sd: list,
+                     sec_mean: list, sec_sd: list):
+        """freqs ต้องเรียงจากน้อยไปมากแล้ว (ผลจาก calculate_frequency_stats)"""
+        self._freqs = freqs
+        self._pri_mean, self._pri_sd = pri_mean, pri_sd
+        self._sec_mean, self._sec_sd = sec_mean, sec_sd
+        self._redraw()
+
+    def clear(self):
+        self._freqs, self._pri_mean, self._pri_sd = [], [], []
+        self._sec_mean, self._sec_sd = [], []
+        self._redraw()
+        self.plot_widget.setXRange(20, 2_000_000)
+
+    # --------------------------------------------------------
+    def _group_y_label(self, show_pri: bool, show_sec: bool) -> str:
+        """ตั้งชื่อแกน Y ตาม 'กลุ่มพารามิเตอร์' ที่ติ๊กเปิดอยู่จริง
+        ถ้าหน่วยเหมือนกันทั้งคู่ (เช่น Re/Im เป็น Ω ทั้งคู่) ให้รวมเป็นกลุ่มเดียว
+        เช่น 'Resistance, R & Reactance, X (Ω)' แทนที่จะเขียนหน่วยซ้ำสองรอบ"""
+        pri_text, pri_unit = _split_name_unit(self.pri_name)
+        sec_text, sec_unit = _split_name_unit(self.sec_name)
+
+        if show_pri and show_sec:
+            if pri_unit and pri_unit == sec_unit:
+                return f"{pri_text} & {sec_text} ({pri_unit})"
+            return f"{self.pri_name} & {self.sec_name}"
+        elif show_pri:
+            return self.pri_name
+        elif show_sec:
+            return self.sec_name
+        return "Mean Value"
+
+    # --------------------------------------------------------
+    def _redraw(self, *args):
+        # ล้าง data label เก่าทุกครั้ง
+        for item in self._data_label_items:
+            self.plot_widget.removeItem(item)
+        self._data_label_items.clear()
+
+        # ล้าง legend เก่าทุกครั้ง แล้วค่อยเติมเฉพาะเส้นที่ "เปิด" ตอนนี้จริงๆ
+        self.legend.clear()
+
+        title = self.input_graph_title.text().strip()
+        self.plot_widget.setTitle(title if title else "Mean vs. Frequency")
+
+        x_scale = self.combo_x_scale.currentText().lower()
+        self.plot_widget.setLogMode(x=(x_scale == 'log'), y=False)
+
+        freqs = np.array(self._freqs, dtype=float) if self._freqs else np.array([])
+        plot_x = np.log10(freqs) if (x_scale == 'log' and len(freqs)) else freqs
+
+        show_pri = self.chk_plot_pri.isChecked() and len(freqs) > 0
+        show_sec = self.chk_plot_sec.isChecked() and len(freqs) > 0
+
+        # ---- ชื่อแกน Y ตามกลุ่มพารามิเตอร์ที่เลือกจริง ----
+        self.plot_widget.setLabel('left', self._group_y_label(show_pri, show_sec), **self.label_style)
+
+        pri_legend_name = f"{self.pri_name} (Mean)"
+        sec_legend_name = f"{self.sec_name} (Mean)"
+
+        # ---- Primary ----
+        if show_pri:
+            means = np.array(self._pri_mean, dtype=float)
+            self.curve_pri.setData(plot_x, means)
+            self.curve_pri.setVisible(True)
+            if self.chk_show_legend.isChecked():
+                self.legend.addItem(self.curve_pri, pri_legend_name)
+            if self.chk_error_bar.isChecked():
+                sds = np.array(self._pri_sd, dtype=float)
+                self.errbar_pri.setData(x=plot_x, y=means, height=sds * 2)
+                self.errbar_pri.setVisible(True)
+            else:
+                self.errbar_pri.setVisible(False)
+            if self.chk_data_labels.isChecked():
+                for x, y in zip(plot_x, means):
+                    t = pg.TextItem(f'{y:.4g}', color='#0a3d91', anchor=(0.5, 1.2))
+                    t.setPos(x, y)
+                    self.plot_widget.addItem(t)
+                    self._data_label_items.append(t)
+        else:
+            self.curve_pri.setVisible(False)
+            self.errbar_pri.setVisible(False)
+
+        # ---- Secondary ----
+        if show_sec:
+            means = np.array(self._sec_mean, dtype=float)
+            self.curve_sec.setData(plot_x, means)
+            self.curve_sec.setVisible(True)
+            if self.chk_show_legend.isChecked():
+                self.legend.addItem(self.curve_sec, sec_legend_name)
+            if self.chk_error_bar.isChecked():
+                sds = np.array(self._sec_sd, dtype=float)
+                self.errbar_sec.setData(x=plot_x, y=means, height=sds * 2)
+                self.errbar_sec.setVisible(True)
+            else:
+                self.errbar_sec.setVisible(False)
+            if self.chk_data_labels.isChecked():
+                for x, y in zip(plot_x, means):
+                    t = pg.TextItem(f'{y:.4g}', color='#8f0050', anchor=(0.5, -0.2))
+                    t.setPos(x, y)
+                    self.plot_widget.addItem(t)
+                    self._data_label_items.append(t)
+        else:
+            self.curve_sec.setVisible(False)
+            self.errbar_sec.setVisible(False)
+
+        # legend ไม่มีอะไรเปิดเลย (หรือผู้ใช้ปิด Show Legend) ให้ซ่อนกล่อง legend ไปเลย
+        self.legend.setVisible(self.chk_show_legend.isChecked() and (show_pri or show_sec))
+
+        # บังคับขยาย/หดสเกลกราฟให้พอดีกับข้อมูลล่าสุดเสมอ (เฉพาะตอนมีข้อมูลจริงแล้ว
+        # ถ้ายังไม่มีข้อมูล คงช่วงเริ่มต้น 20Hz-2MHz ไว้ ไม่ปล่อยให้ autoRange ยุบเหลือช่วงแคบๆ)
+        if len(freqs) > 0:
+            vb = self.plot_widget.getViewBox()
+            vb.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
+            vb.autoRange()
+
+    # --------------------------------------------------------
+    def save_as_jpeg(self):
+        """เซฟกราฟที่กำลังแสดงอยู่เป็นไฟล์ JPEG โดย default ให้เปิดที่โฟลเดอร์ Downloads
+        ของเครื่องผู้ใช้เสมอ (ใช้ QStandardPaths ซึ่งรองรับ Windows/macOS/Linux ให้เอง)"""
+        downloads_dir = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.DownloadLocation
+        )
+        if not downloads_dir or not os.path.isdir(downloads_dir):
+            downloads_dir = os.path.expanduser("~")
+
+        default_name = (self.input_graph_title.text().strip() or "freq_summary_graph") + ".jpg"
+        default_path = os.path.join(downloads_dir, default_name)
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Graph as JPEG", default_path, "JPEG Image (*.jpg *.jpeg)"
+        )
+        if not path:
+            return
+        if not path.lower().endswith(('.jpg', '.jpeg')):
+            path += '.jpg'
+        try:
+            exporter = pg.exporters.ImageExporter(self.plot_widget.plotItem)
+            exporter.parameters()['width'] = 1600
+            exporter.export(path)
+        except Exception as e:
+            QMessageBox.warning(self, "Save Failed", f"ไม่สามารถบันทึกไฟล์ได้: {e}")

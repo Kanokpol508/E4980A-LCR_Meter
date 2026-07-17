@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, QObject
 from core.measurement_thread import MeasurementWorker
 from core.correction_thread import CorrectionWorker
 from hardware.lcr_meter import E4980A
+from data.data_processor import calculate_frequency_stats
 
 class AppController(QObject):
     def __init__(self, view):
@@ -496,6 +497,7 @@ class AppController(QObject):
             sec_y_label=sec_label,
             is_single_mode=(is_single or is_list or is_sweep)
         )
+        v.freq_summary_graph.set_axis_labels(pri_label=pri_label, sec_label=sec_label)
 
     def _refresh_graph_labels(self):
         """
@@ -536,6 +538,7 @@ class AppController(QObject):
             self.graph_raw_pri_y = []
             self.graph_raw_sec_y = []
             v.graph_display.clear_plots()
+            v.freq_summary_graph.clear()
             v.raw_table.clear_table()  # ล้างข้อมูลดิบเก่าเมื่อเริ่มวัดใหม่
 
         if len(self.graph_x_data) == 0:
@@ -700,6 +703,20 @@ class AppController(QObject):
 
         v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode)
 
+        # กราฟ "vs Frequency" มีความหมายเฉพาะ LIST/SWEEP เท่านั้น
+        # (SINGLE มีความถี่เดียว ไม่มีเส้นแนวโน้มให้ลาก)
+        if run_mode in ("LIST", "SWEEP") and raw_records:
+            freq_stats = calculate_frequency_stats(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
+            v.freq_summary_graph.update_data(
+                freqs=[s['freq'] for s in freq_stats],
+                pri_mean=[s['pri_mean'] for s in freq_stats],
+                pri_sd=[s['pri_sd'] or 0.0 for s in freq_stats],
+                sec_mean=[s['sec_mean'] for s in freq_stats],
+                sec_sd=[s['sec_sd'] or 0.0 for s in freq_stats],
+            )
+        else:
+            v.freq_summary_graph.clear()
+
     @staticmethod
     def _safe_float(text: str):
         try:
@@ -729,6 +746,7 @@ class AppController(QObject):
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
         self.view.graph_display.clear_plots()
+        self.view.freq_summary_graph.clear()
         self.view.stats_table.clear_table()
         self.view.raw_table.clear_table()  # [NEW] ล้างตารางข้อมูลดิบด้วย
         self.log.info("🗑 ล้างข้อมูลกราฟและตารางสถิติเรียบร้อย")
@@ -878,6 +896,10 @@ class AppController(QObject):
         v.input_panel.input_freq_list.setEnabled(is_list)
         v.input_panel.input_samples.setEnabled(is_list)
         v.input_panel.input_discard_first.setEnabled(is_list)
+
+        # Tab "กราฟสรุปตามความถี่ (vs Frequency)" มีความหมายเฉพาะ SWEEP/LIST
+        # (SINGLE มีความถี่เดียว ไม่มีเส้นแนวโน้มให้ดู) — ซ่อน Tab ไปเลยกันผู้ใช้สับสน
+        v.right_tabs.setTabVisible(v.freq_graph_tab_index, is_sweep or is_list)
 
         # PPM Reference ใช้ได้ทุกโหมด (SINGLE, SWEEP, LIST)
         # เพราะทุกโหมดวัดซ้ำได้แล้ว (SWEEP มี Samples per Sweep + Discard First เหมือน LIST)

@@ -31,17 +31,39 @@ def _split_name_unit(label: str):
     return label.strip(), None
 
 
+# ขอบเขตแกน X ตามสเปคเครื่อง E4980A (20Hz - 2MHz) เผื่อขอบไว้อีกนิด (2.1MHz)
+# กันไม่ให้จุดข้อมูลที่วัดได้ที่ 2MHz พอดีไปติดชิดขอบกราฟจนมองไม่เห็นเต็มจุด
+FREQ_MIN = 20
+FREQ_MAX = 2_000_000
+FREQ_MAX_BUFFERED = 2_100_000
+
+
 class _FreqEngAxisItem(pg.AxisItem):
     """แกนความถี่ (X): ย่อ k, M, G ได้ ไม่มีทศนิยม ไม่มีค่าติดลบ
-    และจำกัดขอบเขตการวาดตัวเลขให้อยู่ในสเปคเครื่อง 0 - 2 MHz"""
+    และจำกัดขอบเขตการวาดตัวเลขให้อยู่ในสเปคเครื่อง 0 - 2.1 MHz
+    ป้องกัน OverflowError ตอนสลับ Linear/Log แล้ว pyqtgraph ส่งค่า tick ที่ใหญ่ผิดปกติมา
+    (เช่น 10**v ตอน v มีค่ามากเกินกว่าที่ float รองรับ)"""
 
     def tickStrings(self, values, scale, spacing):
         strings = []
         for v in values:
-            raw_val = (10 ** v) if self.logMode else v
-            val = raw_val * scale
+            # log10(20Hz) ~= 1.3, log10(2.1MHz) ~= 6.32 — ค่าที่สมเหตุสมผลไม่ควรหลุดช่วงนี้มาก
+            # ถ้า v หลุดช่วงนี้ไปไกล ให้ทิ้ง tick นั้นไปเลยโดยไม่คำนวณ 10**v ต่อ กัน OverflowError
+            # ทุกรูปแบบ (ทั้งตอน 10**v เอง และตอนแปลงเป็น float ในขั้นตอนถัดไป)
+            if self.logMode and (v < -50 or v > 50):
+                strings.append("")
+                continue
+            try:
+                raw_val = (10 ** v) if self.logMode else v
+                val = raw_val * scale
+                if not math.isfinite(val):
+                    strings.append("")
+                    continue
+            except (OverflowError, ValueError):
+                strings.append("")
+                continue
 
-            if val < 0 or val > 2_000_000:
+            if val < 0 or val > FREQ_MAX_BUFFERED:
                 strings.append("")
                 continue
             if abs(val - round(val)) > 1e-5:
@@ -72,8 +94,20 @@ class _EngAxisItem(pg.AxisItem):
     def tickStrings(self, values, scale, spacing):
         strings = []
         for v in values:
-            raw_val = (10 ** v) if self.logMode else v
-            val = raw_val * scale
+            # กันช่วงเดียวกับแกน X — ค่า ppm deviation (แม้แต่ log-space) ไม่ควรหลุดช่วงนี้
+            if self.logMode and (v < -300 or v > 300):
+                strings.append("")
+                continue
+            try:
+                raw_val = (10 ** v) if self.logMode else v
+                val = raw_val * scale
+                if not math.isfinite(val):
+                    strings.append("")
+                    continue
+            except (OverflowError, ValueError):
+                strings.append("")
+                continue
+
             strings.append(self._format_eng(val))
         return strings
 
@@ -191,12 +225,13 @@ class PpmSummaryGraph(QWidget):
         self.zero_line = pg.InfiniteLine(pos=0, angle=0, pen=pg.mkPen('#94a3b8', width=1, style=pg.QtCore.Qt.PenStyle.DashLine))
         self.plot_widget.addItem(self.zero_line)
 
-        # ตั้งช่วงเริ่มต้นให้เป็นช่วงความถี่ทั่วไปของเครื่อง LCR (20Hz - 2MHz)
-        self.plot_widget.setXRange(20, 2_000_000)
+        # ตั้งช่วงเริ่มต้นให้เป็นช่วงความถี่ทั่วไปของเครื่อง LCR (20Hz - 2.1MHz)
+        # เผื่อขอบไว้นิดหน่อยกันข้อมูลที่วัดได้พอดี 2MHz ไปติดขอบกราฟ
+        self.plot_widget.setXRange(FREQ_MIN, FREQ_MAX_BUFFERED)
 
         vb = self.plot_widget.getViewBox()
-        # ล็อคไม่ให้เลื่อน/ซูมแกน X หลุดช่วงความถี่ที่เครื่อง E4980A รองรับจริง (0 - 2MHz พอดี)
-        vb.setLimits(xMin=0, xMax=2_000_000)
+        # ล็อคไม่ให้เลื่อน/ซูมแกน X หลุดช่วงความถี่ที่เครื่อง E4980A รองรับจริง (0 - 2.1MHz)
+        vb.setLimits(xMin=0, xMax=FREQ_MAX_BUFFERED)
         vb.enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
 
         # legend มุมขวาบนของกราฟ — เพิ่ม/ลบ item เองแบบ dynamic ตามเส้นที่เปิด/ปิดจริง
@@ -236,13 +271,27 @@ class PpmSummaryGraph(QWidget):
         for w in (self.chk_plot_pri, self.chk_plot_sec, self.chk_error_bar,
                   self.chk_data_labels, self.chk_show_legend):
             w.stateChanged.connect(self._redraw)
-        self.combo_x_scale.currentTextChanged.connect(self._redraw)
+        self.combo_x_scale.currentTextChanged.connect(self._on_scale_changed)
         self.input_graph_title.textChanged.connect(self._redraw)
         self.btn_save_jpeg.clicked.connect(self.save_as_jpeg)
 
         self._freqs, self._pri_ppm, self._pri_err = [], [], []
         self._sec_ppm, self._sec_err = [], []
 
+        self._redraw()
+
+    # --------------------------------------------------------
+    def _on_scale_changed(self, *args):
+        """สลับ Linear/Log — ต้องรีเซ็ต view range ก่อน redraw เสมอ กัน pyqtgraph
+        เก็บ range เก่า (ที่เป็นหน่วยอื่น เช่น Hz ตรงๆ) มาตีความผิดเป็น log-space
+        จนได้ tick ค่ามหาศาลแล้ว overflow ตอน 10**v"""
+        is_log = (self.combo_x_scale.currentText().lower() == 'log')
+        self.plot_widget.setLogMode(x=is_log, y=False)
+        if len(self._freqs) == 0:
+            if is_log:
+                self.plot_widget.setXRange(math.log10(FREQ_MIN), math.log10(FREQ_MAX_BUFFERED))
+            else:
+                self.plot_widget.setXRange(FREQ_MIN, FREQ_MAX_BUFFERED)
         self._redraw()
 
     # --------------------------------------------------------
@@ -276,7 +325,11 @@ class PpmSummaryGraph(QWidget):
         self._freqs, self._pri_ppm, self._pri_err = [], [], []
         self._sec_ppm, self._sec_err = [], []
         self._redraw()
-        self.plot_widget.setXRange(20, 2_000_000)
+        is_log = (self.combo_x_scale.currentText().lower() == 'log')
+        if is_log:
+            self.plot_widget.setXRange(math.log10(FREQ_MIN), math.log10(FREQ_MAX_BUFFERED))
+        else:
+            self.plot_widget.setXRange(FREQ_MIN, FREQ_MAX_BUFFERED)
 
     # --------------------------------------------------------
     @staticmethod

@@ -249,6 +249,34 @@ class FrequencyListWidget(QWidget):
         parser เดิม (MeasurementWorker._parse_freq_list) ได้โดยไม่ต้องแก้โค้ดที่อื่น"""
         return ",".join(str(f) for f in self.get_frequencies())
 
+    def set_frequencies(self, freqs: list):
+        """[NEW] ตั้งค่ารายการความถี่ทั้งหมดใหม่ (ใช้ตอน Open Save เพื่อคืนค่า Input เดิม)
+        ปรับจำนวนแถวให้เท่ากับ freqs ที่ส่งเข้ามาโดยอัตโนมัติ (เพิ่ม/ลบแถวให้พอดี)
+        แล้วค่อยใส่ค่าแต่ละแถว ก่อนแจ้งเตือน freq_changed ให้ validate อีกครั้ง"""
+        freqs = [f for f in (freqs or [])]
+        while len(freqs) < self.MIN_ROWS:
+            freqs.append(None)
+
+        while len(self._rows) < len(freqs):
+            self.add_row()
+        while len(self._rows) > len(freqs):
+            self.remove_row(self._rows[-1]['container'])
+
+        for row, val in zip(self._rows, freqs):
+            row['input'].blockSignals(True)
+            row['input'].setText("" if val is None else self._format_freq(val))
+            row['input'].blockSignals(False)
+
+        self.freq_changed.emit()
+
+    @staticmethod
+    def _format_freq(val) -> str:
+        try:
+            f = float(val)
+            return str(int(f)) if f.is_integer() else str(f)
+        except (TypeError, ValueError):
+            return str(val)
+
 
 class InputPanel(QWidget):
     def __init__(self, parent=None):

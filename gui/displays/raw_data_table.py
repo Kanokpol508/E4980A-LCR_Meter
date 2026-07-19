@@ -149,3 +149,21 @@ class RawDataTable(QWidget):
 
     def clear_table(self):
         self.table.setRowCount(0)
+
+    def get_rows(self) -> list:
+        """[NEW] คืนค่าทุกแถวในตารางเป็น list ของ dict (ใช้ตอน Save Result)
+        เก็บเป็นข้อความตามที่แสดงผลจริง เพื่อให้ Open Save คืนค่าตารางได้ตรงเป๊ะ"""
+        rows = []
+        for r in range(self.table.rowCount()):
+            def cell(col):
+                item = self.table.item(r, col)
+                return item.text() if item else ""
+            rows.append({
+                'no': cell(0),
+                'freq': cell(1),
+                'sample_text': cell(2),
+                'primary': cell(3),
+                'secondary': cell(4),
+                'status': cell(5),
+            })
+        return rows

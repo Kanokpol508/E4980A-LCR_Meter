@@ -1,5 +1,7 @@
 # ตัวกลางรับ Event จาก GUI ไปสั่ง Hardware และส่งผลกลับมา GUI
 
+import time
+
 from PyQt6.QtWidgets import QMessageBox, QProgressDialog
 from PyQt6.QtCore import Qt, QObject
 
@@ -7,6 +9,7 @@ from core.measurement_thread import MeasurementWorker
 from core.correction_thread import CorrectionWorker
 from hardware.lcr_meter import E4980A
 from data.data_processor import calculate_frequency_stats
+from core import save_manager
 
 class AppController(QObject):
     def __init__(self, view):
@@ -32,6 +35,10 @@ class AppController(QObject):
         # ตัวแปรสำหรับเก็บ "ค่าดิบ (Raw Data)" เพื่อนำไปคำนวณสถิติ Type A
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
+
+        # [NEW] เวลาที่วัดเสร็จล่าสุด (ใช้เป็นเวลา Save จริงๆ ไม่ใช่เวลาที่กดปุ่ม Save)
+        self.last_measurement_time = None
+        self.last_measurement_time_iso = None
 
         self.meas_options = {
             "Capacitance (ความจุไฟฟ้า)": [
@@ -98,6 +105,10 @@ class AppController(QObject):
         v.input_panel.combo_run_mode.currentIndexChanged.connect(self.toggle_run_mode)
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
+
+        # [NEW] ระบบ Save / View Save Result — ใช้ปุ่มเดิมที่อยู่ข้าง Measurement Result (lcd_display)
+        v.lcd_display.btn_save.clicked.connect(self.handle_save_result)
+        v.lcd_display.btn_view.clicked.connect(self.handle_view_save_result)
 
         v.input_panel.input_start_freq.valueChanged.connect(self.update_calculated_points)
         v.input_panel.input_stop_freq.valueChanged.connect(self.update_calculated_points)
@@ -765,6 +776,11 @@ class AppController(QObject):
         self.set_ui_locked(False)
         self.worker = None
 
+        # [NEW] จำเวลาที่วัดเสร็จไว้ ณ ตอนนี้ — นี่คือเวลาที่จะใช้ตอน Save Result จริงๆ
+        # (ไม่ใช่เวลาที่ผู้ใช้กดปุ่ม Save Result ซึ่งอาจกดทีหลังก็ได้)
+        self.last_measurement_time_iso = time.strftime("%Y-%m-%d %H:%M:%S")
+        self.last_measurement_time = time.strftime("%d/%m/%Y %H:%M:%S")
+
     def clear_graph_data(self):
         self.graph_x_data = []
         self.graph_pri_y = []
@@ -983,3 +999,205 @@ class AppController(QObject):
             v.adv_panel.lbl_dev_warning.setText("")
             self.is_ppm_error = False
         self.update_start_button_state()
+
+    # ========================================================
+    # [NEW] ระบบ Save / View Save Result / Open Save
+    # ========================================================
+    def _build_save_snapshot(self) -> dict:
+        """รวบรวม Input ทั้งหมด + ผลลัพธ์ ณ ปัจจุบันเป็น dict เดียว พร้อมบันทึกลงไฟล์
+        เวลาที่บันทึกในไฟล์ (meta.measurement_time) คือเวลาที่ "วัดเสร็จ" ล่าสุด
+        (self.last_measurement_time) ไม่ใช่เวลาที่ผู้ใช้กดปุ่ม Save Result"""
+        v = self.view
+        run_mode = self.get_current_run_mode()
+
+        measurement_time = self.last_measurement_time or time.strftime("%d/%m/%Y %H:%M:%S")
+        measurement_time_iso = self.last_measurement_time_iso or time.strftime("%Y-%m-%d %H:%M:%S")
+
+        snapshot = {
+            "meta": {
+                "save_name": "",  # ใส่ค่าจริงตอนเรียก save_manager.save_result()
+                "measurement_time": measurement_time,
+                "measurement_time_iso": measurement_time_iso,
+                "run_mode": run_mode,
+            },
+            "inputs": {
+                "visa_resource": v.conn_panel.combo_visa.currentText(),
+                "prop_group": v.input_panel.combo_prop_group.currentText(),
+                "scpi_mode": v.input_panel.combo_scpi_mode.currentData(),
+                "run_mode": run_mode,
+                "freq": v.input_panel.input_freq.value(),
+                "n_single": v.input_panel.input_n_single.value(),
+                "discard_single": v.input_panel.input_discard_single.value(),
+                "start_freq": v.input_panel.input_start_freq.value(),
+                "stop_freq": v.input_panel.input_stop_freq.value(),
+                "step_freq": v.input_panel.input_step_freq.value(),
+                "samples_sweep": v.input_panel.input_samples_sweep.value(),
+                "discard_first_sweep": v.input_panel.input_discard_first_sweep.value(),
+                "freq_list": v.input_panel.input_freq_list.get_frequencies(),
+                "samples_list": v.input_panel.input_samples.value(),
+                "discard_first_list": v.input_panel.input_discard_first.value(),
+                "volt": v.input_panel.input_volt.value(),
+                "level_mode": v.input_panel.combo_level_mode.currentData(),
+                "alc_enabled": v.input_panel.chk_alc.isChecked(),
+                "time_mode": v.input_panel.combo_time.currentText(),
+                "avg": v.input_panel.input_avg.value(),
+                "cable": v.input_panel.combo_cable.currentText(),
+                "imp_range": v.input_panel.combo_range.currentData(),
+                "ppm_enabled": v.adv_panel.chk_dev_ppm_enable.isChecked(),
+                "ppm_pri_ref": v.adv_panel.input_dev_pri.text(),
+                "ppm_sec_ref": v.adv_panel.input_dev_sec.text(),
+            },
+            "results": {
+                "graph_x_data": self.graph_x_data,
+                "graph_pri_y": self.graph_pri_y,
+                "graph_sec_y": self.graph_sec_y,
+                "graph_raw_pri_y": self.graph_raw_pri_y,
+                "graph_raw_sec_y": self.graph_raw_sec_y,
+                "raw_table_rows": v.raw_table.get_rows(),
+            },
+        }
+        return snapshot
+
+    def handle_save_result(self):
+        """เมื่อกดปุ่ม 'Save Result' — เด้งป๊อปอัพให้ตั้งชื่อ แล้วบันทึก Input + ผลลัพธ์ปัจจุบันทั้งหมด"""
+        if len(self.graph_x_data) == 0:
+            QMessageBox.warning(
+                self.view, "ไม่มีข้อมูลให้บันทึก",
+                "ยังไม่มีผลลัพธ์การวัด กรุณากด START เพื่อวัดข้อมูลก่อน แล้วค่อย Save Result"
+            )
+            return
+
+        from gui.dialogs.save_name_dialog import SaveNameDialog
+        dialog = SaveNameDialog(self.view)
+        if dialog.exec() != SaveNameDialog.DialogCode.Accepted:
+            return
+
+        save_name = dialog.get_name()
+        if not save_name:
+            return
+
+        snapshot = self._build_save_snapshot()
+        snapshot["meta"]["save_name"] = save_name
+
+        try:
+            path = save_manager.save_result(save_name, snapshot)
+        except OSError as e:
+            self.log.error(f"❌ บันทึก Save ล้มเหลว: {e}")
+            QMessageBox.critical(self.view, "บันทึกล้มเหลว", f"ไม่สามารถบันทึกไฟล์ Save ได้:\n{e}")
+            return
+
+        self.log.info(f"💾 บันทึกผลลัพธ์ '{save_name}' เรียบร้อย ({path.name})")
+        QMessageBox.information(self.view, "บันทึกสำเร็จ", f"บันทึกผลลัพธ์ \"{save_name}\" เรียบร้อยแล้ว")
+
+    def handle_view_save_result(self):
+        """เมื่อกดปุ่ม 'View Save Result' — เปิดหน้าต่างรายชื่อ Save ทั้งหมด"""
+        from gui.dialogs.view_save_dialog import ViewSaveDialog
+        dialog = ViewSaveDialog(self.view)
+        dialog.open_save_requested.connect(self.open_save)
+        dialog.exec()
+
+    def open_save(self, path: str):
+        """โหลด Input + ผลลัพธ์จากไฟล์ Save ที่เลือก กลับมาแสดงในโปรแกรมทั้งหมด"""
+        if self.worker is not None:
+            QMessageBox.warning(self.view, "กำลังวัดอยู่", "กรุณากด STOP เพื่อหยุดการวัดก่อน แล้วค่อยเปิด Save")
+            return
+
+        try:
+            data = save_manager.load_save(path)
+        except (OSError, ValueError) as e:
+            QMessageBox.critical(self.view, "เปิดไฟล์ล้มเหลว", f"ไม่สามารถเปิดไฟล์ Save นี้ได้:\n{e}")
+            return
+
+        reply = QMessageBox.question(
+            self.view, "ยืนยันการเปิด Save",
+            "การเปิด Save จะแทนที่ค่า Input และผลลัพธ์ปัจจุบันทั้งหมดในโปรแกรม\n"
+            "ต้องการดำเนินการต่อหรือไม่?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        v = self.view
+        meta = data.get("meta", {})
+        inputs = data.get("inputs", {})
+        results = data.get("results", {})
+        run_mode = inputs.get("run_mode", "SINGLE")
+
+        # --- คืนค่า Input ทั้งหมด ---
+        if inputs.get("prop_group"):
+            v.input_panel.combo_prop_group.setCurrentText(inputs["prop_group"])  # จะ trigger update_scpi_modes เอง
+        self._set_combo_by_data(v.input_panel.combo_scpi_mode, inputs.get("scpi_mode"))
+        self._set_combo_by_data(v.input_panel.combo_run_mode, run_mode)  # trigger toggle_run_mode เอง
+
+        v.input_panel.input_freq.setValue(inputs.get("freq", v.input_panel.input_freq.value()))
+        v.input_panel.input_n_single.setValue(inputs.get("n_single", v.input_panel.input_n_single.value()))
+        v.input_panel.input_discard_single.setValue(inputs.get("discard_single", v.input_panel.input_discard_single.value()))
+        v.input_panel.input_start_freq.setValue(inputs.get("start_freq", v.input_panel.input_start_freq.value()))
+        v.input_panel.input_stop_freq.setValue(inputs.get("stop_freq", v.input_panel.input_stop_freq.value()))
+        v.input_panel.input_step_freq.setValue(inputs.get("step_freq", v.input_panel.input_step_freq.value()))
+        v.input_panel.input_samples_sweep.setValue(inputs.get("samples_sweep", v.input_panel.input_samples_sweep.value()))
+        v.input_panel.input_discard_first_sweep.setValue(
+            inputs.get("discard_first_sweep", v.input_panel.input_discard_first_sweep.value())
+        )
+        v.input_panel.input_freq_list.set_frequencies(inputs.get("freq_list", []))
+        v.input_panel.input_samples.setValue(inputs.get("samples_list", v.input_panel.input_samples.value()))
+        v.input_panel.input_discard_first.setValue(
+            inputs.get("discard_first_list", v.input_panel.input_discard_first.value())
+        )
+        v.input_panel.input_volt.setValue(inputs.get("volt", v.input_panel.input_volt.value()))
+        self._set_combo_by_data(v.input_panel.combo_level_mode, inputs.get("level_mode"))
+        v.input_panel.chk_alc.setChecked(inputs.get("alc_enabled", False))
+        if inputs.get("time_mode"):
+            v.input_panel.combo_time.setCurrentText(inputs["time_mode"])
+        v.input_panel.input_avg.setValue(inputs.get("avg", v.input_panel.input_avg.value()))
+        if inputs.get("cable"):
+            v.input_panel.combo_cable.setCurrentText(inputs["cable"])
+        self._set_combo_by_data(v.input_panel.combo_range, inputs.get("imp_range"))
+
+        v.adv_panel.chk_dev_ppm_enable.setChecked(inputs.get("ppm_enabled", False))
+        v.adv_panel.input_dev_pri.setText(inputs.get("ppm_pri_ref") or "")
+        v.adv_panel.input_dev_sec.setText(inputs.get("ppm_sec_ref") or "")
+
+        visa_saved = inputs.get("visa_resource")
+        if visa_saved:
+            idx = v.conn_panel.combo_visa.findText(visa_saved)
+            if idx >= 0:
+                v.conn_panel.combo_visa.setCurrentIndex(idx)
+
+        # --- คืนค่าผลลัพธ์ (กราฟ/ตารางสถิติ/ข้อมูลดิบ) ---
+        self.graph_x_data = list(results.get("graph_x_data", []))
+        self.graph_pri_y = list(results.get("graph_pri_y", []))
+        self.graph_sec_y = list(results.get("graph_sec_y", []))
+        self.graph_raw_pri_y = list(results.get("graph_raw_pri_y", []))
+        self.graph_raw_sec_y = list(results.get("graph_raw_sec_y", []))
+
+        self.setup_graph_labels()
+        is_list_or_sweep = run_mode in ("LIST", "SWEEP")
+        plot_x = list(range(1, len(self.graph_x_data) + 1)) if is_list_or_sweep else self.graph_x_data
+        v.graph_display.clear_plots()
+        v.graph_display.update_plots(plot_x, self.graph_pri_y, self.graph_sec_y)
+
+        v.raw_table.set_mode(run_mode)
+        v.raw_table.update_headers(inputs.get("scpi_mode"))
+        v.raw_table.clear_table()
+        for row in results.get("raw_table_rows", []):
+            v.raw_table.append_row(row)
+
+        self.update_statistics_table()
+        self.update_session_lock()
+
+        self.last_measurement_time = meta.get("measurement_time")
+        self.last_measurement_time_iso = meta.get("measurement_time_iso")
+
+        self.log.info(f"📂 เปิดผลลัพธ์ที่บันทึกไว้: \"{meta.get('save_name', '-')}\" ({meta.get('measurement_time', '-')})")
+
+    @staticmethod
+    def _set_combo_by_data(combo, value):
+        """หา index ของ QComboBox ที่ userData ตรงกับ value ที่ระบุ แล้วเลือก index นั้น
+        (ใช้กับ combo ที่ผูก currentData ไว้ เช่น scpi_mode, run_mode, level_mode, imp_range)"""
+        if value is None:
+            return
+        idx = combo.findData(value)
+        if idx >= 0:
+            combo.setCurrentIndex(idx)

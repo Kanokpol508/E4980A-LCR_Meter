@@ -116,8 +116,9 @@ class MeasurementWorker(QThread):
             is_discarded = is_first_session and (round_idx < discard_single)
 
             lcr.wait_until_ready()
-            lcr.trigger()
-            pri, sec, stat = lcr.fetch_measurement()
+            # [แก้ไข] ใช้ trigger_and_fetch() แทน trigger()+fetch_measurement() แยกกัน
+            # ป้องกันบั๊ก response ค้างใน buffer ของเครื่อง (อ่านค่าเก่า+ใหม่ปนกัน)
+            pri, sec, stat = lcr.trigger_and_fetch()
 
             if is_discarded:
                 # วัดเพื่อทิ้ง — ไม่ emit data_ready
@@ -174,8 +175,8 @@ class MeasurementWorker(QThread):
                 if not self.is_running:
                     break
 
-                lcr.trigger()
-                pri, sec, stat = lcr.fetch_measurement()
+                # [แก้ไข] ใช้ trigger_and_fetch() แทน trigger()+fetch_measurement() แยกกัน
+                pri, sec, stat = lcr.trigger_and_fetch()
 
                 done_points += 1
                 percent = int((done_points / total_points) * 100)
@@ -271,8 +272,8 @@ class MeasurementWorker(QThread):
                 if not self.is_running:
                     break
 
-                lcr.trigger()
-                pri, sec, stat = lcr.fetch_measurement()
+                # [แก้ไข] ใช้ trigger_and_fetch() แทน trigger()+fetch_measurement() แยกกัน
+                pri, sec, stat = lcr.trigger_and_fetch()
 
                 done_points += 1
                 percent = int((done_points / total_points) * 100)

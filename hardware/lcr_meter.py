@@ -150,7 +150,7 @@ class E4980A:
             original_timeout = self.inst.timeout
             self.inst.timeout = 180000
 
-            # 1.1 ตั้งค่า Cable Length ให้ตรงกับสายวัดจริงก่อนทำ Correction เสมอ
+            # 1.1 [ใหม่] ตั้งค่า Cable Length ให้ตรงกับสายวัดจริงก่อนทำ Correction เสมอ
             if cable_text is not None:
                 self.set_cable_length(cable_text)
                 self.wait_until_ready()
@@ -282,7 +282,14 @@ class E4980A:
             self.inst.write(f":FUNCtion:IMPedance:RANGe {imp_range}")
 
     def trigger(self):
-        """บังคับ Trigger 1 ครั้ง"""
+        """บังคับ Trigger 1 ครั้ง (ไม่อ่านค่ากลับ)
+        [คำเตือน] ห้ามใช้ร่วมกับ fetch_measurement() แยกกันเป็นคนละคำสั่งเด็ดขาด!
+        ตามคู่มือ E4980A ระบุไว้ชัดเจนว่า "*TRG" ไม่ใช่ query command แต่ "คืนค่าผลวัดกลับมาเสมอ"
+        (เทียบเท่ากับ ":TRIG;:FETCh?") ถ้า write("*TRG") แล้วไม่อ่านค่าที่คืนมาทันที
+        ค่านั้นจะค้างอยู่ใน output buffer ของเครื่อง แล้วไปปนกับคำตอบของ query ครั้งถัดไป
+        ทำให้ได้ข้อมูลเพี้ยนแบบค่าเก่า+ใหม่ติดกัน (PARSE_ERROR ที่เห็นตัวเลขซ้ำกัน 2 ชุดติดกัน)
+        ให้ใช้ trigger_and_fetch() แทนเสมอสำหรับการวัดจริง — ฟังก์ชันนี้เก็บไว้เผื่อกรณีพิเศษเท่านั้น
+        """
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
         self.inst.write("*TRG")
@@ -290,41 +297,63 @@ class E4980A:
     # ==========================================
     # ระบบอ่านค่า (Measurement Methods)
     # ==========================================
+    def trigger_and_fetch(self):
+        """[แก้ไข] ทริกเกอร์ + อ่านค่าวัด ในคำสั่งเดียวแบบ atomic (แก้บั๊ก Buffer ค้าง)
+        ใช้ "*TRG" เป็น query โดยตรง (write แล้วอ่านค่ากลับทันที) ตามที่คู่มือระบุว่า
+        "*TRG" เทียบเท่ากับ ":TRIG;:FETCh?" — วิธีนี้ปลอดภัยกว่าการแยก trigger()+fetch_measurement()
+        เป็นคนละคำสั่ง เพราะไม่มีการค้างของ response ใน buffer ของเครื่องอีกต่อไป
+        นี่คือฟังก์ชันหลักที่ควรใช้ทุกครั้งตอนวัดจริง (แทนที่ trigger()+fetch_measurement() เดิม)
+        """
+        if not self.is_connected:
+            raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
+        try:
+            raw_data = self.inst.query("*TRG")
+            return self._parse_fetch_response(raw_data)
+        except pyvisa.errors.VisaIOError as e:
+            return None, None, f"TIMEOUT/IO_ERROR: {str(e)}"
+
     def fetch_measurement(self):
-        """สั่งทริกเกอร์และอ่านค่าวัด คืนค่าเป็น (primary, secondary, status)"""
+        """อ่านค่าวัดล่าสุดซ้ำอีกครั้งโดย "ไม่" trigger รอบใหม่ (":FETCh?" เฉยๆ)
+        ปกติควรใช้ trigger_and_fetch() แทนสำหรับการวัดจริงทุกกรณี
+        ฟังก์ชันนี้เก็บไว้เผื่อกรณีต้องการอ่านค่าเดิมซ้ำโดยไม่สั่งวัดใหม่เท่านั้น
+        """
         if not self.is_connected:
             raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
 
         try:
             raw_data = self.inst.query(":FETCh?")
-            parts = raw_data.strip().split(',')
-
-            # รองรับ 3 ค่า (ตอนปิด Comparator) หรือ 4 ค่า (ตอนเปิด Comparator)
-            if len(parts) not in [3, 4]:
-                return None, None, f"PARSE_ERROR: ข้อมูลผิดรูปแบบ ({raw_data})"
-
-            primary   = float(parts[0])
-            secondary = float(parts[1])
-            status    = int(float(parts[2]))
-
-            # ตรวจสอบ Status โค้ดตามคู่มือ
-            if status == -1:
-                return None, None, "NO_DATA"
-            elif status == 1:
-                return None, None, "OVERLOAD"
-            elif status == 3:
-                return None, None, "SIGNAL_SOURCE_OVERLOAD"
-            elif status == 4:
-                return None, None, "ALC_FAIL"
-            elif status != 0:
-                return None, None, f"UNKNOWN_ERROR_CODE_{status}"
-
-            # ดักจับ Overload ทั้งบวก (+9.9e37) และลบ (-9.9e37)
-            # กรณีลบเกิดเมื่อวัด C/L ที่ขาดหรือช็อตแบบมีขั้ว
-            if abs(primary) >= self.OVERLOAD_LIMIT or abs(secondary) >= self.OVERLOAD_LIMIT:
-                return None, None, "OVERLOAD"
-
-            return primary, secondary, "SUCCESS"
-
+            return self._parse_fetch_response(raw_data)
         except pyvisa.errors.VisaIOError as e:
             return None, None, f"TIMEOUT/IO_ERROR: {str(e)}"
+
+    def _parse_fetch_response(self, raw_data: str):
+        """[NEW] แยก logic การแปลงผลลัพธ์ดิบจากเครื่อง (ใช้ร่วมกันทั้ง trigger_and_fetch()
+        และ fetch_measurement() กันโค้ดซ้ำ) คืนค่าเป็น (primary, secondary, status)"""
+        parts = raw_data.strip().split(',')
+
+        # รองรับ 3 ค่า (ตอนปิด Comparator) หรือ 4 ค่า (ตอนเปิด Comparator)
+        if len(parts) not in [3, 4]:
+            return None, None, f"PARSE_ERROR: ข้อมูลผิดรูปแบบ ({raw_data})"
+
+        primary   = float(parts[0])
+        secondary = float(parts[1])
+        status    = int(float(parts[2]))
+
+        # ตรวจสอบ Status โค้ดตามคู่มือ
+        if status == -1:
+            return None, None, "NO_DATA"
+        elif status == 1:
+            return None, None, "OVERLOAD"
+        elif status == 3:
+            return None, None, "SIGNAL_SOURCE_OVERLOAD"
+        elif status == 4:
+            return None, None, "ALC_FAIL"
+        elif status != 0:
+            return None, None, f"UNKNOWN_ERROR_CODE_{status}"
+
+        # ดักจับ Overload ทั้งบวก (+9.9e37) และลบ (-9.9e37)
+        # กรณีลบเกิดเมื่อวัด C/L ที่ขาดหรือช็อตแบบมีขั้ว
+        if abs(primary) >= self.OVERLOAD_LIMIT or abs(secondary) >= self.OVERLOAD_LIMIT:
+            return None, None, "OVERLOAD"
+
+        return primary, secondary, "SUCCESS"

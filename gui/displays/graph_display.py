@@ -23,6 +23,11 @@ class GraphDisplay(QWidget):
         self.plot_primary.getViewBox().enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
         self.plot_primary.getViewBox().setLimits(xMin=0) # ล็อคไม่ให้เลื่อนซ้ายทะลุเลข 0 ไปติดลบ
         self.plot_primary.setXRange(0, 10)               # เปิดโปรแกรมมาให้โชว์สเกล 0 ถึง 10
+        # [แก้ไข] ตั้งค่าเริ่มต้นแกน Y ด้วย ป้องกัน pyqtgraph คำนวณขอบเขตเป็น NaN
+        # ตอนยังไม่มีข้อมูล (กราฟว่าง) แล้วผู้ใช้ scroll/ลากกราฟ จะ throw
+        # "Cannot set range [nan, nan]" รัวๆ — พอมีข้อมูลจริงเข้ามา autoRange() ใน
+        # update_plots() จะปรับสเกลให้เข้ากับข้อมูลอัตโนมัติตามเดิมอยู่แล้ว
+        self.plot_primary.setYRange(0, 1)
         self.curve_primary = self.plot_primary.plot(pen=pg.mkPen('#0066CC', width=2), symbol='o', symbolSize=6, symbolBrush='#0066CC')
         self._style_axes_dark(self.plot_primary)
         
@@ -44,6 +49,8 @@ class GraphDisplay(QWidget):
         self.plot_secondary.getViewBox().enableAutoRange(axis=pg.ViewBox.XYAxes, enable=True)
         self.plot_secondary.getViewBox().setLimits(xMin=0) # ล็อคไม่ให้เลื่อนซ้ายทะลุเลข 0 ไปติดลบ
         self.plot_secondary.setXRange(0, 10)               # เปิดโปรแกรมมาให้โชว์สเกล 0 ถึง 10
+        # [แก้ไข] ตั้งค่าเริ่มต้นแกน Y ด้วย เหตุผลเดียวกับกราฟ Primary ด้านบน
+        self.plot_secondary.setYRange(0, 1)
         self.curve_secondary = self.plot_secondary.plot(pen=pg.mkPen('#CC0066', width=2), symbol='o', symbolSize=6, symbolBrush='#CC0066')
         self._style_axes_dark(self.plot_secondary)
         
@@ -91,3 +98,6 @@ class GraphDisplay(QWidget):
         # รีเซ็ตกราฟกลับไปที่ระยะ 0-10 เหมือนตอนเปิดโปรแกรมใหม่
         self.plot_primary.setXRange(0, 10)
         self.plot_secondary.setXRange(0, 10)
+        # [แก้ไข] รีเซ็ตแกน Y ด้วย ป้องกัน NaN range เหมือนตอนเปิดโปรแกรม (ดู __init__)
+        self.plot_primary.setYRange(0, 1)
+        self.plot_secondary.setYRange(0, 1)

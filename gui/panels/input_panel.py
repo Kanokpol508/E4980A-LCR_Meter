@@ -250,7 +250,7 @@ class FrequencyListWidget(QWidget):
         return ",".join(str(f) for f in self.get_frequencies())
 
     def set_frequencies(self, freqs: list):
-        """[NEW] ตั้งค่ารายการความถี่ทั้งหมดใหม่ (ใช้ตอน Open Save เพื่อคืนค่า Input เดิม)
+        """ตั้งค่ารายการความถี่ทั้งหมดใหม่ (ใช้ตอน Open Save เพื่อคืนค่า Input เดิม)
         ปรับจำนวนแถวให้เท่ากับ freqs ที่ส่งเข้ามาโดยอัตโนมัติ (เพิ่ม/ลบแถวให้พอดี)
         แล้วค่อยใส่ค่าแต่ละแถว ก่อนแจ้งเตือน freq_changed ให้ validate อีกครั้ง"""
         freqs = [f for f in (freqs or [])]

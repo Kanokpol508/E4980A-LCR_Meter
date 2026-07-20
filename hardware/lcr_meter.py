@@ -26,7 +26,17 @@ class E4980A:
     # ระบบเชื่อมต่อ (Connection Management)
     # ==========================================
     def connect(self, resource_address):
-        """เชื่อมต่อกับเครื่อง LCR Meter"""
+        """เชื่อมต่อกับเครื่อง LCR Meter
+        [แก้ไข] เพิ่ม guard: ถ้ามี session ค้างอยู่ (เช่น เคย connect() ไว้แล้วไม่ได้ disconnect())
+        ให้ปิดของเก่าทิ้งก่อนเปิดใหม่เสมอ ป้องกัน VISA resource leak ตอนใช้ instance เดียวซ้ำหลายรอบ
+        """
+        if self.is_connected and self.inst:
+            try:
+                self.inst.close()
+            except Exception:
+                pass
+            self.is_connected = False
+
         try:
             self.inst = self.rm.open_resource(resource_address)
             self.inst.timeout = 5000                # ค่า timeout เริ่มต้น (ms) — จะถูกปรับโดย set_measurement_timeout() ก่อนวัดจริง
@@ -140,7 +150,7 @@ class E4980A:
             original_timeout = self.inst.timeout
             self.inst.timeout = 180000
 
-            # 1.1 [ใหม่] ตั้งค่า Cable Length ให้ตรงกับสายวัดจริงก่อนทำ Correction เสมอ
+            # 1.1 ตั้งค่า Cable Length ให้ตรงกับสายวัดจริงก่อนทำ Correction เสมอ
             if cable_text is not None:
                 self.set_cable_length(cable_text)
                 self.wait_until_ready()

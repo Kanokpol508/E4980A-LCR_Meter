@@ -28,6 +28,10 @@ def main():
     # 4. สร้าง Controller แล้วมอบหมายให้เข้าไปควบคุมหน้าต่าง (Controller -> View)
     controller = AppController(window)
     
+    # ตัดการเชื่อมต่อเครื่อง LCR Meter ให้เรียบร้อยก่อนโปรแกรมปิด
+    # ป้องกัน VISA session ค้างที่เครื่องหลังปิดโปรแกรมกะทันหัน
+    app.aboutToQuit.connect(lambda: controller.lcr.disconnect() if controller.lcr.is_connected else None)
+
     # 5. แสดงหน้าจอและรันโปรแกรม
     window.showMaximized()
     sys.exit(app.exec())

@@ -7,9 +7,10 @@ class VerifyWorker(QThread):
     # ส่งสัญญาณกลับเมื่อเสร็จ: (สำเร็จทั้งหมดหรือไม่, List ของผลลัพธ์ตาราง, ข้อความ Error รวม)
     finished_signal = pyqtSignal(bool, list, str)
 
-    def __init__(self, visa_address: str, settings: dict):
+    def __init__(self, lcr, settings: dict):
         super().__init__()
-        self.visa_address = visa_address
+        # [แก้ไข] รับ instance ที่เชื่อมต่อไว้แล้วจากปุ่ม Connect แทนที่จะเปิด Connection ใหม่เอง
+        self.lcr = lcr
         self.settings = settings
         self.TOLERANCE = 0.001          # 0.1%
 
@@ -25,15 +26,14 @@ class VerifyWorker(QThread):
             return False
 
     def run(self):
-        lcr = E4980A()
+        lcr = self.lcr
         results = []
         all_passed = True
         error_msg = ""
 
         try:
-            success, msg = lcr.connect(self.visa_address)
-            if not success:
-                self.finished_signal.emit(False, [], f"เชื่อมต่อล้มเหลว: {msg}")
+            if not lcr.is_connected:
+                self.finished_signal.emit(False, [], "ยังไม่ได้เชื่อมต่อเครื่องมือวัด — กรุณากด CONNECT ก่อน")
                 return
 
             inst = lcr.inst
@@ -126,4 +126,5 @@ class VerifyWorker(QThread):
             self.finished_signal.emit(False, [], f"เกิดข้อผิดพลาดในการตรวจสอบ: {str(e)}")
             
         finally:
-            lcr.disconnect()
+            # [แก้ไข] ไม่ disconnect() ที่นี่แล้ว — Connection ถูกจัดการโดยปุ่ม Connect/Disconnect ที่ผู้ใช้กดเอง
+            pass

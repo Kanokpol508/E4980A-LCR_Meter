@@ -27,6 +27,11 @@ class AppController(QObject):
         self.progress_dialog = None
         self.current_corr_type = None
 
+        # Instance เดียวที่ถือ Connection ค้างไว้ตลอด session (ใช้ร่วมกับปุ่ม Connect/Disconnect)
+        # Worker แต่ละตัว (Measurement/Correction/Verify) จะใช้ instance นี้ร่วมกัน
+        # แทนที่จะเปิด-ปิด VISA session ใหม่ทุกครั้งที่กดปุ่ม
+        self.lcr = E4980A()
+
         # ตัวแปรสำหรับเก็บข้อมูลวาดกราฟ (ค่าดิบเสมอ)
         self.graph_x_data = []
         self.graph_pri_y = []
@@ -36,7 +41,7 @@ class AppController(QObject):
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
 
-        # [NEW] เวลาที่วัดเสร็จล่าสุด (ใช้เป็นเวลา Save จริงๆ ไม่ใช่เวลาที่กดปุ่ม Save)
+        # เวลาที่วัดเสร็จล่าสุด (ใช้เป็นเวลา Save จริงๆ ไม่ใช่เวลาที่กดปุ่ม Save)
         self.last_measurement_time = None
         self.last_measurement_time_iso = None
 
@@ -87,7 +92,11 @@ class AppController(QObject):
         v.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
-        # [NEW] ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก Vrms เป็น Arms ให้ไปปรับเพดานตัวเลขทันที
+        # ปุ่ม Connect / Disconnect
+        v.conn_panel.btn_connect.clicked.connect(self.handle_connect)
+        v.conn_panel.btn_disconnect.clicked.connect(self.handle_disconnect)
+
+        # ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก Vrms เป็น Arms ให้ไปปรับเพดานตัวเลขทันที
         v.input_panel.combo_level_mode.currentIndexChanged.connect(self.update_hardware_limits)
 
         # PPM Reference: เปิด/ปิด checkbox และ validate ค่า Ref ที่กรอก
@@ -106,7 +115,7 @@ class AppController(QObject):
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
 
-        # [NEW] ระบบ Save / View Save Result — ใช้ปุ่มเดิมที่อยู่ข้าง Measurement Result (lcd_display)
+        # ระบบ Save / View Save Result — ใช้ปุ่มเดิมที่อยู่ข้าง Measurement Result (lcd_display)
         v.lcd_display.btn_save.clicked.connect(self.handle_save_result)
         v.lcd_display.btn_view.clicked.connect(self.handle_view_save_result)
 
@@ -242,8 +251,12 @@ class AppController(QObject):
         v = self.view
 
         # --- Connection Panel ---
-        v.conn_panel.combo_visa.setEnabled(not locked)
-        v.conn_panel.btn_refresh.setEnabled(not locked)
+        # [แก้ไข] ตอน lock (กำลังวัด/Correction/Verify) ต้องล็อกปุ่ม Connect/Disconnect ด้วย
+        # เพื่อป้องกันผู้ใช้ตัดการเชื่อมต่อกลางคัน — ตอนปลดล็อกค่อยคืนสถานะตาม self.lcr.is_connected จริง
+        v.conn_panel.btn_connect.setEnabled(not locked and not self.lcr.is_connected)
+        v.conn_panel.btn_disconnect.setEnabled(not locked and self.lcr.is_connected)
+        v.conn_panel.combo_visa.setEnabled(not locked and not self.lcr.is_connected)
+        v.conn_panel.btn_refresh.setEnabled(not locked and not self.lcr.is_connected)
 
         # --- Input Panel (ทุก group) ---
         # ล็อก group ระดับบนด้วย setEnabled ครอบคลุมทุก widget ใน group นั้นทันที
@@ -275,9 +288,8 @@ class AppController(QObject):
 
     def handle_verify_apply(self):
         v = self.view
-        visa_address = v.conn_panel.combo_visa.currentText()
-        if not visa_address or visa_address == "No Device Found":
-            QMessageBox.warning(v, "ตรวจสอบล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการตรวจสอบการตั้งค่า")
+        if not self.lcr.is_connected:
+            QMessageBox.warning(v, "ตรวจสอบล้มเหลว", "กรุณากด CONNECT เพื่อเชื่อมต่อเครื่อง LCR Meter ก่อนทำการตรวจสอบการตั้งค่า")
             return
 
         # [จุดที่ 4] Verify & Apply ส่งความถี่จาก input_freq (Single Point) เสมอ
@@ -301,7 +313,7 @@ class AppController(QObject):
                 return
 
         settings = {
-            'visa_resource': visa_address,
+            'visa_resource': v.conn_panel.combo_visa.currentText(),
             'freq': v.input_panel.input_freq.value(),
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
@@ -324,7 +336,7 @@ class AppController(QObject):
         self.progress_dialog.show()
 
         from core.verify_thread import VerifyWorker
-        self.verify_worker = VerifyWorker(visa_address, settings)
+        self.verify_worker = VerifyWorker(self.lcr, settings)
         self.verify_worker.finished_signal.connect(self.handle_verify_finished)
         self.verify_worker.start()
 
@@ -348,9 +360,8 @@ class AppController(QObject):
 
     def start_correction(self, corr_type: str):
         v = self.view
-        visa_address = v.conn_panel.combo_visa.currentText()
-        if not visa_address or visa_address == "No Device Found":
-            QMessageBox.warning(v, "เชื่อมต่อล้มเหลว", "กรุณาเชื่อมต่อเครื่อง LCR Meter ก่อนทำการชดเชยค่า")
+        if not self.lcr.is_connected:
+            QMessageBox.warning(v, "เชื่อมต่อล้มเหลว", "กรุณากด CONNECT เพื่อเชื่อมต่อเครื่อง LCR Meter ก่อนทำการชดเชยค่า")
             return
 
         msg = ("กรุณาแยกสายวัดออกจากกัน (ปลดชิ้นงานออก)" if corr_type == "OPEN"
@@ -381,7 +392,7 @@ class AppController(QObject):
 
         # [แก้ไข] ส่งค่า Cable Length ปัจจุบันจาก GUI ไปด้วย เพื่อตั้งที่เครื่องก่อนทำ Correction เสมอ
         cable_text = v.input_panel.combo_cable.currentText()
-        self.corr_worker = CorrectionWorker(visa_address, corr_type, cable_text)
+        self.corr_worker = CorrectionWorker(self.lcr, corr_type, cable_text)
         self.corr_worker.finished_signal.connect(self.handle_correction_finished)
         self.corr_worker.start()
 
@@ -593,7 +604,7 @@ class AppController(QObject):
             'imp_range': v.input_panel.combo_range.currentData(),
         }
 
-        self.worker = MeasurementWorker(settings)
+        self.worker = MeasurementWorker(self.lcr, settings)
         self.worker.data_ready.connect(self.handle_data_ready)
         self.worker.error_occurred.connect(self.handle_worker_error)
         self.worker.progress_updated.connect(self.handle_progress_update)
@@ -635,7 +646,7 @@ class AppController(QObject):
         # 1. ค่าดิบจากฮาร์ดแวร์
         raw_pri = data.get('primary', 0.0)
         raw_sec = data.get('secondary', 0.0)
-        status  = data.get('status', 'SUCCESS')  # [NEW] รับค่า status ที่มาจาก Thread
+        status  = data.get('status', 'SUCCESS')  #รับค่า status ที่มาจาก Thread
 
         # เก็บค่าดิบลง Array ไว้คำนวณ Type A Uncertainty
         self.graph_raw_pri_y.append(raw_pri)
@@ -778,7 +789,7 @@ class AppController(QObject):
         self.set_ui_locked(False)
         self.worker = None
 
-        # [NEW] จำเวลาที่วัดเสร็จไว้ ณ ตอนนี้ — นี่คือเวลาที่จะใช้ตอน Save Result จริงๆ
+        # จำเวลาที่วัดเสร็จไว้ ณ ตอนนี้ — นี่คือเวลาที่จะใช้ตอน Save Result จริงๆ
         # (ไม่ใช่เวลาที่ผู้ใช้กดปุ่ม Save Result ซึ่งอาจกดทีหลังก็ได้)
         self.last_measurement_time_iso = time.strftime("%Y-%m-%d %H:%M:%S")
         self.last_measurement_time = time.strftime("%d/%m/%Y %H:%M:%S")
@@ -793,7 +804,7 @@ class AppController(QObject):
         self.view.freq_summary_graph.clear()
         self.view.ppm_summary_graph.clear()
         self.view.stats_table.clear_table()
-        self.view.raw_table.clear_table()  # [NEW] ล้างตารางข้อมูลดิบด้วย
+        self.view.raw_table.clear_table()
         self.log.info("🗑 ล้างข้อมูลกราฟและตารางสถิติเรียบร้อย")
         self.update_session_lock()
 
@@ -835,9 +846,48 @@ class AppController(QObject):
         self.validate_freq_list()
 
     def validate_visa(self):
-        text = self.view.conn_panel.combo_visa.currentText()
-        self.is_visa_error = (text == "No Device Found" or text.strip() == "")
+        """[แก้ไข] ปุ่ม Start ต้องรอ 'เชื่อมต่อจริง' (self.lcr.is_connected) ไม่ใช่แค่มีรายการใน Dropdown
+        ฟังก์ชันนี้ยังคงเรียกตอนเปลี่ยน Dropdown เพื่อ refresh สถานะปุ่ม Connect เท่านั้น"""
+        self.is_visa_error = not self.lcr.is_connected
         self.update_start_button_state()
+
+    def handle_connect(self):
+        """[NEW] เชื่อมต่อกับเครื่อง LCR Meter ค้างไว้ (ใช้ instance เดียวตลอด session)"""
+        v = self.view
+        visa_address = v.conn_panel.combo_visa.currentText()
+
+        if not visa_address or visa_address == "No Device Found":
+            QMessageBox.warning(v, "เชื่อมต่อล้มเหลว", "ไม่พบ VISA Resource ที่ถูกต้อง กรุณากด REFRESH แล้วเลือกพอร์ตก่อน")
+            return
+
+        if self.lcr.is_connected:
+            return  # ป้องกันกดซ้ำ (ปกติปุ่มจะถูก disable อยู่แล้ว)
+
+        self.log.info(f"🔌 กำลังเชื่อมต่อ {visa_address} ...")
+        success, msg = self.lcr.connect(visa_address)
+
+        if success:
+            v.conn_panel.set_connected_ui(True, visa_address)
+            self.log.info(f"✅ เชื่อมต่อสำเร็จ: {msg}")
+        else:
+            v.conn_panel.set_connected_ui(False)
+            self.log.error(f"❌ เชื่อมต่อล้มเหลว: {msg}")
+            QMessageBox.critical(v, "เชื่อมต่อล้มเหลว", msg)
+
+        self.validate_visa()
+
+    def handle_disconnect(self):
+        """[NEW] ตัดการเชื่อมต่อกับเครื่อง LCR Meter"""
+        v = self.view
+
+        if self.worker is not None or self.corr_worker is not None or self.verify_worker is not None:
+            QMessageBox.warning(v, "กำลังทำงานอยู่", "กรุณารอให้การวัด/Correction/Verify ปัจจุบันเสร็จสิ้นก่อน แล้วค่อย Disconnect")
+            return
+
+        self.lcr.disconnect()
+        v.conn_panel.set_connected_ui(False)
+        self.log.info("🔌 ตัดการเชื่อมต่อเครื่อง LCR Meter เรียบร้อยแล้ว")
+        self.validate_visa()
 
     def update_scpi_modes(self):
         self.view.input_panel.combo_scpi_mode.clear()

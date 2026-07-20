@@ -44,7 +44,7 @@ class ControlPanel(QWidget):
         grid_run.addWidget(self.btn_stop, 1, 1)
 
         # Label แจ้งเตือนข้อผิดพลาด
-        self.lbl_warn_visa = QLabel("⚠️ กรุณาเลือกเครื่องมือวัด (VISA)")
+        self.lbl_warn_visa = QLabel("⚠️ กรุณากด CONNECT เพื่อเชื่อมต่อเครื่องมือวัดก่อน")
         self.lbl_warn_dev_start = QLabel("⚠️ ต้องกรอก Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่า")
         self.lbl_warn_freqlist_start = QLabel("⚠️ กรุณากรอกรายการความถี่ (Frequency List) ก่อนเริ่มวัด")
 

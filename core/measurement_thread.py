@@ -10,25 +10,18 @@ class MeasurementWorker(QThread):
     progress_updated = pyqtSignal(int)      # ส่งเลขเปอร์เซ็นต์
     finished         = pyqtSignal()         # ส่งสัญญาณจบการทำงาน
 
-    def __init__(self, settings: dict):
+    def __init__(self, lcr, settings: dict):
         super().__init__()
+        self.lcr        = lcr          # [แก้ไข] instance ที่เชื่อมต่อไว้แล้วจากปุ่ม Connect (ไม่ปิดเองตอนจบ)
         self.settings   = settings
         self.is_running = True
 
     def run(self):
         """ลอจิกหลักที่ทำงานใน Thread เบื้องหลัง"""
-        lcr = None
+        lcr = self.lcr
         try:
-            visa_address = self.settings.get('visa_resource')
-            if not visa_address or visa_address == "No Device Found":
-                raise ConnectionError("ไม่พบที่อยู่ VISA Resource ที่ถูกต้อง")
-
-            # 1. สร้าง Object และเชื่อมต่อฮาร์ดแวร์
-            lcr = E4980A()
-            success, msg = lcr.connect(visa_address)
-
-            if not success:
-                raise ConnectionError(f"เชื่อมต่อเครื่องล้มเหลว: {msg}")
+            if not lcr.is_connected:
+                raise ConnectionError("ยังไม่ได้เชื่อมต่อเครื่องมือวัด — กรุณากด CONNECT ก่อนเริ่มวัด")
 
             # ========================================================
             # 2. ตั้งค่าเครื่องมือวัดก่อนเริ่มการวัด (Hardware Setup)
@@ -83,11 +76,8 @@ class MeasurementWorker(QThread):
         except Exception as e:
             self.error_occurred.emit(f"Hardware Error:\n{str(e)}")
         finally:
-            if lcr:
-                try:
-                    lcr.disconnect()
-                except:
-                    pass
+            # [แก้ไข] ไม่ disconnect() ที่นี่แล้ว — Connection ถูกจัดการโดยปุ่ม Connect/Disconnect
+            # ที่ผู้ใช้กดเอง ไม่ใช่เปิด-ปิดทุกครั้งที่วัดเสร็จเหมือนก่อนหน้านี้
             self.finished.emit()
 
     def _handle_hardware_status(self, stat: str, current_freq: float = None):

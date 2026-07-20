@@ -402,7 +402,12 @@ class FreqSummaryGraph(QWidget):
                 self.legend.addItem(self.curve_pri, pri_legend_name)
             if self.chk_error_bar.isChecked():
                 sds = np.array(self._pri_sd, dtype=float)
-                self.errbar_pri.setData(x=plot_x, y=means, height=sds * 2)
+                # [แก้ไข] ErrorBarItem ถูกเพิ่มด้วย addItem() ไม่ใช่ plot() จึงไม่อยู่ใน
+                # รายการ items ที่ setLogMode() ของ PlotItem จะแจ้งเตือน/ทำ log10 ให้อัตโนมัติ
+                # เหมือน PlotDataItem (เส้นกราฟ) — ต้องป้อนตำแหน่ง x ที่ log10 มาแล้วเอง
+                # (label_x) ไม่งั้น ViewBox จะตีความค่าความถี่ดิบเป็นพิกัด log-space ตรงๆ
+                # ทำให้ผิดเพี้ยนมหาศาล (แกนโชว์ตัวคูณ x1e+27 อย่างที่เจอ)
+                self.errbar_pri.setData(x=label_x, y=means, height=sds * 2)
                 self.errbar_pri.setVisible(True)
             else:
                 self.errbar_pri.setVisible(False)
@@ -425,7 +430,8 @@ class FreqSummaryGraph(QWidget):
                 self.legend.addItem(self.curve_sec, sec_legend_name)
             if self.chk_error_bar.isChecked():
                 sds = np.array(self._sec_sd, dtype=float)
-                self.errbar_sec.setData(x=plot_x, y=means, height=sds * 2)
+                # [แก้ไข] เหตุผลเดียวกับ errbar_pri ด้านบน — ต้องใช้ label_x (log10 แล้ว)
+                self.errbar_sec.setData(x=label_x, y=means, height=sds * 2)
                 self.errbar_sec.setVisible(True)
             else:
                 self.errbar_sec.setVisible(False)

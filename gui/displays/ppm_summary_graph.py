@@ -422,7 +422,9 @@ class PpmSummaryGraph(QWidget):
                 self.legend.addItem(self.curve_pri, pri_legend_name)
             if self.chk_error_bar.isChecked():
                 ey = np.array(pri_ey, dtype=float)
-                self.errbar_pri.setData(x=raw_fx, y=vy, height=ey * 2)
+                # [แก้ไข] ErrorBarItem ไม่อยู่ใน pipeline auto-log ของ setLogMode() (เพิ่มด้วย
+                # addItem() ไม่ใช่ plot()) ต้องป้อน x ที่ log10 มาแล้วเอง (label_fx) เสมอ
+                self.errbar_pri.setData(x=label_fx, y=vy, height=ey * 2)
                 self.errbar_pri.setVisible(True)
             else:
                 self.errbar_pri.setVisible(False)
@@ -447,7 +449,8 @@ class PpmSummaryGraph(QWidget):
                 self.legend.addItem(self.curve_sec, sec_legend_name)
             if self.chk_error_bar.isChecked():
                 ey = np.array(sec_ey, dtype=float)
-                self.errbar_sec.setData(x=raw_fx, y=vy, height=ey * 2)
+                # [แก้ไข] เหตุผลเดียวกับ errbar_pri ด้านบน
+                self.errbar_sec.setData(x=label_fx, y=vy, height=ey * 2)
                 self.errbar_sec.setVisible(True)
             else:
                 self.errbar_sec.setVisible(False)

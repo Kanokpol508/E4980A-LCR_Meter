@@ -424,7 +424,7 @@ class PpmSummaryGraph(QWidget):
                 self.errbar_pri.setVisible(False)
             if self.chk_data_labels.isChecked():
                 for x, y in zip(fx, vy):
-                    t = pg.TextItem(f'{y:.4g}', color='#0a3d91', anchor=(0.5, 1.2))
+                    t = pg.TextItem(f'{y:+.2f}', color='#0a3d91', anchor=(0.5, 1.2))
                     t.setPos(x, y)
                     self.plot_widget.addItem(t)
                     self._data_label_items.append(t)
@@ -448,7 +448,7 @@ class PpmSummaryGraph(QWidget):
                 self.errbar_sec.setVisible(False)
             if self.chk_data_labels.isChecked():
                 for x, y in zip(fx, vy):
-                    t = pg.TextItem(f'{y:.4g}', color='#8f0050', anchor=(0.5, -0.2))
+                    t = pg.TextItem(f'{y:+.2f}', color='#8f0050', anchor=(0.5, -0.2))
                     t.setPos(x, y)
                     self.plot_widget.addItem(t)
                     self._data_label_items.append(t)

@@ -373,7 +373,16 @@ class FreqSummaryGraph(QWidget):
         is_log = (self.combo_x_scale.currentText().lower() == 'log')
 
         freqs = np.array(self._freqs, dtype=float) if self._freqs else np.array([])
-        plot_x = np.log10(freqs) if (is_log and len(freqs)) else freqs
+        # [แก้ไข] บั๊ก Log Scale ผิดเพี้ยน: pyqtgraph's PlotDataItem (เส้นกราฟ/error bar) จะทำ
+        # log10() ให้กับข้อมูลที่ป้อนเข้าไป "อัตโนมัติ" อยู่แล้วเมื่อ setLogMode(x=True) เปิดอยู่
+        # โค้ดเดิม log10(freqs) เองก่อนป้อนเข้า setData() ทำให้โดน log10 ซ้ำสอง
+        # (กลายเป็น log10(log10(f)) ตำแหน่งจุดเลยหดมารวมกันแคบๆ แถว x=2-3 ผิดตำแหน่งจริง)
+        # ต้องป้อนความถี่ "ดิบ" ให้ PlotDataItem เสมอ ปล่อยให้มันทำ log10 เอง
+        #
+        # ส่วน TextItem (Data Labels) ไม่ได้อยู่ใน pipeline auto-log ของ PlotDataItem
+        # (แค่ setPos ธรรมดา) จึงยังต้องคำนวณตำแหน่ง x เป็น log10(freq) เองอยู่เหมือนเดิม
+        plot_x = freqs
+        label_x = np.log10(freqs) if (is_log and len(freqs)) else freqs
 
         show_pri = self.chk_plot_pri.isChecked() and len(freqs) > 0
         show_sec = self.chk_plot_sec.isChecked() and len(freqs) > 0
@@ -398,7 +407,7 @@ class FreqSummaryGraph(QWidget):
             else:
                 self.errbar_pri.setVisible(False)
             if self.chk_data_labels.isChecked():
-                for x, y in zip(plot_x, means):
+                for x, y in zip(label_x, means):
                     t = pg.TextItem(f'{y:.5e}', color='#0a3d91', anchor=(0.5, 1.2))
                     t.setPos(x, y)
                     self.plot_widget.addItem(t)
@@ -421,7 +430,7 @@ class FreqSummaryGraph(QWidget):
             else:
                 self.errbar_sec.setVisible(False)
             if self.chk_data_labels.isChecked():
-                for x, y in zip(plot_x, means):
+                for x, y in zip(label_x, means):
                     t = pg.TextItem(f'{y:.5e}', color='#8f0050', anchor=(0.5, -0.2))
                     t.setPos(x, y)
                     self.plot_widget.addItem(t)

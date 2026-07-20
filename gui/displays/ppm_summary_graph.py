@@ -410,20 +410,24 @@ class PpmSummaryGraph(QWidget):
 
         # ---- Primary ----
         if show_pri:
-            fx = np.log10(np.array(pri_fx, dtype=float)) if is_log else np.array(pri_fx, dtype=float)
+            # [แก้ไข] เหตุผลเดียวกับ freq_summary_graph.py — PlotDataItem ทำ log10 อัตโนมัติ
+            # เองอยู่แล้วเมื่อ setLogMode(x=True) ต้องป้อนความถี่ดิบเข้า setData()
+            # ส่วน TextItem (Data Labels) ต้องคำนวณ log10 เองเพราะไม่อยู่ใน auto-log pipeline
+            raw_fx = np.array(pri_fx, dtype=float)
+            label_fx = np.log10(raw_fx) if is_log else raw_fx
             vy = np.array(pri_vy, dtype=float)
-            self.curve_pri.setData(fx, vy)
+            self.curve_pri.setData(raw_fx, vy)
             self.curve_pri.setVisible(True)
             if self.chk_show_legend.isChecked():
                 self.legend.addItem(self.curve_pri, pri_legend_name)
             if self.chk_error_bar.isChecked():
                 ey = np.array(pri_ey, dtype=float)
-                self.errbar_pri.setData(x=fx, y=vy, height=ey * 2)
+                self.errbar_pri.setData(x=raw_fx, y=vy, height=ey * 2)
                 self.errbar_pri.setVisible(True)
             else:
                 self.errbar_pri.setVisible(False)
             if self.chk_data_labels.isChecked():
-                for x, y in zip(fx, vy):
+                for x, y in zip(label_fx, vy):
                     t = pg.TextItem(f'{y:+.2f}', color='#0a3d91', anchor=(0.5, 1.2))
                     t.setPos(x, y)
                     self.plot_widget.addItem(t)
@@ -434,20 +438,21 @@ class PpmSummaryGraph(QWidget):
 
         # ---- Secondary ----
         if show_sec:
-            fx = np.log10(np.array(sec_fx, dtype=float)) if is_log else np.array(sec_fx, dtype=float)
+            raw_fx = np.array(sec_fx, dtype=float)
+            label_fx = np.log10(raw_fx) if is_log else raw_fx
             vy = np.array(sec_vy, dtype=float)
-            self.curve_sec.setData(fx, vy)
+            self.curve_sec.setData(raw_fx, vy)
             self.curve_sec.setVisible(True)
             if self.chk_show_legend.isChecked():
                 self.legend.addItem(self.curve_sec, sec_legend_name)
             if self.chk_error_bar.isChecked():
                 ey = np.array(sec_ey, dtype=float)
-                self.errbar_sec.setData(x=fx, y=vy, height=ey * 2)
+                self.errbar_sec.setData(x=raw_fx, y=vy, height=ey * 2)
                 self.errbar_sec.setVisible(True)
             else:
                 self.errbar_sec.setVisible(False)
             if self.chk_data_labels.isChecked():
-                for x, y in zip(fx, vy):
+                for x, y in zip(label_fx, vy):
                     t = pg.TextItem(f'{y:+.2f}', color='#8f0050', anchor=(0.5, -0.2))
                     t.setPos(x, y)
                     self.plot_widget.addItem(t)

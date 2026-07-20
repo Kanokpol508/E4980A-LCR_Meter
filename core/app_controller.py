@@ -27,7 +27,7 @@ class AppController(QObject):
         self.progress_dialog = None
         self.current_corr_type = None
 
-        # Instance เดียวที่ถือ Connection ค้างไว้ตลอด session (ใช้ร่วมกับปุ่ม Connect/Disconnect)
+        # [NEW] Instance เดียวที่ถือ Connection ค้างไว้ตลอด session (ใช้ร่วมกับปุ่ม Connect/Disconnect)
         # Worker แต่ละตัว (Measurement/Correction/Verify) จะใช้ instance นี้ร่วมกัน
         # แทนที่จะเปิด-ปิด VISA session ใหม่ทุกครั้งที่กดปุ่ม
         self.lcr = E4980A()
@@ -41,7 +41,7 @@ class AppController(QObject):
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
 
-        # เวลาที่วัดเสร็จล่าสุด (ใช้เป็นเวลา Save จริงๆ ไม่ใช่เวลาที่กดปุ่ม Save)
+        # [NEW] เวลาที่วัดเสร็จล่าสุด (ใช้เป็นเวลา Save จริงๆ ไม่ใช่เวลาที่กดปุ่ม Save)
         self.last_measurement_time = None
         self.last_measurement_time_iso = None
 
@@ -92,11 +92,11 @@ class AppController(QObject):
         v.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
-        # ปุ่ม Connect / Disconnect
+        # [NEW] ปุ่ม Connect / Disconnect
         v.conn_panel.btn_connect.clicked.connect(self.handle_connect)
         v.conn_panel.btn_disconnect.clicked.connect(self.handle_disconnect)
 
-        # ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก Vrms เป็น Arms ให้ไปปรับเพดานตัวเลขทันที
+        # [NEW] ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก Vrms เป็น Arms ให้ไปปรับเพดานตัวเลขทันที
         v.input_panel.combo_level_mode.currentIndexChanged.connect(self.update_hardware_limits)
 
         # PPM Reference: เปิด/ปิด checkbox และ validate ค่า Ref ที่กรอก
@@ -115,7 +115,7 @@ class AppController(QObject):
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
 
-        # ระบบ Save / View Save Result — ใช้ปุ่มเดิมที่อยู่ข้าง Measurement Result (lcd_display)
+        # [NEW] ระบบ Save / View Save Result — ใช้ปุ่มเดิมที่อยู่ข้าง Measurement Result (lcd_display)
         v.lcd_display.btn_save.clicked.connect(self.handle_save_result)
         v.lcd_display.btn_view.clicked.connect(self.handle_view_save_result)
 
@@ -646,7 +646,7 @@ class AppController(QObject):
         # 1. ค่าดิบจากฮาร์ดแวร์
         raw_pri = data.get('primary', 0.0)
         raw_sec = data.get('secondary', 0.0)
-        status  = data.get('status', 'SUCCESS')  #รับค่า status ที่มาจาก Thread
+        status  = data.get('status', 'SUCCESS')  # [NEW] รับค่า status ที่มาจาก Thread
 
         # เก็บค่าดิบลง Array ไว้คำนวณ Type A Uncertainty
         self.graph_raw_pri_y.append(raw_pri)
@@ -784,15 +784,42 @@ class AppController(QObject):
         if run_mode in ("SWEEP", "LIST"):
             self.view.ctrl_panel.btn_start.setText(f"⏳ RUNNING... {percent}%")
 
+    def _get_session_info_dict(self, measurement_time: str = None) -> dict:
+        """[NEW] รวบรวมข้อมูล Session ปัจจุบัน (ค่าที่คงที่ตลอดการวัดครั้งนี้ ไม่เปลี่ยนต่อแถว)
+        ใช้ 3 ที่: (1) แสดงใน Session Info Bar เหนือ Raw Data Table
+        (2) บันทึกลง Save เพื่อโชว์ตอน Open Save (3) เตรียมไว้ให้ Export Excel ในอนาคต"""
+        v = self.view
+
+        level_mode = v.input_panel.combo_level_mode.currentData()
+        unit = "Arms" if level_mode == "Current" else "Vrms"
+        volt = v.input_panel.input_volt.value()
+
+        ppm_pri = v.adv_panel.input_dev_pri.text().strip()
+        ppm_sec = v.adv_panel.input_dev_sec.text().strip()
+
+        return {
+            "mode": v.input_panel.combo_scpi_mode.currentText() or "-",
+            "signal": f"{volt:g} {unit}",
+            "measurement_time": measurement_time or "-",
+            "avg": v.input_panel.input_avg.value(),
+            "cable": v.input_panel.combo_cable.currentText(),
+            "imp_range": v.input_panel.combo_range.currentText(),
+            "ppm_pri_ref": ppm_pri if ppm_pri else "-",
+            "ppm_sec_ref": ppm_sec if ppm_sec else "-",
+        }
+
     def handle_worker_finished(self):
         self.log.info("✅ การวัดเสร็จสมบูรณ์")
         self.set_ui_locked(False)
         self.worker = None
 
-        # จำเวลาที่วัดเสร็จไว้ ณ ตอนนี้ — นี่คือเวลาที่จะใช้ตอน Save Result จริงๆ
+        # [NEW] จำเวลาที่วัดเสร็จไว้ ณ ตอนนี้ — นี่คือเวลาที่จะใช้ตอน Save Result จริงๆ
         # (ไม่ใช่เวลาที่ผู้ใช้กดปุ่ม Save Result ซึ่งอาจกดทีหลังก็ได้)
         self.last_measurement_time_iso = time.strftime("%Y-%m-%d %H:%M:%S")
         self.last_measurement_time = time.strftime("%d/%m/%Y %H:%M:%S")
+
+        # [NEW] อัปเดต Session Info Bar เหนือ Raw Data Table ด้วยค่าล่าสุดของ session นี้
+        self.view.raw_table.update_session_info(self._get_session_info_dict(self.last_measurement_time))
 
     def clear_graph_data(self):
         self.graph_x_data = []
@@ -804,7 +831,8 @@ class AppController(QObject):
         self.view.freq_summary_graph.clear()
         self.view.ppm_summary_graph.clear()
         self.view.stats_table.clear_table()
-        self.view.raw_table.clear_table()
+        self.view.raw_table.clear_table()  # [NEW] ล้างตารางข้อมูลดิบด้วย
+        self.view.raw_table.clear_session_info()  # [NEW] รีเซ็ต Session Info Bar ด้วย
         self.log.info("🗑 ล้างข้อมูลกราฟและตารางสถิติเรียบร้อย")
         self.update_session_lock()
 
@@ -1072,6 +1100,9 @@ class AppController(QObject):
                 "measurement_time_iso": measurement_time_iso,
                 "run_mode": run_mode,
             },
+            # [NEW] ข้อมูล Session (ค่าคงที่ตลอดการวัดครั้งนี้) — เตรียมไว้ให้ Open Save
+            # โชว์ใน Session Info Bar และให้ Export Excel ในอนาคตดึงไปใช้ได้ทันที
+            "session_info": self._get_session_info_dict(measurement_time),
             "inputs": {
                 "visa_resource": v.conn_panel.combo_visa.currentText(),
                 "prop_group": v.input_panel.combo_prop_group.currentText(),
@@ -1241,6 +1272,11 @@ class AppController(QObject):
 
         self.last_measurement_time = meta.get("measurement_time")
         self.last_measurement_time_iso = meta.get("measurement_time_iso")
+
+        # [NEW] แสดง Session Info Bar ตามที่บันทึกไว้ในไฟล์ Save
+        # (ถ้าเป็น Save เก่าก่อนมีฟีเจอร์นี้ จะไม่มี key "session_info" -> คำนวณสดจาก input ที่เพิ่ง restore แทน)
+        session_info = data.get("session_info") or self._get_session_info_dict(self.last_measurement_time)
+        v.raw_table.update_session_info(session_info)
 
         self.log.info(f"📂 เปิดผลลัพธ์ที่บันทึกไว้: \"{meta.get('save_name', '-')}\" ({meta.get('measurement_time', '-')})")
 

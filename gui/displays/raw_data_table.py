@@ -1,7 +1,7 @@
 # แสดงผลข้อมูลดิบ (Raw Data) จากเครื่องวัด LCR Meter แบบ Real-time เพื่อใช้ตรวจสอบความถูกต้องของข้อมูล
 
 
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QTableWidget, 
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QTableWidget,
                              QTableWidgetItem, QHeaderView, QLabel)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QBrush
@@ -12,16 +12,50 @@ class RawDataTable(QWidget):
     - แสดงค่าเรียงตามลำดับการวัด (No.)
     - แสดงสถานะ (Status) ของแต่ละจุด เพื่อตรวจสอบ Error/Overload
     - เปลี่ยนหัวคอลัมน์แบบไดนามิกตามโหมดการวัดและ SCPI Mode
+    - [NEW] มี Session Info Bar เหนือตาราง แสดงค่าคงที่ตลอด session
+      (Mode/สัญญาณ/สายวัด/ย่าน/PPM Ref ฯลฯ) แยกจากตารางเพราะไม่เปลี่ยนต่อแถว
     """
+    # [NEW] คำอธิบาย (label) ของแต่ละ key ใน session info — ใช้ทั้งตอนสร้าง UI และ update
+    SESSION_INFO_FIELDS = [
+        ("mode",             "โหมดพารามิเตอร์ (Mode)"),
+        ("signal",           "สัญญาณทดสอบ (Signal)"),
+        ("measurement_time", "เวลาวัด (Measured At)"),
+        ("avg",              "ค่าเฉลี่ย (Averaging)"),
+        ("cable",            "สายวัด (Cable)"),
+        ("imp_range",        "ย่านอิมพีแดนซ์ (Range)"),
+        ("ppm_pri_ref",      "PPM Ref (Primary)"),
+        ("ppm_sec_ref",      "PPM Ref (Secondary)"),
+    ]
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._current_mode = "LIST"
+        self._session_info_labels = {}   # key -> QLabel (ค่า) สำหรับอัปเดตทีหลัง
         self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(6)
+
+        # [NEW] Session Info Bar — แสดงค่าคงที่ตลอด session การวัดนี้
+        self.group_session_info = QGroupBox("ข้อมูล Session การวัด (Measurement Session Info)")
+        grid_info = QGridLayout()
+        grid_info.setHorizontalSpacing(18)
+        grid_info.setVerticalSpacing(4)
+
+        for idx, (key, label_text) in enumerate(self.SESSION_INFO_FIELDS):
+            row, col = divmod(idx, 2)
+            lbl_title = QLabel(f"{label_text}:")
+            lbl_title.setStyleSheet("color: #94a3b8; font-size: 11px;")
+            lbl_value = QLabel("-")
+            lbl_value.setStyleSheet("font-weight: bold; font-size: 12px;")
+            grid_info.addWidget(lbl_title, row, col * 2)
+            grid_info.addWidget(lbl_value, row, col * 2 + 1)
+            self._session_info_labels[key] = lbl_value
+
+        self.group_session_info.setLayout(grid_info)
+        layout.addWidget(self.group_session_info)
 
         self.lbl_hint = QLabel("ตารางข้อมูลดิบ (Raw Data) — แสดงค่าที่รับมาจากเครื่องแบบ Real-time")
         self.lbl_hint.setStyleSheet("color: #94a3b8; font-size: 11px;")
@@ -146,6 +180,19 @@ class RawDataTable(QWidget):
         font = self.table.font()
         font.setBold(True)
         return font
+
+    def update_session_info(self, info: dict):
+        """[NEW] อัปเดตค่าใน Session Info Bar — เรียกตอนวัดเสร็จ หรือตอน Open Save
+        info: dict ที่มี key ตรงกับ SESSION_INFO_FIELDS (ค่าที่ไม่มีจะแสดงเป็น '-')"""
+        for key, _ in self.SESSION_INFO_FIELDS:
+            value = info.get(key)
+            text = str(value) if value not in (None, "") else "-"
+            self._session_info_labels[key].setText(text)
+
+    def clear_session_info(self):
+        """[NEW] รีเซ็ต Session Info Bar กลับเป็น '-' ทั้งหมด (เรียกตอน Clear Data)"""
+        for _, lbl in self._session_info_labels.items():
+            lbl.setText("-")
 
     def clear_table(self):
         self.table.setRowCount(0)

@@ -717,10 +717,21 @@ class AppController(QObject):
         v = self.view
         run_mode = self.get_current_run_mode()
 
-        raw_records = [
-            {'freq': f, 'primary': p, 'secondary': s}
-            for f, p, s in zip(self.graph_x_data, self.graph_raw_pri_y, self.graph_raw_sec_y)
-        ]
+        if run_mode == "SINGLE":
+            # [แก้ไข] โหมด SINGLE: self.graph_x_data เก็บ "ลำดับการวัด" (1,2,3...) ไว้ใช้วาดกราฟ
+            # (แกน X = Measurement Count) ไม่ใช่ความถี่จริง ถ้าเอาไปใช้เป็น 'freq' ตรงๆ
+            # ตารางสถิติจะโชว์ Frequency (Hz) ผิดเป็นเลขลำดับ (เช่น "1.00" แทนค่าที่ตั้งไว้จริง)
+            # ต้องดึงความถี่ที่ตั้งไว้จริงจาก Input Panel มาใช้แทนเสมอ
+            fixed_freq = v.input_panel.input_freq.value()
+            raw_records = [
+                {'freq': fixed_freq, 'primary': p, 'secondary': s}
+                for p, s in zip(self.graph_raw_pri_y, self.graph_raw_sec_y)
+            ]
+        else:
+            raw_records = [
+                {'freq': f, 'primary': p, 'secondary': s}
+                for f, p, s in zip(self.graph_x_data, self.graph_raw_pri_y, self.graph_raw_sec_y)
+            ]
 
         # ส่ง Ref เฉพาะตอน checkbox PPM เปิด — ใช้ได้ทั้ง SINGLE, SWEEP และ LIST
         ppm_enabled = v.adv_panel.chk_dev_ppm_enable.isChecked()

@@ -608,7 +608,6 @@ class InputPanel(QWidget):
 
         self.combo_range = QComboBox()
         self.combo_range.addItem("AUTO", userData="AUTO")
-        self.combo_range.addItem("0.1 Ω", userData=0.1)
         self.combo_range.addItem("1 Ω", userData=1)
         self.combo_range.addItem("10 Ω", userData=10)
         self.combo_range.addItem("100 Ω", userData=100)

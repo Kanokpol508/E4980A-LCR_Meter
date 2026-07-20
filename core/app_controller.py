@@ -379,7 +379,9 @@ class AppController(QObject):
         self.progress_dialog.setCancelButton(None)
         self.progress_dialog.show()
 
-        self.corr_worker = CorrectionWorker(visa_address, corr_type)
+        # [แก้ไข] ส่งค่า Cable Length ปัจจุบันจาก GUI ไปด้วย เพื่อตั้งที่เครื่องก่อนทำ Correction เสมอ
+        cable_text = v.input_panel.combo_cable.currentText()
+        self.corr_worker = CorrectionWorker(visa_address, corr_type, cable_text)
         self.corr_worker.finished_signal.connect(self.handle_correction_finished)
         self.corr_worker.start()
 

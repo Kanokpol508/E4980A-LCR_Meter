@@ -121,8 +121,14 @@ class E4980A:
     # ==========================================
     # ระบบชดเชยค่าสายวัด (Correction) - OPEN / SHORT
     # ==========================================
-    def perform_correction(self, corr_type: str) -> tuple[bool, str]:
-        """สั่งเครื่องทำ OPEN หรือ SHORT Correction แบบเต็มรูปแบบ"""
+    def perform_correction(self, corr_type: str, cable_text: str = None) -> tuple[bool, str]:
+        """สั่งเครื่องทำ OPEN หรือ SHORT Correction แบบเต็มรูปแบบ
+
+        [แก้ไข] ต้องตั้งค่า Cable Length ให้ตรงกับสายวัดจริงก่อนทำ Correction เสมอ
+        เพราะค่า OPEN/SHORT ที่วัดได้จะผูกกับ Cable Length ที่ตั้งไว้ ณ ขณะนั้น
+        ถ้าไม่ส่ง cable_text (None) จะใช้ค่า Cable Length ที่ค้างอยู่ในเครื่องจากครั้งก่อนแทน
+        (ควรหลีกเลี่ยง เพราะอาจไม่ตรงกับที่ผู้ใช้เลือกไว้ใน GUI)
+        """
         if not self.is_connected:
             return False, "⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด"
 
@@ -133,6 +139,11 @@ class E4980A:
             # 1. การทำ Correction ใช้เวลานาน ต้องเพิ่ม Timeout
             original_timeout = self.inst.timeout
             self.inst.timeout = 180000
+
+            # 1.1 [ใหม่] ตั้งค่า Cable Length ให้ตรงกับสายวัดจริงก่อนทำ Correction เสมอ
+            if cable_text is not None:
+                self.set_cable_length(cable_text)
+                self.wait_until_ready()
 
             # 2. เปิดโหมด Correction ให้เป็น ON ก่อน แล้วสั่ง Execute
             if corr_type.upper() == "OPEN":

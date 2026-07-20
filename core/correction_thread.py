@@ -15,10 +15,13 @@ class CorrectionWorker(QThread):
     # ส่งสัญญาณ (Signal) คืนค่ากลับเมื่อทำงานเสร็จ: (สถานะ True/False, ข้อความตอบกลับ)
     finished_signal = pyqtSignal(bool, str)
 
-    def __init__(self, visa_address: str, corr_type: str):
+    def __init__(self, visa_address: str, corr_type: str, cable_text: str = "0 m"):
         super().__init__()
         self.visa_address = visa_address
         self.corr_type = corr_type              # 'OPEN' หรือ 'SHORT'
+        # [ใหม่] Cable Length ปัจจุบันจาก GUI — ต้องตั้งที่เครื่องก่อนทำ Correction เสมอ
+        # เพื่อให้ค่า OPEN/SHORT ที่วัดได้ตรงกับสายวัดจริงที่ใช้งาน
+        self.cable_text = cable_text
 
     def run(self):
         lcr = None
@@ -32,7 +35,8 @@ class CorrectionWorker(QThread):
                 return
 
             # 2. สั่งทำ Correction ผ่านฟังก์ชัน perform_correction ที่เซฟตี้แล้วใน lcr_meter
-            succ, result_msg = lcr.perform_correction(self.corr_type)
+            #    [แก้ไข] ส่ง cable_text เข้าไปด้วย เพื่อตั้ง Cable Length ให้ตรงกับ GUI ก่อน Execute เสมอ
+            succ, result_msg = lcr.perform_correction(self.corr_type, self.cable_text)
             
             # 3. ส่งผลลัพธ์กลับไปยังหน้าจอหลัก
             self.finished_signal.emit(succ, result_msg)

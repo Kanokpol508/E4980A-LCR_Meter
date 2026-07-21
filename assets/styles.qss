@@ -376,3 +376,33 @@ QPushButton#btnExportExcel {
 QPushButton#btnExportExcel:hover {
     background-color: #60a5fa;
 }
+
+/* ==========================================
+   7. สีส่วนของ Tab ตรงOutputฝั่งขวา
+========================================== */
+QTabBar::tab {
+    background-color: #172445;
+    color: #ffffff;
+    border: 1px solid #2d4578;
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    padding: 6px 14px;
+    margin-right: 2px;
+    font-weight: bold;
+}
+QTabBar::tab:selected {
+    background-color: #0066CC;
+    color: #ffffff;
+    border: 1px solid #3b82f6;
+    border-bottom: none;
+}
+QTabBar::tab:hover:!disabled {
+    background-color: #2d4578;
+}
+QTabBar::tab:disabled {
+    background-color: #0a101f;
+    color: #475569;
+    border: 1px solid #172445;
+    border-bottom: none;
+}

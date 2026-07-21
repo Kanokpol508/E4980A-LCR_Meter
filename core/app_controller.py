@@ -1125,31 +1125,58 @@ class AppController(QObject):
         )
 
     def toggle_ppm(self):
-        """เปิด/ปิด widget กรอก PPM Reference ตาม checkbox สถานะ"""
+        """เปิด/ปิด widget กรอก PPM Reference ตาม checkbox สถานะ
+        [NEW] ล็อกทั้ง Tab "กราฟ PPM" ไปเลยเมื่อยังไม่เปิดใช้งาน PPM Deviation
+        กันผู้ใช้กดเข้าไปเจอกราฟว่างเปล่าแล้วสับสนว่าทำไมไม่มีข้อมูล"""
         v = self.view
         is_enabled = v.adv_panel.chk_dev_ppm_enable.isChecked()
         v.adv_panel.widget_dev_inner.setEnabled(is_enabled)
+
+        v.right_tabs.setTabEnabled(v.ppm_graph_tab_index, is_enabled)
+        v.right_tabs.setTabToolTip(
+            v.ppm_graph_tab_index,
+            "" if is_enabled else
+            "ต้องเปิด \"เปิดใช้งานการคำนวณ PPM Deviation\" ในแท็บ Advanced ก่อน จึงจะเข้าดูกราฟนี้ได้"
+        )
 
         if is_enabled:
             self.validate_ppm_ref()
         else:
             v.adv_panel.lbl_dev_warning.setText("")
             self.is_ppm_error = False
+            # [NEW] ปิด PPM ทั้งระบบ -> ล็อก checkbox Plot Primary/Secondary ของกราฟ PPM ด้วย
+            v.ppm_summary_graph.chk_plot_pri.setEnabled(False)
+            v.ppm_summary_graph.chk_plot_sec.setEnabled(False)
             self.update_start_button_state()
 
     def validate_ppm_ref(self):
         """
         ตรวจสอบว่ากรอก Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่าเมื่อเปิด PPM
         ถ้าเปิด PPM แล้วไม่กรอกค่าใดเลย จะบล็อกปุ่ม Start เพราะผล PPM Dev จะเป็น '-' ทั้งหมด
+
+        [NEW] ล็อก checkbox "Plot Primary"/"Plot Secondary" ของกราฟ PPM แยกตามว่ากรอก
+        Ref ตัวนั้นไว้หรือยัง — แค่ disable เฉยๆ ไม่ uncheck ทิ้ง เพื่อรักษาสถานะที่ผู้ใช้
+        ตั้งใจติ๊กไว้แต่แรก พอกรอก Ref กลับมาใหม่ checkbox จะ enable + ติ๊กกลับมาเหมือนเดิมทันที
         """
         v = self.view
         if not v.adv_panel.chk_dev_ppm_enable.isChecked():
             self.is_ppm_error = False
+            v.ppm_summary_graph.chk_plot_pri.setEnabled(False)
+            v.ppm_summary_graph.chk_plot_sec.setEnabled(False)
             self.update_start_button_state()
             return
 
         pri_has_value = self._safe_float(v.adv_panel.input_dev_pri.text()) is not None
         sec_has_value = self._safe_float(v.adv_panel.input_dev_sec.text()) is not None
+
+        v.ppm_summary_graph.chk_plot_pri.setEnabled(pri_has_value)
+        v.ppm_summary_graph.chk_plot_pri.setToolTip(
+            "" if pri_has_value else "กรอก Primary Ref ในแท็บ Advanced ก่อน จึงจะเปิดดูเส้นนี้ได้"
+        )
+        v.ppm_summary_graph.chk_plot_sec.setEnabled(sec_has_value)
+        v.ppm_summary_graph.chk_plot_sec.setToolTip(
+            "" if sec_has_value else "กรอก Secondary Ref ในแท็บ Advanced ก่อน จึงจะเปิดดูเส้นนี้ได้"
+        )
 
         if not pri_has_value and not sec_has_value:
             v.adv_panel.lbl_dev_warning.setText(

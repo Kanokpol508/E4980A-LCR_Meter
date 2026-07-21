@@ -249,7 +249,7 @@ class PpmSummaryGraph(QWidget):
         title_bar = QHBoxLayout()
         title_bar.addWidget(QLabel("Graph Title:"))
         self.input_graph_title = QLineEdit()
-        self.input_graph_title.setPlaceholderText("เช่น 10kOhm Resistor PPM Deviation vs Frequency")
+        self.input_graph_title.setPlaceholderText("กรอกชื่อกราฟที่ต้องการ")
         title_bar.addWidget(self.input_graph_title, stretch=1)
 
         self.btn_save_jpeg = QPushButton("💾 Save as JPEG")

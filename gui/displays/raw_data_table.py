@@ -17,12 +17,12 @@ class RawDataTable(QWidget):
     """
     # [NEW] คำอธิบาย (label) ของแต่ละ key ใน session info — ใช้ทั้งตอนสร้าง UI และ update
     SESSION_INFO_FIELDS = [
-        ("mode",             "โหมดพารามิเตอร์ (Mode)"),
-        ("signal",           "สัญญาณทดสอบ (Signal)"),
-        ("measurement_time", "เวลาวัด (Measured At)"),
-        ("avg",              "ค่าเฉลี่ย (Averaging)"),
-        ("cable",            "สายวัด (Cable)"),
-        ("imp_range",        "ย่านอิมพีแดนซ์ (Range)"),
+        ("mode",             "Mode"),
+        ("signal",           "Signal"),
+        ("measurement_time", "Measured At"),
+        ("avg",              "Averaging"),
+        ("cable",            "Cable"),
+        ("imp_range",        "Range"),
         ("ppm_pri_ref",      "PPM Ref (Primary)"),
         ("ppm_sec_ref",      "PPM Ref (Secondary)"),
     ]
@@ -39,7 +39,7 @@ class RawDataTable(QWidget):
         layout.setSpacing(6)
 
         # [NEW] Session Info Bar — แสดงค่าคงที่ตลอด session การวัดนี้
-        self.group_session_info = QGroupBox("ข้อมูล Session การวัด (Measurement Session Info)")
+        self.group_session_info = QGroupBox("Measurement Session Info")
         grid_info = QGridLayout()
         grid_info.setHorizontalSpacing(18)
         grid_info.setVerticalSpacing(4)
@@ -57,7 +57,7 @@ class RawDataTable(QWidget):
         self.group_session_info.setLayout(grid_info)
         layout.addWidget(self.group_session_info)
 
-        self.lbl_hint = QLabel("ตารางข้อมูลดิบ (Raw Data) — แสดงค่าที่รับมาจากเครื่องแบบ Real-time")
+        self.lbl_hint = QLabel("Raw Data Table (ตารางข้อมูลดิบ) — แสดงค่าที่ได้รับจากเครื่องมือแบบเรียลไทม์")
         self.lbl_hint.setStyleSheet("color: #94a3b8; font-size: 11px;")
         layout.addWidget(self.lbl_hint)
 

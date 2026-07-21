@@ -79,7 +79,7 @@ class FrequencyListWidget(QWidget):
         main_layout.addWidget(self.lbl_incomplete)
 
         # ปุ่มเพิ่มรายการความถี่ - เปลี่ยนจาก "+" วงกลมเป็นปุ่มข้อความ (สีเขียวเหมือนเดิม)
-        self.btn_add = QPushButton("+ เพิ่มรายการความถี่")
+        self.btn_add = QPushButton("+ Add Frequency")
         self.btn_add.setMinimumHeight(32)
         self.btn_add.setStyleSheet(
             "QPushButton { background-color: #22c55e; color: white; border-radius: 6px; "
@@ -107,7 +107,7 @@ class FrequencyListWidget(QWidget):
         row_layout = QHBoxLayout(row_container)
         row_layout.setContentsMargins(0, 0, 0, 0)
 
-        lbl = QLabel(f"ความถี่ที่ {index}")
+        lbl = QLabel(f"Frequency {index}")
         lbl.setFixedWidth(95)
 
         input_field = QLineEdit()
@@ -185,7 +185,7 @@ class FrequencyListWidget(QWidget):
 
     def _renumber_labels(self):
         for i, r in enumerate(self._rows):
-            r['label'].setText(f"ความถี่ที่ {i + 1}")
+            r['label'].setText(f"Freq {i + 1} (ความถี่ที่ {i + 1})")
 
     def _check_and_warn(self):
         """ตรวจสอบว่ารายการความถี่กรอกครบทุกช่อง (ไม่มีช่องว่างค้าง) และค่าที่กรอก
@@ -289,7 +289,7 @@ class InputPanel(QWidget):
         # ใช้ QGridLayout เพื่อให้ทั้ง 2 dropdown อยู่คอลัมน์เดียวกัน
         # -> ความกว้างเท่ากันและชิดตรงกันโดยอัตโนมัติ
         # ==========================================================
-        self.group_prop = QGroupBox("ประเภทการวัด (Measurement Type)")
+        self.group_prop = QGroupBox("Measurement Type")
         grid_prop = QGridLayout()
         grid_prop.setVerticalSpacing(8)
         grid_prop.setColumnStretch(1, 1)
@@ -297,8 +297,8 @@ class InputPanel(QWidget):
         self.combo_prop_group = QComboBox()
         self.combo_scpi_mode = QComboBox()
 
-        lbl_prop_group = QLabel("กลุ่มพารามิเตอร์\n(Parameter Group):")
-        lbl_scpi_mode = QLabel("โหมดพารามิเตอร์\n(SCPI Mode):")
+        lbl_prop_group = QLabel("Parameter Group:")
+        lbl_scpi_mode = QLabel("SCPI Mode:")
         lbl_prop_group.setMaximumWidth(120)
         lbl_scpi_mode.setMaximumWidth(120)
 
@@ -312,16 +312,16 @@ class InputPanel(QWidget):
         # ==========================================================
         # 2. ตั้งค่าความถี่ (Frequency Settings)
         # ==========================================================
-        self.group_mode = QGroupBox("ตั้งค่าความถี่ (Frequency Settings)")
+        self.group_mode = QGroupBox("Frequency Settings")
         v_mode = QVBoxLayout()
         v_mode.setSpacing(10)
 
         # --- Dropdown เลือกโหมดการวัด ---
-        v_mode.addWidget(QLabel("เลือกโหมดการวัด (Select Measurement Mode):"))
+        v_mode.addWidget(QLabel("Select Measurement Mode:"))
         self.combo_run_mode = QComboBox()
-        self.combo_run_mode.addItem("วัดจุดเดียว (Single Frequency)", userData="SINGLE")
-        self.combo_run_mode.addItem("สแกนความถี่ (Sweep Frequency)", userData="SWEEP")
-        self.combo_run_mode.addItem("รายการความถี่ (Frequency List)", userData="LIST")
+        self.combo_run_mode.addItem("Single Frequency (โหมดวัดจุดเดียว)", userData="SINGLE")
+        self.combo_run_mode.addItem("Sweep Frequency (โหมดสแกนความถี่)", userData="SWEEP")
+        self.combo_run_mode.addItem("Frequency List (โหมดรายการความถี่)", userData="LIST")
         self.combo_run_mode.setCurrentIndex(0)  # ค่าเริ่มต้น = Single
         v_mode.addWidget(self.combo_run_mode)
 
@@ -366,19 +366,19 @@ class InputPanel(QWidget):
         self.lbl_total_rounds_single = QLabel("-")
         self.lbl_total_rounds_single.setStyleSheet("color: #38bdf8; font-weight: bold;")
 
-        grid_single.addWidget(QLabel("ความถี่ (Frequency):"), 0, 0)
+        grid_single.addWidget(QLabel("Frequency:"), 0, 0)
         grid_single.addWidget(self.input_freq, 0, 1)
         grid_single.addWidget(QLabel("Hz"), 0, 2)
 
-        grid_single.addWidget(QLabel("จำนวนครั้งที่วัด (Samples Count):"), 1, 0)
+        grid_single.addWidget(QLabel("Samples Count:"), 1, 0)
         grid_single.addWidget(self.input_n_single, 1, 1)
-        grid_single.addWidget(QLabel("ครั้ง"), 1, 2)
+        grid_single.addWidget(QLabel("Times"), 1, 2)
 
-        grid_single.addWidget(QLabel("ทิ้งค่าแรกสุด (Discard First):"), 2, 0)
+        grid_single.addWidget(QLabel("Discard First:"), 2, 0)
         grid_single.addWidget(self.input_discard_single, 2, 1)
-        grid_single.addWidget(QLabel("ครั้ง"), 2, 2)
+        grid_single.addWidget(QLabel("Times"), 2, 2)
 
-        grid_single.addWidget(QLabel("รวมรอบวัดทั้งหมด:"), 3, 0)
+        grid_single.addWidget(QLabel("Total Readings:"), 3, 0)
         grid_single.addWidget(self.lbl_total_rounds_single, 3, 1)
 
         grid_single.setColumnStretch(3, 1)
@@ -427,19 +427,19 @@ class InputPanel(QWidget):
         self.lbl_calculated_points = QLabel("-")
         self.lbl_calculated_points.setStyleSheet("color: #38bdf8; font-weight: bold;")
 
-        grid_sweep.addWidget(QLabel("ความถี่เริ่มต้น (Start Freq):"), 0, 0)
+        grid_sweep.addWidget(QLabel("Start Frequency:"), 0, 0)
         grid_sweep.addWidget(self.input_start_freq, 0, 1)
         grid_sweep.addWidget(QLabel("Hz"), 0, 2)
 
-        grid_sweep.addWidget(QLabel("ความถี่สิ้นสุด (Stop Freq):"), 1, 0)
+        grid_sweep.addWidget(QLabel("Stop Frequency:"), 1, 0)
         grid_sweep.addWidget(self.input_stop_freq, 1, 1)
         grid_sweep.addWidget(QLabel("Hz"), 1, 2)
 
-        grid_sweep.addWidget(QLabel("ค่าเพิ่มต่อจุด (Step Size):"), 2, 0)
+        grid_sweep.addWidget(QLabel("Step Size:"), 2, 0)
         grid_sweep.addWidget(self.input_step_freq, 2, 1)
         grid_sweep.addWidget(QLabel("Hz"), 2, 2)
 
-        grid_sweep.addWidget(QLabel("จำนวนจุดที่ได้:"), 3, 0)
+        grid_sweep.addWidget(QLabel("Points Count:"), 3, 0)
         grid_sweep.addWidget(self.lbl_calculated_points, 3, 1)
 
         grid_sweep.setColumnStretch(3, 1)  # เผื่อพื้นที่ว่างด้านขวาสุด
@@ -469,15 +469,15 @@ class InputPanel(QWidget):
         self.lbl_total_rounds_sweep = QLabel("-")
         self.lbl_total_rounds_sweep.setStyleSheet("color: #38bdf8; font-weight: bold;")
 
-        grid_sweep_samples.addWidget(QLabel("จำนวนรอบวัดซ้ำต่อความถี่ (Samples per Sweep):"), 0, 0)
+        grid_sweep_samples.addWidget(QLabel("Samples per Sweep:"), 0, 0)
         grid_sweep_samples.addWidget(self.input_samples_sweep, 0, 1)
-        grid_sweep_samples.addWidget(QLabel("ครั้ง"), 0, 2)
+        grid_sweep_samples.addWidget(QLabel("Times"), 0, 2)
 
-        grid_sweep_samples.addWidget(QLabel("ทิ้งค่าตัวอย่างแรกสุด (Discard First Reading):"), 1, 0)
+        grid_sweep_samples.addWidget(QLabel("Discard First Reading:"), 1, 0)
         grid_sweep_samples.addWidget(self.input_discard_first_sweep, 1, 1)
-        grid_sweep_samples.addWidget(QLabel("ครั้ง"), 1, 2)
+        grid_sweep_samples.addWidget(QLabel("Times"), 1, 2)
 
-        grid_sweep_samples.addWidget(QLabel("รวมรอบวัดทั้งหมด/ความถี่:"), 2, 0)
+        grid_sweep_samples.addWidget(QLabel("Total Readings / Frequency:"), 2, 0)
         grid_sweep_samples.addWidget(self.lbl_total_rounds_sweep, 2, 1)
 
         grid_sweep_samples.setColumnStretch(3, 1)  # เผื่อพื้นที่ว่างด้านขวาสุด
@@ -492,7 +492,7 @@ class InputPanel(QWidget):
         v_list.setContentsMargins(0, 0, 0, 0)
         v_list.setSpacing(10)
 
-        v_list.addWidget(QLabel("รายการความถี่ (Frequency List)"))
+        v_list.addWidget(QLabel("Frequency List:"))
         self.input_freq_list = FrequencyListWidget()
         v_list.addWidget(self.input_freq_list)
 
@@ -523,15 +523,15 @@ class InputPanel(QWidget):
         self.lbl_total_rounds_list = QLabel("-")
         self.lbl_total_rounds_list.setStyleSheet("color: #38bdf8; font-weight: bold;")
 
-        grid_list_nums.addWidget(QLabel("จำนวนรอบวัดซ้ำต่อความถี่ (Samples per Sweep):"), 0, 0)
+        grid_list_nums.addWidget(QLabel("Samples per Sweep:"), 0, 0)
         grid_list_nums.addWidget(self.input_samples, 0, 1)
-        grid_list_nums.addWidget(QLabel("ครั้ง"), 0, 2)
+        grid_list_nums.addWidget(QLabel("Times"), 0, 2)
 
-        grid_list_nums.addWidget(QLabel("ทิ้งค่าตัวอย่างแรกสุด (Discard First Reading):"), 1, 0)
+        grid_list_nums.addWidget(QLabel("Discard First Reading:"), 1, 0)
         grid_list_nums.addWidget(self.input_discard_first, 1, 1)
-        grid_list_nums.addWidget(QLabel("ครั้ง"), 1, 2)
+        grid_list_nums.addWidget(QLabel("Times"), 1, 2)
 
-        grid_list_nums.addWidget(QLabel("รวมรอบวัดทั้งหมด/ความถี่:"), 2, 0)
+        grid_list_nums.addWidget(QLabel("Total Readings / Frequency:"), 2, 0)
         grid_list_nums.addWidget(self.lbl_total_rounds_list, 2, 1)
 
         # เชื่อมสัญญาณเพื่ออัปเดต label ทุกครั้งที่ค่าเปลี่ยน
@@ -547,7 +547,7 @@ class InputPanel(QWidget):
         # ==========================================================
         # 3. สัญญาณทดสอบ (Test Signal)
         # ==========================================================
-        self.group_signal = QGroupBox("สัญญาณทดสอบ (Test Signal)")
+        self.group_signal = QGroupBox("Test Signal")
         v_signal = QVBoxLayout()
         v_signal.setSpacing(8)
 
@@ -565,7 +565,7 @@ class InputPanel(QWidget):
         self.combo_level_mode.setFixedWidth(103)
 
         # Label อยู่แถวบน, SpinBox + Dropdown อยู่แถวล่าง
-        v_signal.addWidget(QLabel("ระดับสัญญาณ (Signal Level):"))
+        v_signal.addWidget(QLabel("Signal Level:"))
 
         h_level = QHBoxLayout()
         h_level.addWidget(self.input_volt)
@@ -574,7 +574,7 @@ class InputPanel(QWidget):
         v_signal.addLayout(h_level)
 
         # ALC (Automatic Level Control)
-        self.chk_alc = QCheckBox("เปิด ALC (Automatic Level Control)")
+        self.chk_alc = QCheckBox("Enable ALC (Automatic Level Control)")
         self.chk_alc.setToolTip(
             "ALC ทำให้ระดับสัญญาณ ณ จุดที่ชิ้นงาน เท่ากับค่าที่ตั้งไว้จริงๆ\n"
             "แนะนำเปิดเมื่อวัด Inductor ด้วยโหมด Arms\n"
@@ -590,7 +590,7 @@ class InputPanel(QWidget):
         # ใช้ QGridLayout เพื่อให้ทั้ง 4 ช่อง (dropdown/spinbox) อยู่
         # คอลัมน์เดียวกัน -> ความกว้างเท่ากันและชิดตรงกันโดยอัตโนมัติ
         # ==========================================================
-        self.group_hw = QGroupBox("ฮาร์ดแวร์และเวลา (Hardware & Timing)")
+        self.group_hw = QGroupBox("Hardware & Timing")
         grid_hw = QGridLayout()
         grid_hw.setVerticalSpacing(8)
         grid_hw.setColumnStretch(1, 1)
@@ -618,13 +618,13 @@ class InputPanel(QWidget):
         self.combo_range.addItem("30 kΩ", userData=30000)
         self.combo_range.addItem("100 kΩ", userData=100000)
 
-        grid_hw.addWidget(QLabel("เวลาวัด (Meas Time):"), 0, 0)
+        grid_hw.addWidget(QLabel("Meas Time:"), 0, 0)
         grid_hw.addWidget(self.combo_time, 0, 1)
-        grid_hw.addWidget(QLabel("ค่าเฉลี่ย (Averaging):"), 1, 0)
+        grid_hw.addWidget(QLabel("Averaging(AVG):"), 1, 0)
         grid_hw.addWidget(self.input_avg, 1, 1)
-        grid_hw.addWidget(QLabel("สายวัด (Cable Length):"), 2, 0)
+        grid_hw.addWidget(QLabel("Cable Length:"), 2, 0)
         grid_hw.addWidget(self.combo_cable, 2, 1)
-        grid_hw.addWidget(QLabel("ย่านอิมพีแดนซ์ (Z Range):"), 3, 0)
+        grid_hw.addWidget(QLabel("Range:"), 3, 0)
         grid_hw.addWidget(self.combo_range, 3, 1)
 
         self.group_hw.setLayout(grid_hw)

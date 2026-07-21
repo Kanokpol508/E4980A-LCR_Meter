@@ -9,7 +9,7 @@ class LcdDisplay(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        group_lcd = QGroupBox("ผลการวัด (Measurement Result)")
+        group_lcd = QGroupBox("Measurement Result")
         group_lcd.setObjectName("lcdGroup")
         group_lcd.setMinimumHeight(160)
         h_lcd = QHBoxLayout()
@@ -25,13 +25,13 @@ class LcdDisplay(QWidget):
         self.lbl_sec_val.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         v_pri = QVBoxLayout()
-        lbl_pri_title = QLabel("พารามิเตอร์หลัก (Primary)")
+        lbl_pri_title = QLabel("Primary Parameter")
         lbl_pri_title.setObjectName("lblPriTitle")              # ID หัวข้อหลัก
         v_pri.addWidget(lbl_pri_title)
         v_pri.addWidget(self.lbl_pri_val, stretch=1)
         
         v_sec = QVBoxLayout()
-        lbl_sec_title = QLabel("พารามิเตอร์รอง (Secondary)")
+        lbl_sec_title = QLabel("Secondary Parameter")
         lbl_sec_title.setObjectName("lblSecTitle")              # ID หัวข้อรอง
         v_sec.addWidget(lbl_sec_title)
         v_sec.addWidget(self.lbl_sec_val, stretch=1)

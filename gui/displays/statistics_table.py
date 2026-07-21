@@ -133,16 +133,16 @@ _COLS_SWEEP = _COLS_LIST
 
 _HINTS = {
     "SINGLE": (
-        "โหมดวัดจุดเดียว — สถิติรวมของ session ที่ความถี่นั้น "
+        "Single Frequency mode \u2014 สถิติรวมของ session ที่ความถี่นั้น "
         "(Type A ppm = ความไม่แน่นอนจากการวัดซ้ำ)"
     ),
     "SWEEP": (
-        "โหมดสแกนความถี่ — สถิติเต็มรูปแบบแยกตามความถี่ "
-        "(PPM Dev ต้องเปิด Deviation PPM และกรอกค่า Reference)"
+        "Sweep Frequency mode \u2014 สถิติแบบละเอียดแยกตามความถี่"
+        "(PPM Dev ต้องเปิดใช้งาน Deviation PPM และกรอกค่าอ้างอิง (Reference) ก่อน)"
     ),
     "LIST": (
-        "โหมดรายการความถี่ — สถิติเต็มรูปแบบแยกตามความถี่ "
-        "(PPM Dev ต้องเปิด Deviation PPM และกรอกค่า Reference)"
+        "Frequency List mode \u2014 สถิติแบบละเอียดแยกตามความถี่"
+        "(PPM Dev ต้องเปิดใช้งาน Deviation PPM และกรอกค่าอ้างอิง (Reference) ก่อน)"
     ),
 }
 

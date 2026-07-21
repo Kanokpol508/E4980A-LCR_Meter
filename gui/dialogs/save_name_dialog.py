@@ -61,7 +61,7 @@ class SaveNameDialog(QDialog):
     def _on_confirm(self):
         name = self.input_name.text().strip()
         if not name:
-            QMessageBox.warning(self, "กรุณากรอกชื่อ", "กรุณากรอกชื่อ Save ที่ต้องการก่อนบันทึก")
+            QMessageBox.warning(self, "Name Required", "กรุณากรอกชื่อ Save ที่ต้องการก่อนบันทึก")
             self.input_name.setFocus()
             return
         self.accept()

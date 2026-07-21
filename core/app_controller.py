@@ -175,7 +175,7 @@ class AppController(QObject):
 
         n_points = int((stop - start) / step) + 1
         n_points = max(2, min(201, n_points))
-        v.input_panel.lbl_calculated_points.setText(f"{n_points} จุด")
+        v.input_panel.lbl_calculated_points.setText(f"{n_points} Points")
 
     def update_single_total(self):
         """คำนวณและแสดงรวมรอบวัดทั้งหมดของโหมด SINGLE
@@ -185,7 +185,7 @@ class AppController(QObject):
         n = v.input_panel.input_n_single.value()
         d = v.input_panel.input_discard_single.value()
         total = n + d
-        v.input_panel.lbl_total_rounds_single.setText(f"{total} ครั้ง  (ทิ้ง {d} + วัด{n})")
+        v.input_panel.lbl_total_rounds_single.setText(f"{total} Times (Discard {d} + Measure {n})")
 
     def update_list_total(self):
         """คำนวณและแสดงรวมรอบวัดทั้งหมดต่อความถี่ของโหมด LIST
@@ -195,7 +195,7 @@ class AppController(QObject):
         s = v.input_panel.input_samples.value()
         d = v.input_panel.input_discard_first.value()
         total = s + d
-        v.input_panel.lbl_total_rounds_list.setText(f"{total} ครั้ง/ความถี่ \n (ทิ้ง {d} + วัด {s})")
+        v.input_panel.lbl_total_rounds_list.setText(f"{total} Times/Frequency \n (Discard {d} + Measure {s})")
 
     def update_sweep_total(self):
         """คำนวณและแสดงรวมรอบวัดทั้งหมดต่อความถี่ของโหมด SWEEP
@@ -205,7 +205,7 @@ class AppController(QObject):
         s = v.input_panel.input_samples_sweep.value()
         d = v.input_panel.input_discard_first_sweep.value()
         total = s + d
-        v.input_panel.lbl_total_rounds_sweep.setText(f"{total} ครั้ง/ความถี่ \n (ทิ้ง {d} + วัด {s})")
+        v.input_panel.lbl_total_rounds_sweep.setText(f"{total} Times/Frequency \n (Discard {d} + Measure {s})")
 
     def update_hardware_limits(self):
         """อัปเดตเพดานสูงสุดของกล่องกรอกระดับสัญญาณ ตามโหมด V/I ที่ผู้ใช้เลือก"""

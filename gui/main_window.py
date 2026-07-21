@@ -67,16 +67,16 @@ class MainWindow(QMainWindow):
         self.log_display   = LogDisplay() 
 
         self.right_tabs = QTabWidget()
-        self.right_tabs.addTab(self.graph_display, "กราฟ (Graph)")
+        self.right_tabs.addTab(self.graph_display, "Live Trend Graph")
         self.freq_graph_tab_index = self.right_tabs.addTab(
-            self.freq_summary_graph, "กราฟสรุปตามความถี่ (vs Frequency)"
+            self.freq_summary_graph, "Parameter vs Frequency Graph"
         )
         self.ppm_graph_tab_index = self.right_tabs.addTab(
-            self.ppm_summary_graph, "กราฟ PPM (PPM vs Frequency)"
+            self.ppm_summary_graph, "PPM vs Frequency Graph"
         )
-        self.right_tabs.addTab(self.stats_table,   "ตารางสถิติ (Statistics Table)")
-        self.right_tabs.addTab(self.raw_table,     "ข้อมูลดิบ (Raw Data)")
-        self.right_tabs.addTab(self.log_display,   "บันทึกเหตุการณ์ (Log)")
+        self.right_tabs.addTab(self.stats_table,   "Statistics Table")
+        self.right_tabs.addTab(self.raw_table,     "Raw Data Table")
+        self.right_tabs.addTab(self.log_display,   "Log Display")
 
         self.lcd_display = LcdDisplay()
 

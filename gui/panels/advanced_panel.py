@@ -14,14 +14,11 @@ class AdvancedPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # --- Correction ---
-        group_corr = QGroupBox("การปรับชดเชยค่าสายวัด (Correction)")
+        group_corr = QGroupBox("Correction")
         v_corr = QVBoxLayout()
         v_corr.setSpacing(10)
         lbl_corr_hint = QLabel(
-            "💡 คำแนะนำ:\n"
-            "• ถ่างปลายสายวัดออกจากกัน ➔ กด OPEN\n"
-            "• นำปลายสายวัดมาช็อตกัน ➔ กด SHORT\n"
-            "• ตรวจสอบตั้งค่า สายวัด (Cable Length) ให้ตรงกับสายที่ใช้จริงก่อนกดปุ่มเสมอ"
+            "💡ตรวจสอบให้แน่ใจว่าตั้งค่า Cable Length ตรงกับสายที่ใช้งานจริงก่อนกดปุ่มเสมอ"
         )
         lbl_corr_hint.setWordWrap(True)
         v_corr.addWidget(lbl_corr_hint)
@@ -39,20 +36,18 @@ class AdvancedPanel(QWidget):
         # --- PPM Reference ---
         # ใช้สำหรับคำนวณ PPM Deviation ในตารางสถิติทุกโหมดการวัด (SINGLE, SWEEP, LIST)
         # กราฟแสดงค่าดิบเสมอ — ไม่มี Graph Deviation แล้ว
-        self.group_ppm = QGroupBox("ค่าอ้างอิง PPM (PPM Reference)")
+        self.group_ppm = QGroupBox("PPM Deviation")
         v_ppm = QVBoxLayout()
         v_ppm.setSpacing(8)
 
         lbl_ppm_hint = QLabel(
-            "💡 กรอกค่าอ้างอิงที่ทราบค่าจริง (เช่น จาก Standard หรือใบรับรองสอบเทียบ)\n"
-            "โปรแกรมจะคำนวณ PPM Deviation = (Mean − Ref) / |Ref| × 1,000,000\n"
-            "แสดงผลในคอลัมน์ PPM Dev ของตารางสถิติ"
+            "💡ผลลัพธ์จะแสดงในคอลัมน์ PPM Dev ของตาราง Statistics Table"
         )
         lbl_ppm_hint.setWordWrap(True)
         v_ppm.addWidget(lbl_ppm_hint)
 
         # checkbox เปิด/ปิด PPM — ใช้งานได้ทุกโหมดการวัด (SINGLE, SWEEP, LIST)
-        self.chk_dev_ppm_enable = QCheckBox("เปิดใช้งานการคำนวณ PPM Deviation")
+        self.chk_dev_ppm_enable = QCheckBox("Enable PPM Deviation calculation")
         v_ppm.addWidget(self.chk_dev_ppm_enable)
 
         # widget ที่ถูก enable/disable ตาม checkbox
@@ -70,8 +65,8 @@ class AdvancedPanel(QWidget):
             w.setValidator(v)
             return w
 
-        self.input_dev_pri = _make_ref_input("เช่น 100.032e-12 หรือ 1.00032e-10")
-        self.input_dev_sec = _make_ref_input("เช่น 0.00032 หรือ 3.2e-4")
+        self.input_dev_pri = _make_ref_input("กรอกค่าอ้างอิง")
+        self.input_dev_sec = _make_ref_input("กรอกค่าอ้างอิง")
 
         grid = QGridLayout()
         grid.setVerticalSpacing(8)

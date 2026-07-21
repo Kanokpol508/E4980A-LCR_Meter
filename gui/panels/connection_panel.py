@@ -9,7 +9,7 @@ class ConnectionPanel(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        group_visa = QGroupBox("เลือกพอร์ตสื่อสาร (VISA Resource)")
+        group_visa = QGroupBox("VISA Resource")
         v_visa = QVBoxLayout()
 
         # --- แถวบน: Dropdown เลือกพอร์ต + ปุ่ม Refresh ---
@@ -48,7 +48,7 @@ class ConnectionPanel(QWidget):
             "QPushButton#btnDisconnect:disabled { background-color: #4b5563; border: 1px solid #374151; color: #9ca3af; }"
         )
 
-        self.lbl_status = QLabel("⚪ ยังไม่ได้เชื่อมต่อ")
+        self.lbl_status = QLabel("\u26aa Not Connected")
         self.lbl_status.setStyleSheet("font-weight: bold; color: #9ca3af;")
 
         h_conn.addWidget(self.btn_connect)
@@ -62,10 +62,10 @@ class ConnectionPanel(QWidget):
     def set_connected_ui(self, connected: bool, resource_text: str = ""):
         """ปรับหน้าตาปุ่ม/สถานะให้ตรงกับสถานะการเชื่อมต่อปัจจุบัน"""
         if connected:
-            self.lbl_status.setText(f"🟢 เชื่อมต่อแล้ว: {resource_text}")
+            self.lbl_status.setText(f"\U0001F7E2 Connected: {resource_text}")
             self.lbl_status.setStyleSheet("font-weight: bold; color: #22c55e;")
         else:
-            self.lbl_status.setText("⚪ ยังไม่ได้เชื่อมต่อ")
+            self.lbl_status.setText("\u26aa Not Connected")
             self.lbl_status.setStyleSheet("font-weight: bold; color: #9ca3af;")
 
         self.btn_connect.setEnabled(not connected)

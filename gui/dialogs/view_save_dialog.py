@@ -20,10 +20,10 @@ class ViewSaveDialog(QDialog):
     open_save_requested = pyqtSignal(str)  # ส่ง path ของไฟล์ save ที่ต้องการเปิด
 
     FILTER_OPTIONS = [
-        ("ทั้งหมด (All)", "ALL"),
-        ("วัดจุดเดียว (Single)", "SINGLE"),
-        ("สแกนความถี่ (Sweep)", "SWEEP"),
-        ("รายการความถี่ (List)", "LIST"),
+        ("All (โหมดทั้งหมด)", "ALL"),
+        ("Single (โหมดวัดจุดเดียว)", "SINGLE"),
+        ("Sweep (โหมดสแกนความถี่)", "SWEEP"),
+        ("List (โหมดรายการความถี่)", "LIST"),
     ]
 
     def __init__(self, parent=None):
@@ -38,7 +38,7 @@ class ViewSaveDialog(QDialog):
 
         # --- หัวข้อ + Dropdown กรอง ---
         h_top = QHBoxLayout()
-        lbl_title = QLabel("รายชื่อ Save ในระบบ")
+        lbl_title = QLabel("Saved Results List")
         lbl_title.setStyleSheet("font-size: 16px; font-weight: bold;")
         h_top.addWidget(lbl_title)
         h_top.addStretch()
@@ -141,7 +141,7 @@ class ViewSaveDialog(QDialog):
     def _on_open_save(self):
         item = self._selected_save()
         if item is None:
-            QMessageBox.information(self, "ยังไม่ได้เลือก Save", "กรุณาเลือกรายการ Save ที่ต้องการเปิดก่อน")
+            QMessageBox.information(self, "No Save Selected", "กรุณาเลือกรายการ Save ที่ต้องการเปิดก่อน")
             return
         self.open_save_requested.emit(item["path"])
         self.accept()
@@ -152,13 +152,13 @@ class ViewSaveDialog(QDialog):
     def _on_delete_save(self):
         item = self._selected_save()
         if item is None:
-            QMessageBox.information(self, "ยังไม่ได้เลือก Save", "กรุณาเลือกรายการ Save ที่ต้องการลบก่อน")
+            QMessageBox.information(self, "No Save Selected", "กรุณาเลือกรายการ Save ที่ต้องการลบก่อน")
             return
 
         reply = QMessageBox.question(
             self,
-            "ยืนยันการลบ Save",
-            f"คุณต้องการลบ Save \"{item['save_name']}\" นี้จริงหรือไม่?\nการลบไม่สามารถกู้คืนได้",
+            "Confirm Delete Save",
+            f"คุณต้องการลบ Save นี้จริงหรือไม่ \"{item['save_name']}\"? \nการลบไม่สามารถกู้คืนได้",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )

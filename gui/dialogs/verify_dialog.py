@@ -34,7 +34,7 @@ class VerifyDialog(QDialog):
         # สร้างตาราง
         self.table = QTableWidget()
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["พารามิเตอร์", "ค่าที่โปรแกรมส่งไป (Expected)", "ค่าที่เครื่องตอบกลับ (Actual)", "สถานะ"])
+        self.table.setHorizontalHeaderLabels(["Parameter (พารามิเตอร์)", "Expected (ค่าที่โปรแกรมส่งไป)", "Actual (ค่าที่เครื่องตอบกลับ)", "Status (สถานะ)"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)             # ห้ามแก้ไข
         

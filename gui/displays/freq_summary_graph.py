@@ -216,6 +216,27 @@ class FreqSummaryGraph(QWidget):
         main_layout.addWidget(group_opts)
 
         # ==========================================
+        # แถบ Progress / Current Reading (ระหว่างวัดซ้ำ)
+        # แสดงว่าตอนนี้กำลังวัดซ้ำอยู่ที่ความถี่ไหน — อัปเดตจาก app_controller
+        # ผ่าน set_progress()/set_current_reading() ทุกครั้งที่มีจุดข้อมูลใหม่เข้ามา
+        # ==========================================
+        status_bar = QHBoxLayout()
+        status_bar.addWidget(QLabel("Progress:"))
+        self.lbl_progress = QLabel("Idle")
+        self.lbl_progress.setStyleSheet("font-weight: bold;")
+        status_bar.addWidget(self.lbl_progress)
+
+        status_bar.addSpacing(20)
+
+        status_bar.addWidget(QLabel("Current Reading:"))
+        self.lbl_current_reading = QLabel("--")
+        self.lbl_current_reading.setStyleSheet("font-weight: bold;")
+        status_bar.addWidget(self.lbl_current_reading)
+
+        status_bar.addStretch(1)
+        main_layout.addLayout(status_bar)
+
+        # ==========================================
         # แถบ Graph Title + ปุ่ม Save เป็น JPEG
         # ==========================================
         title_bar = QHBoxLayout()
@@ -338,6 +359,19 @@ class FreqSummaryGraph(QWidget):
             self.plot_widget.setXRange(math.log10(FREQ_MIN), math.log10(FREQ_MAX_BUFFERED))
         else:
             self.plot_widget.setXRange(FREQ_MIN, FREQ_MAX_BUFFERED)
+        self.set_progress("Idle")
+        self.set_current_reading("--")
+
+    # --------------------------------------------------------
+    def set_progress(self, text: str):
+        """เรียกจาก app_controller ระหว่างวัด เพื่อบอกสถานะภาพรวม
+        เช่น 'Sample 2/5 @ Freq 3/10 (1.0 kHz)' หรือ 'Idle' / 'Stopped' / 'Complete'"""
+        self.lbl_progress.setText(text)
+
+    def set_current_reading(self, text: str):
+        """เรียกจาก app_controller ทุกครั้งที่มีจุดข้อมูลใหม่เข้ามา เพื่อบอกว่ากำลัง
+        วัดซ้ำอยู่ที่ความถี่ไหน พร้อมค่าที่อ่านได้ล่าสุด เช่น 'Re: 1.00234e+04 Ω @ 1.0 kHz'"""
+        self.lbl_current_reading.setText(text)
 
     # --------------------------------------------------------
     def _group_y_label(self, show_pri: bool, show_sec: bool) -> str:

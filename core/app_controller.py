@@ -1,5 +1,6 @@
 # ตัวกลางรับ Event จาก GUI ไปสั่ง Hardware และส่งผลกลับมา GUI
 
+import re
 import time
 
 from PyQt6.QtWidgets import QMessageBox, QProgressDialog
@@ -641,6 +642,10 @@ class AppController(QObject):
             self.view.ctrl_panel.btn_stop.setText("STOPPING...")
             self.view.ctrl_panel.btn_stop.setEnabled(False)
             self.log.warning("⏹ ผู้ใช้กด STOP — กำลังหยุดการวัด...")
+            run_mode = self.get_current_run_mode()
+            if run_mode in ("LIST", "SWEEP"):
+                self.view.freq_summary_graph.set_progress("Stopped")
+                self.view.ppm_summary_graph.set_progress("Stopped")
 
     # ========================================================
     # การคำนวณและแสดงผลข้อมูล (Data Handling & Math)
@@ -715,6 +720,60 @@ class AppController(QObject):
 
         v.graph_display.update_plots(plot_x, self.graph_pri_y, self.graph_sec_y)
         self.update_statistics_table()
+
+        # --- [NEW] อัปเดต Progress / Current Reading ใต้กราฟสรุปตามความถี่ & กราฟ PPM ---
+        # มีความหมายเฉพาะโหมด LIST/SWEEP (ที่วัดหลายความถี่ วนซ้ำหลายรอบต่อความถี่)
+        if is_list or is_sweep:
+            freq_display = self._format_freq_display(current_freq)
+            progress_text = f"Sample {sample_text} | Freq: {freq_display}"
+
+            # โชว์เฉพาะพารามิเตอร์ที่ผู้ใช้ติ๊กเปิดไว้บนกราฟ (Plot Primary/Secondary)
+            # ให้ตรงกับสิ่งที่กำลังแสดงอยู่จริง — ไม่ใช่โชว์ครบทั้งคู่ตายตัว
+            parts = []
+            if v.freq_summary_graph.chk_plot_pri.isChecked():
+                pri_name = self._format_param_display(v.freq_summary_graph.pri_name)
+                parts.append(f"{pri_name}: {raw_pri:.5e}")
+            if v.freq_summary_graph.chk_plot_sec.isChecked():
+                sec_name = self._format_param_display(v.freq_summary_graph.sec_name)
+                parts.append(f"{sec_name}: {raw_sec:.5e}")
+
+            if parts:
+                reading_text = ", ".join(parts) + f" | Freq: {freq_display}"
+            else:
+                reading_text = f"(Plot Primary/Secondary ปิดอยู่ทั้งคู่) | Freq: {freq_display}"
+
+            v.freq_summary_graph.set_progress(progress_text)
+            v.freq_summary_graph.set_current_reading(reading_text)
+            v.ppm_summary_graph.set_progress(progress_text)
+            v.ppm_summary_graph.set_current_reading(reading_text)
+
+    @staticmethod
+    def _format_param_display(label: str) -> str:
+        """แปลงชื่อพารามิเตอร์รูปแบบเต็ม 'Capacitance, Cp (F)' (ใช้กับแกนกราฟ/legend)
+        ให้เป็นรูปแบบสั้น อ่านง่ายขึ้นสำหรับ Current Reading: 'Capacitance (Cp)'
+        (ไม่แก้ pri_name/sec_name ต้นทาง เพราะที่อื่นในโปรแกรมยังใช้รูปแบบเดิมอยู่)"""
+        text = label
+        m = re.match(r"^(.*?)\s*\([^()]+\)\s*$", text)
+        if m:
+            text = m.group(1).strip()  # ตัดหน่วยท้ายวงเล็บออกก่อน เช่น '(F)', '(Ω)'
+        if ',' in text:
+            name, abbr = text.split(',', 1)
+            return f"{name.strip()} ({abbr.strip()})"
+        return text
+
+    @staticmethod
+    def _format_freq_display(freq: float) -> str:
+        """แปลงความถี่ (Hz) ดิบให้อ่านง่าย เช่น 1000 -> '1 kHz', 1500000 -> '1.5 MHz'"""
+        try:
+            freq = float(freq)
+        except (TypeError, ValueError):
+            return str(freq)
+        if freq >= 1e6:
+            return f"{freq / 1e6:g} MHz"
+        elif freq >= 1e3:
+            return f"{freq / 1e3:g} kHz"
+        else:
+            return f"{freq:g} Hz"
 
     def update_statistics_table(self):
         """สร้าง raw_records จากข้อมูลที่เก็บไว้ แล้วส่งให้ StatisticsTable คำนวณ/แสดงผลใหม่
@@ -828,6 +887,12 @@ class AppController(QObject):
         self.log.info("✅ การวัดเสร็จสมบูรณ์")
         self.set_ui_locked(False)
         self.worker = None
+
+        # [NEW] อัปเดต Progress ใต้กราฟสรุป/PPM ให้รู้ว่าวัดเสร็จแล้ว (เฉพาะถ้ามีการวัดจริง)
+        run_mode = self.get_current_run_mode()
+        if run_mode in ("LIST", "SWEEP"):
+            self.view.freq_summary_graph.set_progress("Complete")
+            self.view.ppm_summary_graph.set_progress("Complete")
 
         # [NEW] จำเวลาที่วัดเสร็จไว้ ณ ตอนนี้ — นี่คือเวลาที่จะใช้ตอน Save Result จริงๆ
         # (ไม่ใช่เวลาที่ผู้ใช้กดปุ่ม Save Result ซึ่งอาจกดทีหลังก็ได้)

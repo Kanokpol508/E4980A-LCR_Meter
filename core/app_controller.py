@@ -88,7 +88,6 @@ class AppController(QObject):
         v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._refresh_graph_labels)
         v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._refresh_raw_table_headers)
         v.input_panel.combo_run_mode.currentIndexChanged.connect(self._refresh_graph_labels)
-        v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._reset_correction_status)
         v.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
@@ -138,16 +137,22 @@ class AppController(QObject):
         # ตรวจสอบ Frequency List ทุกครั้งที่มีการแก้ไข (เฉพาะมีผลตอนอยู่โหมด List)
         v.input_panel.input_freq_list.freq_changed.connect(self.validate_freq_list)
 
-        # รีเซ็ตสถานะปุ่ม Correction เมื่อเปลี่ยนค่าที่ทำให้ Correction ใช้ไม่ได้
-        # อ้างอิงจากคู่มือ E4980A หน้า 117: "after correction, different length cable/
-        # different fixture is connected or settings of frequency/level is changed"
-        # → Cable Length: ส่งผลโดยตรงต่อ phase compensation ของ correction
-        # → Meas Mode (เช่น CPD→ZTD): เปลี่ยนฟังก์ชันวัด correction data ไม่ตรงกัน
-        # → Signal Level/หน่วย: คู่มือระบุตรงๆ ว่า level เปลี่ยนแล้ว correction ไม่ valid
+        # รีเซ็ตสถานะปุ่ม Correction เมื่อเปลี่ยน "Cable Length" เท่านั้น
+        # เหตุผล (อ้างอิงคู่มือ E4980A หน้า 116): OPEN/SHORT Correction แบบ "all frequency
+        # points" ที่โปรแกรมนี้ใช้ (:CORR:OPEN:EXEC / :CORR:SHOR:EXEC) จะวัดค่าที่ 51 จุด
+        # ความถี่คงที่เสมอ "regardless of the test frequency settings" และค่าที่ชดเชยคือ
+        # stray admittance ในช่วงจาก "calibration plane" ซึ่งถูกกำหนดโดย Cable Length
+        # ไปถึงจุดต่อ DUT (หน้า 115) — คือปัจจัยเดียวที่มีเอกสารระบุชัดว่ากระทบ correction
+        # data ของโหมดนี้โดยตรง จึงเหลือ trigger รีเซ็ตไว้แค่ตัวเดียวคือ combo_cable
+        #
+        # ส่วน Meas Mode (SCPI mode) และ Signal Level ไม่รีเซ็ตอีกต่อไป เพราะ:
+        # - Meas Mode (CPD/ZTD/...): เป็นแค่การแปลงค่า R-X ที่วัดได้ไปแสดงเป็นพารามิเตอร์
+        #   ต่างกัน ไม่ได้เปลี่ยนตัว correction data ที่เก็บไว้ในเครื่อง
+        # - Signal Level: คู่มือหน้า 117 มีคำเตือนทั่วไปว่า "settings of frequency/level
+        #   is changed" อาจทำให้ correction ไม่ valid แต่คำเตือนนี้ครอบคลุมโหมด SPOT
+        #   correction (วัดที่จุดเดียวตามความถี่/level ปัจจุบัน) เป็นหลัก ไม่ใช่โหมด
+        #   "all frequency points" ที่โปรแกรมนี้ใช้ซึ่งสวีปคงที่ 51 จุดเสมอ
         v.input_panel.combo_cable.currentIndexChanged.connect(self._reset_correction_status)
-        v.input_panel.combo_scpi_mode.currentIndexChanged.connect(self._reset_correction_status)
-        v.input_panel.input_volt.valueChanged.connect(self._reset_correction_status)
-        v.input_panel.combo_level_mode.currentIndexChanged.connect(self._reset_correction_status)
 
     # ========================================================
     # Logic Methods
@@ -423,9 +428,9 @@ class AppController(QObject):
     def _reset_correction_status(self):
         """
         รีเซ็ตปุ่ม OPEN/SHORT Correction กลับสู่สถานะเริ่มต้น (สีเทา / ไม่มี OK)
-        เรียกอัตโนมัติเมื่อผู้ใช้เปลี่ยนค่าที่ทำให้ Correction data ที่ทำไว้ไม่ valid อีกต่อไป
-        ได้แก่: Cable Length, Meas Mode, Signal Level, Signal Level Unit
-        (อ้างอิงคู่มือ E4980A หน้า 117)
+        เรียกอัตโนมัติเมื่อผู้ใช้เปลี่ยน "Cable Length" เท่านั้น (ดูเหตุผลเต็มๆ ที่จุด
+        connect สัญญาณใน _connect_signals ด้านบน) — Meas Mode และ Signal Level
+        ไม่ทำให้ Correction data ที่ทำไว้ไม่ valid อีกต่อไปแล้ว จึงไม่ trigger reset นี้
 
         หมายเหตุ: method นี้รีเซ็ตเฉพาะ label/style บนปุ่ม GUI เพื่อแจ้งเตือนผู้ใช้
         ข้อมูล Correction ที่อยู่ในตัวเครื่อง (hardware) ไม่ถูกลบ — ผู้ใช้ต้องกด

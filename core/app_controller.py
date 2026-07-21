@@ -21,6 +21,7 @@ class AppController(QObject):
         self.is_ppm_error = False               # ป้องกัน AttributeError: เปิด PPM แต่ไม่กรอก Ref
         self.is_visa_error = True
         self.is_freqlist_error = False          # ป้องกัน AttributeError
+        self._stopped_by_user = False           # [NEW] แยกกรณีวัดจบเองกับผู้ใช้กด Stop เอง (กันป๊อปอัพเด้งตอนกด Stop)
 
         self.worker = None
         self.corr_worker = None
@@ -557,6 +558,7 @@ class AppController(QObject):
         v = self.view
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
+        self._stopped_by_user = False  # [NEW] เริ่มวัดใหม่ทุกครั้ง ถือว่ายังไม่ได้ถูกกด Stop
 
         # [NEW] เตรียมตาราง Raw Data ก่อนเริ่มวัด
         v.raw_table.set_mode(run_mode)
@@ -638,6 +640,7 @@ class AppController(QObject):
 
     def stop_measurement(self):
         if self.worker and self.worker.isRunning():
+            self._stopped_by_user = True  # [NEW] กันป๊อปอัพ "วัดเสร็จสมบูรณ์" เด้งตอนผู้ใช้ตั้งใจกด Stop เอง
             self.worker.stop()
             self.view.ctrl_panel.btn_stop.setText("STOPPING...")
             self.view.ctrl_panel.btn_stop.setEnabled(False)
@@ -893,6 +896,12 @@ class AppController(QObject):
         if run_mode in ("LIST", "SWEEP"):
             self.view.freq_summary_graph.set_progress("Complete")
             self.view.ppm_summary_graph.set_progress("Complete")
+
+        # [NEW] ป๊อปอัพแจ้งเตือนตอนวัดเสร็จ — เฉพาะกรณีวัดจบเองตามรอบจริงๆ เท่านั้น
+        # ไม่เด้งตอนผู้ใช้ตั้งใจกด Stop เอง (กันความรำคาญ/สับสนว่า "จบ" ทั้งที่ตัวเองสั่งหยุด)
+        if not self._stopped_by_user:
+            QMessageBox.information(self.view, "วัดเสร็จสมบูรณ์", "การวัดเสร็จสมบูรณ์แล้ว ✅")
+        self._stopped_by_user = False
 
         # [NEW] จำเวลาที่วัดเสร็จไว้ ณ ตอนนี้ — นี่คือเวลาที่จะใช้ตอน Save Result จริงๆ
         # (ไม่ใช่เวลาที่ผู้ใช้กดปุ่ม Save Result ซึ่งอาจกดทีหลังก็ได้)

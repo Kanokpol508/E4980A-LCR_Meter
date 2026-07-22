@@ -271,7 +271,7 @@ class PpmSummaryGraph(QWidget):
         # กราฟหลัก (Primary/Secondary รวมในแกน Y เดียวกัน หน่วย ppm)
         # ==========================================
         self.plot_widget = pg.PlotWidget(
-            title="PPM Deviation vs. Frequency",
+            title="PPM Deviation vs Frequency",
             axisItems={
                 'bottom': _FreqEngAxisItem(orientation='bottom'),
                 'left':   _EngAxisItem(orientation='left'),
@@ -458,7 +458,7 @@ class PpmSummaryGraph(QWidget):
         self.legend.clear()
 
         title = self.input_graph_title.text().strip()
-        self.plot_widget.setTitle(title if title else "PPM Deviation vs. Frequency")
+        self.plot_widget.setTitle(title if title else "PPM Deviation vs Frequency")
 
         x_scale = self.combo_x_scale.currentText().lower()
         is_log = (x_scale == 'log')

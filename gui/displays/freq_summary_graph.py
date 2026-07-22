@@ -258,7 +258,7 @@ class FreqSummaryGraph(QWidget):
         # กราฟหลัก (Primary/Secondary รวมในแกน Y เดียวกัน)
         # ==========================================
         self.plot_widget = pg.PlotWidget(
-            title="Mean vs. Frequency",
+            title="Parameter vs Frequency",
             axisItems={
                 'bottom': _FreqEngAxisItem(orientation='bottom'),
                 'left':   _EngAxisItem(orientation='left'),
@@ -268,7 +268,7 @@ class FreqSummaryGraph(QWidget):
         self.plot_widget.showGrid(x=True, y=True, alpha=0.3)
         self._style_axes_dark(self.plot_widget)
         self.plot_widget.setLabel('bottom', 'Frequency (Hz)', **self.label_style)
-        self.plot_widget.setLabel('left', 'Mean Value', **self.label_style)
+        self.plot_widget.setLabel('left', 'Parameter Value', **self.label_style)
 
         # ตั้งช่วงเริ่มต้นให้เป็นช่วงความถี่ทั่วไปของเครื่อง LCR (20Hz - 2.1MHz)
         # เผื่อขอบไว้นิดหน่อยกันข้อมูลที่วัดได้พอดี 2MHz ไปติดขอบกราฟ
@@ -405,7 +405,7 @@ class FreqSummaryGraph(QWidget):
             return self.pri_name
         elif show_sec:
             return self.sec_name
-        return "Mean Value"
+        return "Parameter Value"
 
     # --------------------------------------------------------
     def _redraw(self, *args):
@@ -418,7 +418,7 @@ class FreqSummaryGraph(QWidget):
         self.legend.clear()
 
         title = self.input_graph_title.text().strip()
-        self.plot_widget.setTitle(title if title else "Mean vs. Frequency")
+        self.plot_widget.setTitle(title if title else "Parameter vs Frequency")
 
         is_log = (self.combo_x_scale.currentText().lower() == 'log')
 

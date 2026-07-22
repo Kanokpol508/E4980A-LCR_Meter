@@ -14,7 +14,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QCheckBox, QLabel, QLineEdit, QComboBox, QPushButton, QFileDialog, QMessageBox
 )
-from PyQt6.QtCore import QStandardPaths
+from PyQt6.QtCore import QStandardPaths, Qt
+from PyQt6.QtGui import QStandardItemModel, QStandardItem
 import pyqtgraph as pg
 import pyqtgraph.exporters
 
@@ -186,10 +187,29 @@ class PpmSummaryGraph(QWidget):
         opts_layout = QHBoxLayout()
         opts_layout.setSpacing(12)
 
-        self.chk_plot_pri = QCheckBox("Plot Primary")
-        self.chk_plot_pri.setChecked(True)
-        self.chk_plot_sec = QCheckBox("Plot Secondary")
-        self.chk_plot_sec.setChecked(True)
+        # [เปลี่ยนจาก 2 checkbox อิสระ (Plot Primary / Plot Secondary) มาเป็น
+        #  Dropdown เดียว 3 ตัวเลือก: Primary / Secondary / Both — ค่าเริ่มต้นเปิดโปรแกรม
+        #  ครั้งแรกคือ "Plot Primary" ตามที่ผู้ใช้ต้องการ]
+        # ใช้ QStandardItemModel แทน addItem() ธรรมดา เพราะต้อง enable/disable ทีละตัวเลือก
+        # ได้ (เช่น ปิด "Plot Primary" ถ้ายังไม่กรอก Primary Ref) เหมือนที่เดิม
+        # setEnabled(False) ทำกับ checkbox ทีละตัวได้ แต่ QComboBox ทำแบบนั้นไม่ได้
+        # ต้องสั่งที่ item ใน model แทน
+        self.combo_plot_select = QComboBox()
+        self._plot_select_model = QStandardItemModel(self.combo_plot_select)
+
+        self._item_plot_pri = QStandardItem("Plot Primary")
+        self._item_plot_pri.setData("PRI", Qt.ItemDataRole.UserRole)
+        self._item_plot_sec = QStandardItem("Plot Secondary")
+        self._item_plot_sec.setData("SEC", Qt.ItemDataRole.UserRole)
+        self._item_plot_both = QStandardItem("Plot Both")
+        self._item_plot_both.setData("BOTH", Qt.ItemDataRole.UserRole)
+
+        for item in (self._item_plot_pri, self._item_plot_sec, self._item_plot_both):
+            self._plot_select_model.appendRow(item)
+
+        self.combo_plot_select.setModel(self._plot_select_model)
+        self.combo_plot_select.setCurrentIndex(0)  # ค่าเริ่มต้น = Plot Primary
+
         self.chk_error_bar = QCheckBox("Show Stability Error Bars (SD PPM)")
         self.chk_error_bar.setChecked(True)
         self.chk_data_labels = QCheckBox("Show Data Labels")
@@ -197,8 +217,8 @@ class PpmSummaryGraph(QWidget):
         self.chk_show_legend = QCheckBox("Show Legend")
         self.chk_show_legend.setChecked(True)
 
-        opts_layout.addWidget(self.chk_plot_pri)
-        opts_layout.addWidget(self.chk_plot_sec)
+        opts_layout.addWidget(QLabel("Plot:"))
+        opts_layout.addWidget(self.combo_plot_select)
         opts_layout.addWidget(self.chk_error_bar)
         opts_layout.addWidget(self.chk_data_labels)
         opts_layout.addWidget(self.chk_show_legend)
@@ -212,15 +232,6 @@ class PpmSummaryGraph(QWidget):
 
         group_opts.setLayout(opts_layout)
         main_layout.addWidget(group_opts)
-
-        # คำเตือนเล็กๆ ใต้ตัวเลือก — เตือนว่ากราฟนี้ต้องเปิด PPM Reference ก่อนถึงจะมีข้อมูล
-        self.lbl_ref_hint = QLabel(
-            "* ต้องเปิด \"เปิดใช้งานการคำนวณ PPM Deviation\" และกรอกค่าอ้างอิง (Nominal) "
-            "ในแท็บ Advanced ก่อนเริ่มวัด กราฟนี้จึงจะมีข้อมูล"
-        )
-        self.lbl_ref_hint.setStyleSheet("color: #64748b; font-size: 11px; padding: 2px 4px;")
-        self.lbl_ref_hint.setWordWrap(True)
-        main_layout.addWidget(self.lbl_ref_hint)
 
         # ==========================================
         # แถบ Progress / Current Reading (ระหว่างวัดซ้ำ)
@@ -319,9 +330,9 @@ class PpmSummaryGraph(QWidget):
         # ==========================================
         # Signal เชื่อมต่อ: เปลี่ยนตัวเลือกแล้ว redraw ทันที
         # ==========================================
-        for w in (self.chk_plot_pri, self.chk_plot_sec, self.chk_error_bar,
-                  self.chk_data_labels, self.chk_show_legend):
+        for w in (self.chk_error_bar, self.chk_data_labels, self.chk_show_legend):
             w.stateChanged.connect(self._redraw)
+        self.combo_plot_select.currentIndexChanged.connect(self._redraw)
         self.combo_x_scale.currentTextChanged.connect(self._on_scale_changed)
         self.input_graph_title.textChanged.connect(self._redraw)
         self.btn_save_jpeg.clicked.connect(self.save_as_jpeg)
@@ -330,6 +341,28 @@ class PpmSummaryGraph(QWidget):
         self._sec_ppm, self._sec_err = [], []
 
         self._redraw()
+
+    # --------------------------------------------------------
+    def is_plot_primary_enabled(self) -> bool:
+        """คืนค่า True ถ้าตัวเลือกปัจจุบันใน Dropdown คือ 'Plot Primary' หรือ 'Plot Both'
+        (แทนที่ chk_plot_pri.isChecked() เดิม)"""
+        return self.combo_plot_select.currentData() in ("PRI", "BOTH")
+
+    def is_plot_secondary_enabled(self) -> bool:
+        """คืนค่า True ถ้าตัวเลือกปัจจุบันใน Dropdown คือ 'Plot Secondary' หรือ 'Plot Both'"""
+        return self.combo_plot_select.currentData() in ("SEC", "BOTH")
+
+    def set_primary_option_enabled(self, enabled: bool, tooltip: str = ""):
+        """เปิด/ปิดตัวเลือก 'Plot Primary' ใน Dropdown (แทนที่ chk_plot_pri.setEnabled() เดิม)
+        ไม่บังคับเปลี่ยนตัวเลือกที่กำลังเลือกอยู่แม้จะถูกปิด — รักษาพฤติกรรมเดิมที่แค่ทำให้
+        เลือกไม่ได้ (จาง) แต่ไม่รีเซ็ตตัวเลือกทิ้ง เผื่อผู้ใช้กรอก Ref กลับมาใหม่ภายหลัง"""
+        self._item_plot_pri.setEnabled(enabled)
+        self._item_plot_pri.setToolTip(tooltip)
+
+    def set_secondary_option_enabled(self, enabled: bool, tooltip: str = ""):
+        """เปิด/ปิดตัวเลือก 'Plot Secondary' ใน Dropdown (แทนที่ chk_plot_sec.setEnabled() เดิม)"""
+        self._item_plot_sec.setEnabled(enabled)
+        self._item_plot_sec.setToolTip(tooltip)
 
     # --------------------------------------------------------
     def _on_scale_changed(self, *args):
@@ -434,8 +467,8 @@ class PpmSummaryGraph(QWidget):
         pri_fx, pri_vy, pri_ey = self._filter_none(self._freqs, self._pri_ppm, self._pri_err)
         sec_fx, sec_vy, sec_ey = self._filter_none(self._freqs, self._sec_ppm, self._sec_err)
 
-        show_pri = self.chk_plot_pri.isChecked() and len(pri_fx) > 0
-        show_sec = self.chk_plot_sec.isChecked() and len(sec_fx) > 0
+        show_pri = self.is_plot_primary_enabled() and len(pri_fx) > 0
+        show_sec = self.is_plot_secondary_enabled() and len(sec_fx) > 0
 
         self.plot_widget.setLabel('left', self._group_y_label(show_pri, show_sec), **self.label_style)
 

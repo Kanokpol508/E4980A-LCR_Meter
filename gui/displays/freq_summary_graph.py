@@ -188,10 +188,15 @@ class FreqSummaryGraph(QWidget):
         opts_layout = QHBoxLayout()
         opts_layout.setSpacing(12)
 
-        self.chk_plot_pri = QCheckBox("Plot Primary")
-        self.chk_plot_pri.setChecked(True)
-        self.chk_plot_sec = QCheckBox("Plot Secondary")
-        self.chk_plot_sec.setChecked(True)
+        # [เปลี่ยนจาก 2 checkbox อิสระ (Plot Primary / Plot Secondary) มาเป็น
+        #  Dropdown เดียว 3 ตัวเลือก: Primary / Secondary / Both — ค่าเริ่มต้นเปิดโปรแกรม
+        #  ครั้งแรกคือ "Plot Primary" ตามที่ผู้ใช้ต้องการ]
+        self.combo_plot_select = QComboBox()
+        self.combo_plot_select.addItem("Plot Primary", userData="PRI")
+        self.combo_plot_select.addItem("Plot Secondary", userData="SEC")
+        self.combo_plot_select.addItem("Plot Both", userData="BOTH")
+        self.combo_plot_select.setCurrentIndex(0)  # ค่าเริ่มต้น = Plot Primary
+
         self.chk_error_bar = QCheckBox("Show SD Error Bars")
         self.chk_error_bar.setChecked(True)
         self.chk_data_labels = QCheckBox("Show Data Labels")
@@ -199,8 +204,8 @@ class FreqSummaryGraph(QWidget):
         self.chk_show_legend = QCheckBox("Show Legend")
         self.chk_show_legend.setChecked(True)
 
-        opts_layout.addWidget(self.chk_plot_pri)
-        opts_layout.addWidget(self.chk_plot_sec)
+        opts_layout.addWidget(QLabel("Plot:"))
+        opts_layout.addWidget(self.combo_plot_select)
         opts_layout.addWidget(self.chk_error_bar)
         opts_layout.addWidget(self.chk_data_labels)
         opts_layout.addWidget(self.chk_show_legend)
@@ -301,9 +306,9 @@ class FreqSummaryGraph(QWidget):
         # ==========================================
         # Signal เชื่อมต่อ: เปลี่ยนตัวเลือกแล้ว redraw ทันที
         # ==========================================
-        for w in (self.chk_plot_pri, self.chk_plot_sec, self.chk_error_bar,
-                  self.chk_data_labels, self.chk_show_legend):
+        for w in (self.chk_error_bar, self.chk_data_labels, self.chk_show_legend):
             w.stateChanged.connect(self._redraw)
+        self.combo_plot_select.currentIndexChanged.connect(self._redraw)
         self.combo_x_scale.currentTextChanged.connect(self._on_scale_changed)
         self.input_graph_title.textChanged.connect(self._redraw)
         self.btn_save_jpeg.clicked.connect(self.save_as_jpeg)
@@ -312,6 +317,17 @@ class FreqSummaryGraph(QWidget):
         self._sec_mean, self._sec_sd = [], []
 
         self._redraw()
+
+    # --------------------------------------------------------
+    def is_plot_primary_enabled(self) -> bool:
+        """คืนค่า True ถ้าตัวเลือกปัจจุบันใน Dropdown คือ 'Plot Primary' หรือ 'Plot Both'
+        (แทนที่ chk_plot_pri.isChecked() เดิม เผื่อโค้ดภายนอก เช่น app_controller.py
+        ยังต้องเรียกเช็คว่ากำลังโชว์เส้น Primary อยู่หรือไม่)"""
+        return self.combo_plot_select.currentData() in ("PRI", "BOTH")
+
+    def is_plot_secondary_enabled(self) -> bool:
+        """คืนค่า True ถ้าตัวเลือกปัจจุบันใน Dropdown คือ 'Plot Secondary' หรือ 'Plot Both'"""
+        return self.combo_plot_select.currentData() in ("SEC", "BOTH")
 
     # --------------------------------------------------------
     def _style_axes_dark(self, plot_widget):
@@ -418,8 +434,8 @@ class FreqSummaryGraph(QWidget):
         plot_x = freqs
         label_x = np.log10(freqs) if (is_log and len(freqs)) else freqs
 
-        show_pri = self.chk_plot_pri.isChecked() and len(freqs) > 0
-        show_sec = self.chk_plot_sec.isChecked() and len(freqs) > 0
+        show_pri = self.is_plot_primary_enabled() and len(freqs) > 0
+        show_sec = self.is_plot_secondary_enabled() and len(freqs) > 0
 
         # ---- ชื่อแกน Y ตามกลุ่มพารามิเตอร์ที่เลือกจริง ----
         self.plot_widget.setLabel('left', self._group_y_label(show_pri, show_sec), **self.label_style)

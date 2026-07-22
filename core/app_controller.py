@@ -733,10 +733,10 @@ class AppController(QObject):
             # โชว์เฉพาะพารามิเตอร์ที่ผู้ใช้ติ๊กเปิดไว้บนกราฟ (Plot Primary/Secondary)
             # ให้ตรงกับสิ่งที่กำลังแสดงอยู่จริง — ไม่ใช่โชว์ครบทั้งคู่ตายตัว
             parts = []
-            if v.freq_summary_graph.chk_plot_pri.isChecked():
+            if v.freq_summary_graph.is_plot_primary_enabled():
                 pri_name = self._format_param_display(v.freq_summary_graph.pri_name)
                 parts.append(f"{pri_name}: {raw_pri:.5e}")
-            if v.freq_summary_graph.chk_plot_sec.isChecked():
+            if v.freq_summary_graph.is_plot_secondary_enabled():
                 sec_name = self._format_param_display(v.freq_summary_graph.sec_name)
                 parts.append(f"{sec_name}: {raw_sec:.5e}")
 
@@ -1153,9 +1153,9 @@ class AppController(QObject):
         else:
             v.adv_panel.lbl_dev_warning.setText("")
             self.is_ppm_error = False
-            # [NEW] ปิด PPM ทั้งระบบ -> ล็อก checkbox Plot Primary/Secondary ของกราฟ PPM ด้วย
-            v.ppm_summary_graph.chk_plot_pri.setEnabled(False)
-            v.ppm_summary_graph.chk_plot_sec.setEnabled(False)
+            # [NEW] ปิด PPM ทั้งระบบ -> ล็อกตัวเลือก Plot Primary/Secondary ของกราฟ PPM ด้วย
+            v.ppm_summary_graph.set_primary_option_enabled(False)
+            v.ppm_summary_graph.set_secondary_option_enabled(False)
             self.update_start_button_state()
 
     def validate_ppm_ref(self):
@@ -1163,27 +1163,28 @@ class AppController(QObject):
         ตรวจสอบว่ากรอก Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่าเมื่อเปิด PPM
         ถ้าเปิด PPM แล้วไม่กรอกค่าใดเลย จะบล็อกปุ่ม Start เพราะผล PPM Dev จะเป็น '-' ทั้งหมด
 
-        [NEW] ล็อก checkbox "Plot Primary"/"Plot Secondary" ของกราฟ PPM แยกตามว่ากรอก
-        Ref ตัวนั้นไว้หรือยัง — แค่ disable เฉยๆ ไม่ uncheck ทิ้ง เพื่อรักษาสถานะที่ผู้ใช้
-        ตั้งใจติ๊กไว้แต่แรก พอกรอก Ref กลับมาใหม่ checkbox จะ enable + ติ๊กกลับมาเหมือนเดิมทันที
+        [NEW] ล็อกตัวเลือก "Plot Primary"/"Plot Secondary" ใน Dropdown ของกราฟ PPM แยกตามว่า
+        กรอก Ref ตัวนั้นไว้หรือยัง — แค่ disable เฉยๆ ไม่เปลี่ยนตัวเลือกที่กำลังเลือกอยู่ทิ้ง
+        เพื่อรักษาสถานะที่ผู้ใช้ตั้งใจเลือกไว้แต่แรก พอกรอก Ref กลับมาใหม่ ตัวเลือกจะ enable
+        กลับมาเหมือนเดิมทันที
         """
         v = self.view
         if not v.adv_panel.chk_dev_ppm_enable.isChecked():
             self.is_ppm_error = False
-            v.ppm_summary_graph.chk_plot_pri.setEnabled(False)
-            v.ppm_summary_graph.chk_plot_sec.setEnabled(False)
+            v.ppm_summary_graph.set_primary_option_enabled(False)
+            v.ppm_summary_graph.set_secondary_option_enabled(False)
             self.update_start_button_state()
             return
 
         pri_has_value = self._safe_float(v.adv_panel.input_dev_pri.text()) is not None
         sec_has_value = self._safe_float(v.adv_panel.input_dev_sec.text()) is not None
 
-        v.ppm_summary_graph.chk_plot_pri.setEnabled(pri_has_value)
-        v.ppm_summary_graph.chk_plot_pri.setToolTip(
+        v.ppm_summary_graph.set_primary_option_enabled(
+            pri_has_value,
             "" if pri_has_value else "กรอก Primary Ref ในแท็บ Advanced ก่อน จึงจะเปิดดูเส้นนี้ได้"
         )
-        v.ppm_summary_graph.chk_plot_sec.setEnabled(sec_has_value)
-        v.ppm_summary_graph.chk_plot_sec.setToolTip(
+        v.ppm_summary_graph.set_secondary_option_enabled(
+            sec_has_value,
             "" if sec_has_value else "กรอก Secondary Ref ในแท็บ Advanced ก่อน จึงจะเปิดดูเส้นนี้ได้"
         )
 

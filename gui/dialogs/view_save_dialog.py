@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QComboBox, QPushButton, QMessageBox, QAbstractItemView)
 from PyQt6.QtCore import Qt, pyqtSignal
+from utils.helpers import NoScrollComboBox
 
 from core import save_manager
 
@@ -43,7 +44,7 @@ class ViewSaveDialog(QDialog):
         h_top.addWidget(lbl_title)
         h_top.addStretch()
 
-        self.combo_filter = QComboBox()
+        self.combo_filter = NoScrollComboBox()
         for label, _ in self.FILTER_OPTIONS:
             self.combo_filter.addItem(label)
         self.combo_filter.setMinimumWidth(220)

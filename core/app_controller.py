@@ -649,6 +649,7 @@ class AppController(QObject):
             if run_mode in ("LIST", "SWEEP"):
                 self.view.freq_summary_graph.set_progress("Stopped")
                 self.view.ppm_summary_graph.set_progress("Stopped")
+                self.view.graph_display.set_progress("Stopped")
 
     # ========================================================
     # การคำนวณและแสดงผลข้อมูล (Data Handling & Math)
@@ -749,6 +750,8 @@ class AppController(QObject):
             v.freq_summary_graph.set_current_reading(reading_text)
             v.ppm_summary_graph.set_progress(progress_text)
             v.ppm_summary_graph.set_current_reading(reading_text)
+            v.graph_display.set_progress(progress_text)
+            v.graph_display.set_current_reading(reading_text)
 
     @staticmethod
     def _format_param_display(label: str) -> str:
@@ -896,6 +899,7 @@ class AppController(QObject):
         if run_mode in ("LIST", "SWEEP"):
             self.view.freq_summary_graph.set_progress("Complete")
             self.view.ppm_summary_graph.set_progress("Complete")
+            self.view.graph_display.set_progress("Complete")
 
         # [NEW] ป๊อปอัพแจ้งเตือนตอนวัดเสร็จ — เฉพาะกรณีวัดจบเองตามรอบจริงๆ เท่านั้น
         # ไม่เด้งตอนผู้ใช้ตั้งใจกด Stop เอง (กันความรำคาญ/สับสนว่า "จบ" ทั้งที่ตัวเองสั่งหยุด)
@@ -1190,7 +1194,7 @@ class AppController(QObject):
 
         if not pri_has_value and not sec_has_value:
             v.adv_panel.lbl_dev_warning.setText(
-                "⚠️ ต้องระบุ Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่า ก่อนเริ่มวัด"
+                "⚠️ ต้องระบุ Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่า"
             )
             self.is_ppm_error = True
         else:

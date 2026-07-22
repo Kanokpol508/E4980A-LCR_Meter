@@ -18,6 +18,7 @@ from PyQt6.QtCore import QStandardPaths, Qt
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 import pyqtgraph as pg
 import pyqtgraph.exporters
+from utils.helpers import NoScrollComboBox
 
 # แยก "ชื่อพารามิเตอร์" กับ "หน่วยในวงเล็บท้ายสุด" เช่น
 # "Resistance, R (Ω)" -> ("Resistance, R", "Ω")  — ใช้แค่ดึงชื่อออกมา ไม่สนใจหน่วยเดิม
@@ -194,7 +195,7 @@ class PpmSummaryGraph(QWidget):
         # ได้ (เช่น ปิด "Plot Primary" ถ้ายังไม่กรอก Primary Ref) เหมือนที่เดิม
         # setEnabled(False) ทำกับ checkbox ทีละตัวได้ แต่ QComboBox ทำแบบนั้นไม่ได้
         # ต้องสั่งที่ item ใน model แทน
-        self.combo_plot_select = QComboBox()
+        self.combo_plot_select = NoScrollComboBox()
         self._plot_select_model = QStandardItemModel(self.combo_plot_select)
 
         self._item_plot_pri = QStandardItem("Plot Primary")
@@ -226,7 +227,7 @@ class PpmSummaryGraph(QWidget):
         opts_layout.addStretch(1)
 
         opts_layout.addWidget(QLabel("Frequency Scale:"))
-        self.combo_x_scale = QComboBox()
+        self.combo_x_scale = NoScrollComboBox()
         self.combo_x_scale.addItems(["Linear", "Log"])
         opts_layout.addWidget(self.combo_x_scale)
 

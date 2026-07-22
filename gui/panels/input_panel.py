@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QGridLayout,
                              QSizePolicy, QLineEdit, QCheckBox, QPushButton)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDoubleValidator
+from utils.helpers import NoScrollComboBox
 
 # ความกว้างมาตรฐานของช่องกรอกค่าตัวเลขสั้นๆ (ความถี่ / แรงดัน)
 # (ลดลงจากเดิมเพื่อคืนพื้นที่ฝั่งซ้ายให้แคบลง เอาไปเพิ่มพื้นที่ Output ฝั่งขวา)
@@ -299,8 +300,8 @@ class InputPanel(QWidget):
         grid_prop.setHorizontalSpacing(6)
         grid_prop.setColumnStretch(1, 1)
 
-        self.combo_prop_group = QComboBox()
-        self.combo_scpi_mode = QComboBox()
+        self.combo_prop_group = NoScrollComboBox()
+        self.combo_scpi_mode = NoScrollComboBox()
 
         lbl_prop_group = QLabel("Parameter Group:")
         lbl_scpi_mode = QLabel("SCPI Mode:")
@@ -323,7 +324,7 @@ class InputPanel(QWidget):
 
         # --- Dropdown เลือกโหมดการวัด ---
         v_mode.addWidget(QLabel("Select Measurement Mode:"))
-        self.combo_run_mode = QComboBox()
+        self.combo_run_mode = NoScrollComboBox()
         self.combo_run_mode.addItem("Single Frequency (โหมดวัดจุดเดียว)", userData="SINGLE")
         self.combo_run_mode.addItem("Sweep Frequency (โหมดสแกนความถี่)", userData="SWEEP")
         self.combo_run_mode.addItem("Frequency List (โหมดรายการความถี่)", userData="LIST")
@@ -596,7 +597,7 @@ class InputPanel(QWidget):
         self.input_volt.setFixedWidth(VOLT_FIELD_WIDTH + 10)
 
         # Dropdown หน่วย: Vrms (Voltage) หรือ Arms (Current)
-        self.combo_level_mode = QComboBox()
+        self.combo_level_mode = NoScrollComboBox()
         self.combo_level_mode.addItem("Vrms", userData="Voltage")
         self.combo_level_mode.addItem("Arms", userData="Current")
         self.combo_level_mode.setFixedWidth(105)
@@ -633,7 +634,7 @@ class InputPanel(QWidget):
         grid_hw.setHorizontalSpacing(6)
         grid_hw.setColumnStretch(1, 1)
 
-        self.combo_time = QComboBox()
+        self.combo_time = NoScrollComboBox()
         self.combo_time.addItems(["SHORT", "MEDIUM", "LONG"])
         self.combo_time.setCurrentText("LONG")  # ค่าเริ่มต้น = LONG (ความแม่นยำสูงสุด)
 
@@ -641,20 +642,20 @@ class InputPanel(QWidget):
         self.input_avg.setRange(1, 256)
         self.input_avg.setValue(1)
 
-        self.combo_cable = QComboBox()
+        self.combo_cable = NoScrollComboBox()
         self.combo_cable.addItems(["0 m", "1 m", "2 m", "4 m"])
 
-        self.combo_range = QComboBox()
+        self.combo_range = NoScrollComboBox()
         self.combo_range.addItem("AUTO", userData="AUTO")
         self.combo_range.addItem("1 Ω", userData=1)
         self.combo_range.addItem("10 Ω", userData=10)
         self.combo_range.addItem("100 Ω", userData=100)
         self.combo_range.addItem("300 Ω", userData=300)
-        self.combo_range.addItem("1 kΩ", userData=1000)
-        self.combo_range.addItem("3 kΩ", userData=3000)
-        self.combo_range.addItem("10 kΩ", userData=10000)
-        self.combo_range.addItem("30 kΩ", userData=30000)
-        self.combo_range.addItem("100 kΩ", userData=100000)
+        self.combo_range.addItem("1000 Ω", userData=1000)
+        self.combo_range.addItem("3000 Ω", userData=3000)
+        self.combo_range.addItem("10000 Ω", userData=10000)
+        self.combo_range.addItem("30000 Ω", userData=30000)
+        self.combo_range.addItem("100000 Ω", userData=100000)
 
         grid_hw.addWidget(QLabel("Meas Time:"), 0, 0)
         grid_hw.addWidget(self.combo_time, 0, 1)

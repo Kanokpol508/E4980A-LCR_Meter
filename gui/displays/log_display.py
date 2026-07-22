@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                               QMessageBox)
 from PyQt6.QtCore import Qt, QMetaObject, Q_ARG, pyqtSlot
 from PyQt6.QtGui import QFont, QTextCursor
+from utils.helpers import NoScrollComboBox
 
 
 # ==========================================
@@ -82,7 +83,7 @@ class LogDisplay(QWidget):
         lbl.setFixedWidth(130)
         toolbar.addWidget(lbl)
 
-        self.combo_level_filter = QComboBox()
+        self.combo_level_filter = NoScrollComboBox()
         self.combo_level_filter.addItems([
             "DEBUG",
             "INFO",

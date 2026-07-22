@@ -2,6 +2,7 @@
 
 from PyQt6.QtWidgets import (QWidget, QGroupBox, QHBoxLayout, QVBoxLayout,
                              QComboBox, QPushButton, QLabel, QSizePolicy)
+from utils.helpers import NoScrollComboBox
 
 class ConnectionPanel(QWidget):
     def __init__(self, parent=None):
@@ -15,7 +16,7 @@ class ConnectionPanel(QWidget):
         # --- แถวบน: Dropdown เลือกพอร์ต + ปุ่ม Refresh ---
         h_visa = QHBoxLayout()
 
-        self.combo_visa = QComboBox()
+        self.combo_visa = NoScrollComboBox()
         self.combo_visa.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         self.btn_refresh = QPushButton("REFRESH")

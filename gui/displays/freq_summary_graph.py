@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QStandardPaths
 import pyqtgraph as pg
 import pyqtgraph.exporters
+from utils.helpers import NoScrollComboBox
 
 # แยก "ชื่อพารามิเตอร์" กับ "หน่วยในวงเล็บท้ายสุด" เช่น
 # "Resistance, R (Ω)" -> ("Resistance, R", "Ω")
@@ -191,7 +192,7 @@ class FreqSummaryGraph(QWidget):
         # [เปลี่ยนจาก 2 checkbox อิสระ (Plot Primary / Plot Secondary) มาเป็น
         #  Dropdown เดียว 3 ตัวเลือก: Primary / Secondary / Both — ค่าเริ่มต้นเปิดโปรแกรม
         #  ครั้งแรกคือ "Plot Primary" ตามที่ผู้ใช้ต้องการ]
-        self.combo_plot_select = QComboBox()
+        self.combo_plot_select = NoScrollComboBox()
         self.combo_plot_select.addItem("Plot Primary", userData="PRI")
         self.combo_plot_select.addItem("Plot Secondary", userData="SEC")
         self.combo_plot_select.addItem("Plot Both", userData="BOTH")
@@ -213,7 +214,7 @@ class FreqSummaryGraph(QWidget):
         opts_layout.addStretch(1)
 
         opts_layout.addWidget(QLabel("Frequency Scale:"))
-        self.combo_x_scale = QComboBox()
+        self.combo_x_scale = NoScrollComboBox()
         self.combo_x_scale.addItems(["Linear", "Log"])
         opts_layout.addWidget(self.combo_x_scale)
 

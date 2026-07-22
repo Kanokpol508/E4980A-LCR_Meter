@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QStandardPaths
 import pyqtgraph as pg
 import pyqtgraph.exporters
+from utils.helpers import NoScrollComboBox
 
 # แยก "ชื่อพารามิเตอร์" กับ "หน่วยในวงเล็บท้ายสุด" เช่น
 # "Resistance, R (Ω)" -> ("Resistance, R", "Ω")
@@ -136,7 +137,7 @@ class GraphDisplay(QWidget):
         opts_layout = QHBoxLayout()
         opts_layout.setSpacing(12)
 
-        self.combo_plot_select = QComboBox()
+        self.combo_plot_select = NoScrollComboBox()
         self.combo_plot_select.addItem("Plot Primary", userData="PRI")
         self.combo_plot_select.addItem("Plot Secondary", userData="SEC")
         self.combo_plot_select.addItem("Plot Both", userData="BOTH")
@@ -155,7 +156,7 @@ class GraphDisplay(QWidget):
         opts_layout.addStretch(1)
 
         opts_layout.addWidget(QLabel("Frequency Scale:"))
-        self.combo_x_scale = QComboBox()
+        self.combo_x_scale = NoScrollComboBox()
         self.combo_x_scale.addItems(["Linear", "Log"])
         opts_layout.addWidget(self.combo_x_scale)
 

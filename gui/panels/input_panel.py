@@ -7,8 +7,12 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDoubleValidator
 
 # ความกว้างมาตรฐานของช่องกรอกค่าตัวเลขสั้นๆ (ความถี่ / แรงดัน)
-FREQ_FIELD_WIDTH = 150
-VOLT_FIELD_WIDTH = 90
+# (ลดลงจากเดิมเพื่อคืนพื้นที่ฝั่งซ้ายให้แคบลง เอาไปเพิ่มพื้นที่ Output ฝั่งขวา)
+FREQ_FIELD_WIDTH = 135
+VOLT_FIELD_WIDTH = 120
+# ความกว้างช่องกรอกตัวเลข "จำนวนครั้ง" (Samples / Discard) ซึ่งเป็นเลขหลักเดียว-4 หลัก
+# ไม่จำเป็นต้องกว้างเท่าช่องความถี่ (สูงสุด 7 หลัก) จึงแยกค่าคงที่ให้แคบกว่า
+COUNT_FIELD_WIDTH = 111
 
 
 class CleanDoubleSpinBox(QDoubleSpinBox):
@@ -108,7 +112,7 @@ class FrequencyListWidget(QWidget):
         row_layout.setContentsMargins(0, 0, 0, 0)
 
         lbl = QLabel(f"Frequency {index}")
-        lbl.setFixedWidth(95)
+        lbl.setFixedWidth(85)
 
         input_field = QLineEdit()
         input_field.setFixedWidth(FREQ_FIELD_WIDTH)
@@ -292,6 +296,7 @@ class InputPanel(QWidget):
         self.group_prop = QGroupBox("Measurement Type")
         grid_prop = QGridLayout()
         grid_prop.setVerticalSpacing(8)
+        grid_prop.setHorizontalSpacing(6)
         grid_prop.setColumnStretch(1, 1)
 
         self.combo_prop_group = QComboBox()
@@ -326,12 +331,22 @@ class InputPanel(QWidget):
         v_mode.addWidget(self.combo_run_mode)
 
         # --- เนื้อหาย่อย: วัดจุดเดียว (SINGLE) ---
-        # ใช้ QGridLayout เพื่อให้ช่องกรอกทุกแถว (Frequency / Readings / Discard)
-        # เสมอกันในแนวตั้ง (คอลัมน์ spinbox เริ่ม x เดียวกันเป๊ะ)
+        # แยกเป็น 2 QGridLayout อิสระจากกัน (เหมือนวิธีที่ใช้กับ SWEEP/LIST):
+        # 1) Frequency (ใช้ FREQ_FIELD_WIDTH ซึ่งกว้างกว่า เพราะต้องรองรับเลขได้ถึง 7 หลัก)
+        # 2) Samples Count / Discard First / Total Readings (ใช้ COUNT_FIELD_WIDTH แคบกว่า)
+        # เหตุผลที่ต้องแยก: ถ้าอยู่ grid เดียวกัน คอลัมน์ช่องกรอกจะถูกบังคับให้กว้างเท่า
+        # ช่องที่กว้างที่สุดในคอลัมน์นั้นเสมอ (Frequency, 110px) ทำให้ช่อง Samples/Discard
+        # ที่ตั้ง fixed width แคบกว่า (85px) ถูกจัดชิดซ้ายแล้วเหลือช่องว่างก่อนถึงหน่วย "Times"
+        # (นี่คือสาเหตุจริงของช่องว่างที่ยังเห็นอยู่ก่อนหน้านี้)
         self.widget_freq_single = QWidget()
-        grid_single = QGridLayout(self.widget_freq_single)
-        grid_single.setContentsMargins(0, 0, 0, 0)
-        grid_single.setVerticalSpacing(8)
+        v_single = QVBoxLayout(self.widget_freq_single)
+        v_single.setContentsMargins(0, 0, 0, 0)
+        v_single.setSpacing(14)
+
+        # --- กลุ่ม 1: Frequency ---
+        grid_single_freq = QGridLayout()
+        grid_single_freq.setVerticalSpacing(8)
+        grid_single_freq.setHorizontalSpacing(6)
 
         self.input_freq = CleanDoubleSpinBox()
         self.input_freq.setRange(20.0, 2000000.0)
@@ -340,11 +355,23 @@ class InputPanel(QWidget):
         self.input_freq.setValue(100000.0)
         self.input_freq.setFixedWidth(FREQ_FIELD_WIDTH)
 
+        grid_single_freq.addWidget(QLabel("Frequency:"), 0, 0)
+        grid_single_freq.addWidget(self.input_freq, 0, 1)
+        grid_single_freq.addWidget(QLabel("Hz"), 0, 2)
+        grid_single_freq.setColumnStretch(3, 1)
+
+        v_single.addLayout(grid_single_freq)
+
+        # --- กลุ่ม 2: Samples Count / Discard First / Total Readings ---
+        grid_single_samples = QGridLayout()
+        grid_single_samples.setVerticalSpacing(8)
+        grid_single_samples.setHorizontalSpacing(6)
+
         # จำนวนครั้งที่วัดซ้ำ (N) ใน SINGLE mode
         self.input_n_single = QSpinBox()
         self.input_n_single.setRange(1, 9999)
         self.input_n_single.setValue(10)
-        self.input_n_single.setFixedWidth(FREQ_FIELD_WIDTH)
+        self.input_n_single.setFixedWidth(COUNT_FIELD_WIDTH)
         self.input_n_single.setToolTip(
             "จำนวนครั้งที่วัดซ้ำต่อ 1 ครั้งที่กด Start\n"
             "ยิ่งมาก Type A (ppm) ยิ่งน่าเชื่อถือ\n"
@@ -355,7 +382,7 @@ class InputPanel(QWidget):
         self.input_discard_single = QSpinBox()
         self.input_discard_single.setRange(0, 5)
         self.input_discard_single.setValue(1)
-        self.input_discard_single.setFixedWidth(FREQ_FIELD_WIDTH)
+        self.input_discard_single.setFixedWidth(COUNT_FIELD_WIDTH)
         self.input_discard_single.setToolTip(
             "จำนวนครั้งแรกที่วัดแล้วทิ้ง ไม่นำไปคำนวณสถิติ\n"
             "เครื่องต้องใช้เวลาปรับตัวหลังตั้งค่า ค่าแรกๆ อาจยังไม่นิ่ง\n"
@@ -366,22 +393,24 @@ class InputPanel(QWidget):
         self.lbl_total_rounds_single = QLabel("-")
         self.lbl_total_rounds_single.setStyleSheet("color: #38bdf8; font-weight: bold;")
 
-        grid_single.addWidget(QLabel("Frequency:"), 0, 0)
-        grid_single.addWidget(self.input_freq, 0, 1)
-        grid_single.addWidget(QLabel("Hz"), 0, 2)
+        grid_single_samples.addWidget(QLabel("Samples Count:"), 0, 0)
+        grid_single_samples.addWidget(self.input_n_single, 0, 1)
+        grid_single_samples.addWidget(QLabel("Times"), 0, 2)
 
-        grid_single.addWidget(QLabel("Samples Count:"), 1, 0)
-        grid_single.addWidget(self.input_n_single, 1, 1)
-        grid_single.addWidget(QLabel("Times"), 1, 2)
+        grid_single_samples.addWidget(QLabel("Discard First:"), 1, 0)
+        grid_single_samples.addWidget(self.input_discard_single, 1, 1)
+        grid_single_samples.addWidget(QLabel("Times"), 1, 2)
 
-        grid_single.addWidget(QLabel("Discard First:"), 2, 0)
-        grid_single.addWidget(self.input_discard_single, 2, 1)
-        grid_single.addWidget(QLabel("Times"), 2, 2)
+        grid_single_samples.addWidget(QLabel("Total Readings:"), 2, 0)
+        # colSpan=3 (คร่อมคอลัมน์ 1-3): เพราะข้อความในนี้ยาว (เช่น
+        # "11 Times (Discard 1 + Measure 10)") ถ้าใส่แค่คอลัมน์ 1 เฉยๆ จะไปบังคับ
+        # ให้คอลัมน์ 1 กว้างตามข้อความยาวนี้ไปด้วย ทำให้ช่อง Samples/Discard ที่แคบกว่า
+        # ถูกจัดชิดซ้ายแล้วเหลือช่องว่างค้างก่อนถึงหน่วย "Times" (สาเหตุของปัญหาที่เห็น)
+        grid_single_samples.addWidget(self.lbl_total_rounds_single, 2, 1, 1, 3)
 
-        grid_single.addWidget(QLabel("Total Readings:"), 3, 0)
-        grid_single.addWidget(self.lbl_total_rounds_single, 3, 1)
+        grid_single_samples.setColumnStretch(3, 1)
 
-        grid_single.setColumnStretch(3, 1)
+        v_single.addLayout(grid_single_samples)
 
         # เชื่อมสัญญาณเพื่ออัปเดต label ทุกครั้งที่ค่าเปลี่ยน
         # (signal connect และการคำนวณจริงอยู่ใน app_controller.py เพื่อรวมไว้กับ
@@ -402,6 +431,7 @@ class InputPanel(QWidget):
         # --- กลุ่ม 1: ความถี่เริ่มต้น / สิ้นสุด / ค่าเพิ่มต่อจุด / จำนวนจุดที่ได้ ---
         grid_sweep = QGridLayout()
         grid_sweep.setVerticalSpacing(8)
+        grid_sweep.setHorizontalSpacing(6)
 
         self.input_start_freq = CleanDoubleSpinBox()
         self.input_start_freq.setRange(20.0, 2000000.0)
@@ -449,16 +479,21 @@ class InputPanel(QWidget):
         # --- กลุ่ม 2: จำนวนรอบวัดซ้ำต่อความถี่ + ทิ้งค่าตัวอย่างแรกสุด (เหมือนโหมด LIST) ---
         grid_sweep_samples = QGridLayout()
         grid_sweep_samples.setVerticalSpacing(8)
+        grid_sweep_samples.setHorizontalSpacing(6)
+        # หมายเหตุ: เดิมกลุ่มนี้ไม่ได้ตั้ง setColumnStretch เลย ทำให้ Qt กระจายพื้นที่ว่าง
+        # ให้ทุกคอลัมน์เท่าๆ กัน (รวมคอลัมน์ระหว่างช่องกรอกกับหน่วย "Times") จึงดูห่างเกินไป
+        # ต้องดันพื้นที่ว่างทั้งหมดไปไว้คอลัมน์ขวาสุดเหมือน grid_sweep ด้านบนแทน
+        grid_sweep_samples.setColumnStretch(3, 1)
 
         self.input_samples_sweep = QSpinBox()
         self.input_samples_sweep.setRange(1, 999)
         self.input_samples_sweep.setValue(10)
-        self.input_samples_sweep.setFixedWidth(105)
+        self.input_samples_sweep.setFixedWidth(COUNT_FIELD_WIDTH)
 
         self.input_discard_first_sweep = QSpinBox()
         self.input_discard_first_sweep.setRange(0, 5)
         self.input_discard_first_sweep.setValue(1)
-        self.input_discard_first_sweep.setFixedWidth(105)
+        self.input_discard_first_sweep.setFixedWidth(COUNT_FIELD_WIDTH)
         self.input_discard_first_sweep.setToolTip(
             "จำนวนตัวอย่างแรกสุดของแต่ละความถี่ที่จะไม่นำไปคำนวณสถิติ\n"
             "(ค่าที่วัดได้ทันทีหลังเปลี่ยนความถี่มักยังไม่นิ่ง)\n"
@@ -478,9 +513,7 @@ class InputPanel(QWidget):
         grid_sweep_samples.addWidget(QLabel("Times"), 1, 2)
 
         grid_sweep_samples.addWidget(QLabel("Total Readings / Frequency:"), 2, 0)
-        grid_sweep_samples.addWidget(self.lbl_total_rounds_sweep, 2, 1)
-
-        grid_sweep_samples.setColumnStretch(3, 1)  # เผื่อพื้นที่ว่างด้านขวาสุด
+        grid_sweep_samples.addWidget(self.lbl_total_rounds_sweep, 2, 1, 1, 3)
 
         v_sweep.addLayout(grid_sweep_samples)
 
@@ -498,7 +531,11 @@ class InputPanel(QWidget):
 
         grid_list_nums = QGridLayout()
         grid_list_nums.setVerticalSpacing(8)
-        grid_list_nums.setColumnStretch(2, 1)
+        grid_list_nums.setHorizontalSpacing(6)
+        # เดิมตั้ง stretch ไว้ที่คอลัมน์ 2 (คอลัมน์ label "Times") ทำให้พื้นที่ว่างไปแทรก
+        # อยู่ระหว่างช่องกรอกกับ "Times" เอง (ห่างเกินไป) ต้องย้ายไปคอลัมน์ 3 (ขวาสุด) แทน
+        # เหมือนกลุ่ม grid_sweep / grid_single เพื่อให้ช่องกรอกชิดหน่วยพอดี
+        grid_list_nums.setColumnStretch(3, 1)
 
         self.input_samples = QSpinBox()
         self.input_samples.setRange(1, 999)
@@ -516,8 +553,8 @@ class InputPanel(QWidget):
 
         # บังคับให้ทั้งสองช่องกว้างเท่ากันเป๊ะ (แคบกว่าช่องความถี่ปกติเล็กน้อย
         # เพราะค่าที่กรอกเป็นแค่จำนวนครั้ง ไม่ใช่ตัวเลขความถี่ที่อาจยาวหลักล้าน)
-        self.input_samples.setFixedWidth(105)
-        self.input_discard_first.setFixedWidth(105)
+        self.input_samples.setFixedWidth(COUNT_FIELD_WIDTH)
+        self.input_discard_first.setFixedWidth(COUNT_FIELD_WIDTH)
 
         # Label แสดงจำนวนรอบวัดทั้งหมดต่อ 1 ความถี่ = Discard + Samples
         self.lbl_total_rounds_list = QLabel("-")
@@ -532,7 +569,7 @@ class InputPanel(QWidget):
         grid_list_nums.addWidget(QLabel("Times"), 1, 2)
 
         grid_list_nums.addWidget(QLabel("Total Readings / Frequency:"), 2, 0)
-        grid_list_nums.addWidget(self.lbl_total_rounds_list, 2, 1)
+        grid_list_nums.addWidget(self.lbl_total_rounds_list, 2, 1, 1, 3)
 
         # เชื่อมสัญญาณเพื่ออัปเดต label ทุกครั้งที่ค่าเปลี่ยน
         # (signal connect และการคำนวณจริงอยู่ใน app_controller.py เพื่อรวมไว้กับ
@@ -556,13 +593,13 @@ class InputPanel(QWidget):
         self.input_volt.setDecimals(4)
         self.input_volt.setSingleStep(0.1)
         self.input_volt.setValue(1.0)
-        self.input_volt.setFixedWidth(110)
+        self.input_volt.setFixedWidth(VOLT_FIELD_WIDTH + 10)
 
         # Dropdown หน่วย: Vrms (Voltage) หรือ Arms (Current)
         self.combo_level_mode = QComboBox()
         self.combo_level_mode.addItem("Vrms", userData="Voltage")
         self.combo_level_mode.addItem("Arms", userData="Current")
-        self.combo_level_mode.setFixedWidth(103)
+        self.combo_level_mode.setFixedWidth(105)
 
         # Label อยู่แถวบน, SpinBox + Dropdown อยู่แถวล่าง
         v_signal.addWidget(QLabel("Signal Level:"))
@@ -593,6 +630,7 @@ class InputPanel(QWidget):
         self.group_hw = QGroupBox("Hardware & Timing")
         grid_hw = QGridLayout()
         grid_hw.setVerticalSpacing(8)
+        grid_hw.setHorizontalSpacing(6)
         grid_hw.setColumnStretch(1, 1)
 
         self.combo_time = QComboBox()

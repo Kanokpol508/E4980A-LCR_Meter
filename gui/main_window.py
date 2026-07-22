@@ -28,8 +28,11 @@ class MainWindow(QMainWindow):
 
         # ─────────────── ฝั่งซ้าย: แผงควบคุม ─────────────────────────────
         left_panel_container = QWidget()
-        left_panel_container.setMinimumWidth(450)
-        left_panel_container.setMaximumWidth(500)
+        # ลดความกว้างฝั่งซ้ายลง (จากเดิม 450-500) เนื่องจากช่องกรอกต่างๆ ถูกบีบให้
+        # แคบลงแล้ว (ดู FREQ_FIELD_WIDTH / COUNT_FIELD_WIDTH ใน input_panel.py)
+        # เอาพื้นที่ที่ประหยัดได้ไปเพิ่มให้ฝั่งขวา (กราฟ/ตาราง Output)
+        left_panel_container.setMinimumWidth(380)
+        left_panel_container.setMaximumWidth(410)
         left_main_layout = QVBoxLayout(left_panel_container)
         left_main_layout.setContentsMargins(0, 0, 0, 0)
 

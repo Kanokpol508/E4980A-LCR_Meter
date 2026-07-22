@@ -18,7 +18,8 @@ class AdvancedPanel(QWidget):
         v_corr = QVBoxLayout()
         v_corr.setSpacing(10)
         lbl_corr_hint = QLabel(
-            "💡ตรวจสอบให้แน่ใจว่าตั้งค่า Cable Length ตรงกับสายที่ใช้งานจริงก่อนกดปุ่มเสมอ"
+            "💡ตรวจสอบให้แน่ใจว่าตั้งค่า Cable Length \n"
+            "ตรงกับสายที่ใช้งานจริงก่อนกดปุ่มเสมอ"
         )
         lbl_corr_hint.setWordWrap(True)
         v_corr.addWidget(lbl_corr_hint)
@@ -41,7 +42,7 @@ class AdvancedPanel(QWidget):
         v_ppm.setSpacing(8)
 
         lbl_ppm_hint = QLabel(
-            "💡ผลลัพธ์จะแสดงในคอลัมน์ PPM Dev ของตาราง Statistics Table"
+            "💡ผลลัพธ์จะแสดงในคอลัมน์ PPM Dev ตาราง Statistics Table"
         )
         lbl_ppm_hint.setWordWrap(True)
         v_ppm.addWidget(lbl_ppm_hint)
@@ -74,7 +75,7 @@ class AdvancedPanel(QWidget):
 
         lbl_pri = QLabel("Primary Ref:")
         lbl_sec = QLabel("Secondary Ref:")
-        label_width = 110
+        label_width = 95
         lbl_pri.setFixedWidth(label_width)
         lbl_sec.setFixedWidth(label_width)
 

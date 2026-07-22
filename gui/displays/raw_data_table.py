@@ -17,11 +17,11 @@ class RawDataTable(QWidget):
     """
     # [NEW] คำอธิบาย (label) ของแต่ละ key ใน session info — ใช้ทั้งตอนสร้าง UI และ update
     SESSION_INFO_FIELDS = [
-        ("mode",             "Mode"),
-        ("signal",           "Signal"),
+        ("mode",             "SCPI Mode"),
+        ("signal",           "Signal Level"),
         ("measurement_time", "Measured At"),
         ("avg",              "Averaging"),
-        ("cable",            "Cable"),
+        ("cable",            "Cable Length"),
         ("imp_range",        "Range"),
         ("ppm_pri_ref",      "PPM Ref (Primary)"),
         ("ppm_sec_ref",      "PPM Ref (Secondary)"),

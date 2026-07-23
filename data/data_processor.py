@@ -54,14 +54,17 @@ def _calc_stats_block(values: list, ref=None) -> dict:
         return {k: None for k in ('mean', 'sd', 'min', 'max', 'rsd_pct', 'ppm', 'type_a_ppm')}
 
     mean  = statistics.fmean(values)
-    sd    = statistics.stdev(values) if len(values) > 1 else 0.0
+    n     = len(values)
+    sd    = statistics.stdev(values) if n > 1 else 0.0
 
     return {
         'mean':       mean,
         'sd':         sd,
         'min':        min(values),
         'max':        max(values),
-        'rsd_pct':    (sd / abs(mean) * 100) if mean != 0 else None,
+        # N < 2: ไม่มีข้อมูลพอจะคำนวณการกระจายตัวจริง (SD ถูกบังคับ = 0.0 ด้านบน)
+        # แสดง '-' แทน 0.00 ป้องกันเข้าใจผิดว่า "นิ่งมาก" ทั้งที่วัดครั้งเดียว
+        'rsd_pct':    (sd / abs(mean) * 100) if (n > 1 and mean != 0) else None,
         'ppm':        _calc_ppm(mean, ref),
         'type_a_ppm': _calc_type_a_ppm(values),
     }

@@ -100,14 +100,14 @@ _COLS_SINGLE = [
     ("pri_max",        "Primary Max"),
     ("pri_rsd_pct",    "Primary %RSD"),
     ("pri_ppm",        "Primary PPM Dev"),
-    ("pri_type_a_ppm", "Primary Type A (ppm)"),
+    ("pri_type_a_ppm", "Primary Type A (PPM)"),
     ("sec_mean",       "Secondary Mean"),
     ("sec_sd",         "Secondary SD"),
     ("sec_min",        "Secondary Min"),
     ("sec_max",        "Secondary Max"),
     ("sec_rsd_pct",    "Secondary %RSD"),
     ("sec_ppm",        "Secondary PPM Dev"),
-    ("sec_type_a_ppm", "Secondary Type A (ppm)"),
+    ("sec_type_a_ppm", "Secondary Type A (PPM)"),
 ]
 
 # SWEEP ใช้ column set เดียวกับ LIST ทุกประการ (วัดซ้ำได้หลายครั้ง/ความถี่เหมือนกันแล้ว)
@@ -120,14 +120,14 @@ _COLS_LIST = [
     ("pri_max",        "Primary Max"),
     ("pri_rsd_pct",    "Primary %RSD"),
     ("pri_ppm",        "Primary PPM Dev"),
-    ("pri_type_a_ppm", "Primary Type A (ppm)"),
+    ("pri_type_a_ppm", "Primary Type A (PPM)"),
     ("sec_mean",       "Secondary Mean"),
     ("sec_sd",         "Secondary SD"),
     ("sec_min",        "Secondary Min"),
     ("sec_max",        "Secondary Max"),
     ("sec_rsd_pct",    "Secondary %RSD"),
     ("sec_ppm",        "Secondary PPM Dev"),
-    ("sec_type_a_ppm", "Secondary Type A (ppm)"),
+    ("sec_type_a_ppm", "Secondary Type A (PPM)"),
 ]
 _COLS_SWEEP = _COLS_LIST
 

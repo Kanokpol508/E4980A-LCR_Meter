@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QBrush
 
 from data.data_processor import (
-    calculate_single_stats,    format_single_row_for_table,
+    calculate_single_stats_per_run, format_single_row_for_table,
     calculate_frequency_stats, format_stats_row_for_table,
 )
 
@@ -231,7 +231,9 @@ class StatisticsTable(QWidget):
     def update_table(self, raw_records: list, pri_ref=None, sec_ref=None, mode: str = None):
         """
         อัปเดตตารางใหม่ทั้งหมดจากข้อมูลดิบ
-        raw_records: [{'freq':.., 'primary':.., 'secondary':..}, ...]
+        - SINGLE mode: raw_records คือ "กลุ่มต่อรอบ" [[{...},...], [{...},...], ...]
+          (1 ครั้งกด Start = 1 รอบ = 1 แถวในตาราง)
+        - SWEEP/LIST mode: raw_records คือ flat list [{'freq':.., 'primary':.., 'secondary':..}, ...]
         สูตรทั้งหมดอยู่ใน data_processor.py — ที่นี่แค่แสดงผล
         (SWEEP ใช้สูตรและการแสดงผลเดียวกับ LIST ทุกประการ)
         """
@@ -239,18 +241,20 @@ class StatisticsTable(QWidget):
             self._apply_columns(mode)
 
         if self._current_mode == "SINGLE":
-            self._render_single(raw_records)
+            self._render_single(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
         else:  # SWEEP หรือ LIST
             self._render_list(raw_records, pri_ref, sec_ref)
 
-    def _render_single(self, raw_records: list):
-        stat = calculate_single_stats(raw_records)
-        if stat is None:
-            self.table.setRowCount(0)
-            return
-        fmt = format_single_row_for_table(stat)
-        self.table.setRowCount(1)
-        self._set_row(0, [fmt[key] for key, _ in _COLS_SINGLE])
+    def _render_single(self, run_groups: list, pri_ref=None, sec_ref=None):
+        """[แก้ไข] เดิมรวมทุกรอบเป็นแถวเดียว (calculate_single_stats บนข้อมูลทั้งหมด)
+        ตอนนี้แยกคำนวณทีละรอบ (1 รอบ = 1 แถว) ด้วย calculate_single_stats_per_run()
+        และแก้บั๊กเดิมที่ไม่เคยส่ง pri_ref/sec_ref เข้าไปเลย ทำให้คอลัมน์ PPM Dev ของ
+        โหมด SINGLE ไม่เคยคำนวณค่าให้แม้จะกรอก Reference ไว้แล้วก็ตาม"""
+        stats_list = calculate_single_stats_per_run(run_groups, pri_ref=pri_ref, sec_ref=sec_ref)
+        self.table.setRowCount(len(stats_list))
+        for i, stat in enumerate(stats_list):
+            fmt = format_single_row_for_table(stat)
+            self._set_row(i, [fmt[key] for key, _ in _COLS_SINGLE])
 
     def _render_list(self, raw_records: list, pri_ref=None, sec_ref=None):
         stats = calculate_frequency_stats(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)

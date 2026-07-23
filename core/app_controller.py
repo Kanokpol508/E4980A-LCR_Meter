@@ -43,6 +43,16 @@ class AppController(QObject):
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
 
+        # [NEW] โหมด SINGLE: แต่ละครั้งที่กด Start = 1 "รอบ" (run) แยกกัน
+        # self.single_runs = [[(pri, sec), ...], [(pri, sec), ...], ...] — แต่ละ sub-list
+        # คือค่าดิบของรอบนั้นๆ ใช้แยกคำนวณสถิติทีละรอบใน Statistics Table (ไม่ปนกัน
+        # แม้จะวัดที่ความถี่เดียวกัน) ส่วน Raw Data Table/กราฟยังคง "ต่อข้อมูล" กันทุกรอบ
+        self.single_runs = []
+        # [NEW] ตัวนับ Samples ของ "รอบปัจจุบัน" เท่านั้น (รีเซ็ตทุกครั้งที่กด Start ใหม่ในโหมด SINGLE)
+        # แยกจาก no_val (ตัวนับสะสมทั้ง session ใช้กับคอลัมน์ No.) เพื่อไม่ให้เลข Samples
+        # เพี้ยนเป็น 6/5, 7/5 ตอนกดวัดซ้ำรอบสอง
+        self._single_run_sample_no = 0
+
         # [NEW] เวลาที่วัดเสร็จล่าสุด (ใช้เป็นเวลา Save จริงๆ ไม่ใช่เวลาที่กดปุ่ม Save)
         self.last_measurement_time = None
         self.last_measurement_time_iso = None
@@ -558,10 +568,19 @@ class AppController(QObject):
         v = self.view
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
+        # True เฉพาะรอบแรกของ session ใหม่ (ยังไม่มีข้อมูลค้างอยู่เลย) — ใช้แยกจาก
+        # รอบต่อเนื่อง (accumulate) ที่กด Start ซ้ำในโหมด SINGLE ขณะมีข้อมูลเก่าอยู่แล้ว
+        is_first_single_session = is_single and len(self.graph_x_data) == 0
         self._stopped_by_user = False  # [NEW] เริ่มวัดใหม่ทุกครั้ง ถือว่ายังไม่ได้ถูกกด Stop
 
-        # [NEW] เตรียมตาราง Raw Data ก่อนเริ่มวัด
-        v.raw_table.set_mode(run_mode)
+        # [แก้ไข] เตรียมตาราง Raw Data ก่อนเริ่มวัด
+        # เดิม: เรียก set_mode() (ซึ่งข้างในมี clear_table() ซ่อนอยู่) ทุกครั้งที่กด Start
+        # ทำให้โหมด SINGLE ที่ตั้งใจ "ต่อข้อมูล" รอบใหม่ ถูกล้างตารางทิ้งไปด้วยทุกรอบ
+        # ตอนนี้เรียก set_mode() (ซึ่งจะ clear ตาราง) เฉพาะตอนเปลี่ยนโหมดจริง หรือเป็น
+        # SINGLE รอบแรกของ session ใหม่เท่านั้น — ถ้าเป็น SINGLE รอบต่อเนื่อง จะข้าม
+        # การ clear ไปเลย (อัปเดตแค่ชื่อคอลัมน์ Primary/Secondary เผื่อ SCPI mode เปลี่ยน)
+        if not is_single or is_first_single_session:
+            v.raw_table.set_mode(run_mode)
         v.raw_table.update_headers(v.input_panel.combo_scpi_mode.currentData())
 
         if not is_single:
@@ -574,6 +593,13 @@ class AppController(QObject):
             v.freq_summary_graph.clear()
             v.ppm_summary_graph.clear()
             v.raw_table.clear_table()  # ล้างข้อมูลดิบเก่าเมื่อเริ่มวัดใหม่
+
+        if is_single:
+            # [NEW] 1 ครั้งกด Start ในโหมด SINGLE = 1 "รอบ" (run) ใหม่เสมอ — ใช้แยกคำนวณ
+            # สถิติทีละรอบใน Statistics Table (ไม่ปนกันแม้ freq จะเท่าเดิมทุกรอบ)
+            if is_first_single_session:
+                self.single_runs = []
+            self.single_runs.append([])
 
         if len(self.graph_x_data) == 0:
             self.setup_graph_labels()
@@ -601,7 +627,7 @@ class AppController(QObject):
             # จะ fallback เป็น n=1, discard=0 ทำให้การตั้งค่าใน UI ไม่มีผลเลย
             'n_single':               v.input_panel.input_n_single.value(),
             'discard_single':         v.input_panel.input_discard_single.value(),
-            'is_first_single_session': len(self.graph_x_data) == 0,
+            'is_first_single_session': is_first_single_session,
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
             'level_mode': v.input_panel.combo_level_mode.currentData(),
@@ -675,14 +701,23 @@ class AppController(QObject):
         is_list = (run_mode == "LIST")
         is_sweep = (run_mode == "SWEEP")
 
+        # [NEW] เก็บค่าดิบลงรอบปัจจุบัน (self.single_runs[-1]) ด้วย — ใช้แยกคำนวณสถิติ
+        # ทีละรอบใน Statistics Table (start_measurement() การันตีว่ามี sub-list พร้อมรออยู่แล้ว)
+        if is_single and self.single_runs:
+            self.single_runs[-1].append((raw_pri, raw_sec))
+
         # --- [NEW] ลอจิกเตรียมข้อมูลให้ Raw Data Table ---
-        no_val = len(self.graph_x_data) + 1  # ลำดับที่ของการวัด (1, 2, 3...)
+        no_val = len(self.graph_x_data) + 1  # ลำดับที่ของการวัด (1, 2, 3... สะสมทั้ง session)
         current_freq = data.get('freq', 0)
 
         # จัดรูปแบบข้อความ "Samples (N)" ให้ตรงกับโหมด
         if is_single:
             n_single = v.input_panel.input_n_single.value()
-            sample_text = f"{no_val}/{n_single}"  # ตัวอย่าง: 1/5, 2/5
+            # [แก้ไข] เดิมใช้ no_val (เลขสะสมทั้ง session) หารกับ n_single ของรอบล่าสุด
+            # ทำให้กด Start ซ้ำรอบ 2 แล้วเห็นเลขเพี้ยนเป็น 6/5, 7/5, 8/5 แทนที่จะเป็น 1/5, 2/5...
+            # ตอนนี้ใช้ลำดับ "ภายในรอบปัจจุบัน" (len ของ self.single_runs[-1] หลัง append ไปแล้ว)
+            run_no = len(self.single_runs[-1]) if self.single_runs else no_val
+            sample_text = f"{run_no}/{n_single}"  # ตัวอย่าง: 1/5, 2/5 (รีเซ็ตใหม่ทุกครั้งที่กด Start)
             freq_val = v.input_panel.input_freq.value()
         elif is_list:
             n_samples = v.input_panel.input_samples.value()
@@ -783,7 +818,7 @@ class AppController(QObject):
 
     def update_statistics_table(self):
         """สร้าง raw_records จากข้อมูลที่เก็บไว้ แล้วส่งให้ StatisticsTable คำนวณ/แสดงผลใหม่
-        รองรับทุกโหมด: SINGLE (overall stats) / SWEEP (per-freq raw) / LIST (per-freq stats)"""
+        รองรับทุกโหมด: SINGLE (แยกสถิติทีละรอบ/1 Start = 1 แถว) / SWEEP (per-freq raw) / LIST (per-freq stats)"""
         v = self.view
         run_mode = self.get_current_run_mode()
 
@@ -793,9 +828,12 @@ class AppController(QObject):
             # ตารางสถิติจะโชว์ Frequency (Hz) ผิดเป็นเลขลำดับ (เช่น "1.00" แทนค่าที่ตั้งไว้จริง)
             # ต้องดึงความถี่ที่ตั้งไว้จริงจาก Input Panel มาใช้แทนเสมอ
             fixed_freq = v.input_panel.input_freq.value()
+            # [แก้ไข] ส่งเป็น "กลุ่มต่อรอบ" (list ของ list) แทนที่จะรวมทุกรอบเป็น flat list เดียว
+            # เพื่อให้ Statistics Table คำนวณสถิติแยกทีละรอบ (1 ครั้งกด Start = 1 แถว) ไม่ปนกัน
+            # แม้ freq จะเท่าเดิมทุกรอบก็ตาม (raw_data_table ยังคง "ต่อข้อมูล" ทุกแถวตามเดิม)
             raw_records = [
-                {'freq': fixed_freq, 'primary': p, 'secondary': s}
-                for p, s in zip(self.graph_raw_pri_y, self.graph_raw_sec_y)
+                [{'freq': fixed_freq, 'primary': p, 'secondary': s} for p, s in run]
+                for run in self.single_runs
             ]
         else:
             raw_records = [
@@ -921,6 +959,7 @@ class AppController(QObject):
         self.graph_sec_y = []
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
+        self.single_runs = []  # [NEW] เคลียร์กลุ่มข้อมูลดิบแยกตามรอบด้วย
         self.view.graph_display.clear_plots()
         self.view.freq_summary_graph.clear()
         self.view.ppm_summary_graph.clear()
@@ -1194,7 +1233,7 @@ class AppController(QObject):
 
         if not pri_has_value and not sec_has_value:
             v.adv_panel.lbl_dev_warning.setText(
-                "⚠️ ต้องระบุ Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่า"
+                "⚠️ ต้องระบุ Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่า ก่อนเริ่มวัด"
             )
             self.is_ppm_error = True
         else:
@@ -1258,6 +1297,9 @@ class AppController(QObject):
                 "graph_sec_y": self.graph_sec_y,
                 "graph_raw_pri_y": self.graph_raw_pri_y,
                 "graph_raw_sec_y": self.graph_raw_sec_y,
+                # [NEW] เก็บกลุ่มข้อมูลดิบแยกตาม "รอบ" (1 ครั้งกด Start ในโหมด SINGLE = 1 รอบ)
+                # ไว้ใช้คำนวณ Statistics Table แยกแถวต่อรอบ ตอน Open Save กลับมาดูทีหลัง
+                "single_runs": self.single_runs,
                 "raw_table_rows": v.raw_table.get_rows(),
             },
         }
@@ -1376,6 +1418,11 @@ class AppController(QObject):
         self.graph_sec_y = list(results.get("graph_sec_y", []))
         self.graph_raw_pri_y = list(results.get("graph_raw_pri_y", []))
         self.graph_raw_sec_y = list(results.get("graph_raw_sec_y", []))
+        # [NEW] คืนค่ากลุ่มข้อมูลดิบแยกตามรอบ (ใช้คำนวณ Statistics Table ต่อรอบใน SINGLE mode)
+        # ไฟล์เก่าก่อนมีฟีเจอร์นี้จะไม่มี key นี้ -> fallback เป็น 1 รอบรวมทั้งหมด (พฤติกรรมเดิม)
+        self.single_runs = [list(map(tuple, run)) for run in results.get(
+            "single_runs", [list(zip(self.graph_raw_pri_y, self.graph_raw_sec_y))]
+        )]
 
         self.setup_graph_labels()
         is_list_or_sweep = run_mode in ("LIST", "SWEEP")

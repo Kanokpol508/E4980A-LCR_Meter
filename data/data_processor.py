@@ -138,6 +138,30 @@ def calculate_single_stats(raw_records: list, pri_ref=None, sec_ref=None) -> dic
     }
 
 
+def calculate_single_stats_per_run(run_groups: list, pri_ref=None, sec_ref=None) -> list:
+    """
+    [NEW] SINGLE mode — คำนวณสถิติแยกทีละ "รอบ" (1 ครั้งกด Start = 1 รอบ = 1 แถวในตาราง)
+    แทนที่จะรวมทุกรอบเป็นแถวเดียว (calculate_single_stats() เดิม) — เหตุผล: ถึงแม้ทุกรอบ
+    จะวัดที่ความถี่/เงื่อนไขเดียวกัน (ถูกล็อกไว้ระหว่างมีข้อมูลค้าง) การแยกแถวช่วยให้เห็น
+    ความคลาดเคลื่อนระหว่างรอบ (run-to-run) ที่การรวมกันเป็นก้อนเดียวจะกลบไป (เช่น SD
+    ที่โชว์จะเป็น SD รวมของทุกรอบ ไม่ใช่ SD ภายในรอบเดียว)
+
+    run_groups: [[{'freq':.., 'primary':.., 'secondary':..}, ...], ...]
+                แต่ละ sub-list คือค่าดิบของ 1 รอบ (ตามลำดับที่วัดจริง)
+    pri_ref / sec_ref: ค่าอ้างอิงสำหรับคำนวณ PPM Deviation (None = ไม่คำนวณ) — ใช้ค่าเดียวกัน
+                        กับทุกรอบ เพราะ Reference ไม่ได้ผูกกับรอบใดรอบหนึ่งโดยเฉพาะ
+
+    คืน list ของ dict (โครงสร้างเดียวกับ calculate_single_stats()) เรียงตามลำดับรอบที่วัดจริง
+    รอบที่ไม่มีข้อมูล (list ว่าง) จะถูกข้ามไปเงียบๆ
+    """
+    results = []
+    for recs in run_groups:
+        stat = calculate_single_stats(recs, pri_ref=pri_ref, sec_ref=sec_ref)
+        if stat is not None:
+            results.append(stat)
+    return results
+
+
 def format_single_row_for_table(stat: dict) -> dict:
     """แปลงผลจาก calculate_single_stats() เป็น string พร้อมแสดงใน QTableWidget"""
     freq_val = stat.get('freq')

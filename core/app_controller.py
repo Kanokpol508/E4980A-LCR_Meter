@@ -701,14 +701,20 @@ class AppController(QObject):
         is_list = (run_mode == "LIST")
         is_sweep = (run_mode == "SWEEP")
 
-        # [NEW] เก็บค่าดิบลงรอบปัจจุบัน (self.single_runs[-1]) ด้วย — ใช้แยกคำนวณสถิติ
-        # ทีละรอบใน Statistics Table (start_measurement() การันตีว่ามี sub-list พร้อมรออยู่แล้ว)
-        if is_single and self.single_runs:
-            self.single_runs[-1].append((raw_pri, raw_sec))
-
         # --- [NEW] ลอจิกเตรียมข้อมูลให้ Raw Data Table ---
         no_val = len(self.graph_x_data) + 1  # ลำดับที่ของการวัด (1, 2, 3... สะสมทั้ง session)
+        # [แก้ไข] current_freq มาจาก data['freq'] ซึ่งเป็นค่าความถี่ "ที่ใช้วัดจริง" ของรอบนี้
+        # (worker ส่งมาจาก settings snapshot ตอนกด Start ไม่ใช่อ่าน UI สดๆ) — ใช้ค่านี้เป็น
+        # หลักเสมอ แทนที่จะอ่าน v.input_panel.input_freq.value() ซ้ำ เพราะตอนนี้ input_freq
+        # ปลดล็อกแล้ว ผู้ใช้อาจเปลี่ยนความถี่ระหว่างรอบได้ ถ้าอ่าน UI สดจะได้ค่าใหม่ผิดรอบ
         current_freq = data.get('freq', 0)
+
+        # [NEW] เก็บค่าดิบ + ความถี่ที่ใช้จริงของรอบนี้ลงรอบปัจจุบัน (self.single_runs[-1])
+        # ด้วย — ใช้แยกคำนวณสถิติทีละรอบใน Statistics Table โดยแต่ละรอบจะจำความถี่ของตัวเอง
+        # ไว้ตรงตัว ไม่ต้องพึ่งค่า input_freq ปัจจุบันตอนคำนวณ (start_measurement() การันตี
+        # ว่ามี sub-list พร้อมรออยู่แล้ว)
+        if is_single and self.single_runs:
+            self.single_runs[-1].append((raw_pri, raw_sec, current_freq))
 
         # จัดรูปแบบข้อความ "Samples (N)" ให้ตรงกับโหมด
         if is_single:
@@ -718,7 +724,7 @@ class AppController(QObject):
             # ตอนนี้ใช้ลำดับ "ภายในรอบปัจจุบัน" (len ของ self.single_runs[-1] หลัง append ไปแล้ว)
             run_no = len(self.single_runs[-1]) if self.single_runs else no_val
             sample_text = f"{run_no}/{n_single}"  # ตัวอย่าง: 1/5, 2/5 (รีเซ็ตใหม่ทุกครั้งที่กด Start)
-            freq_val = v.input_panel.input_freq.value()
+            freq_val = current_freq  # [แก้ไข] ใช้ความถี่จริงของรอบนี้ ไม่ใช่ UI สดที่อาจเปลี่ยนไปแล้ว
         elif is_list:
             n_samples = v.input_panel.input_samples.value()
             current_sample = data.get('sample_index', 1)
@@ -823,16 +829,18 @@ class AppController(QObject):
         run_mode = self.get_current_run_mode()
 
         if run_mode == "SINGLE":
-            # [แก้ไข] โหมด SINGLE: self.graph_x_data เก็บ "ลำดับการวัด" (1,2,3...) ไว้ใช้วาดกราฟ
-            # (แกน X = Measurement Count) ไม่ใช่ความถี่จริง ถ้าเอาไปใช้เป็น 'freq' ตรงๆ
-            # ตารางสถิติจะโชว์ Frequency (Hz) ผิดเป็นเลขลำดับ (เช่น "1.00" แทนค่าที่ตั้งไว้จริง)
-            # ต้องดึงความถี่ที่ตั้งไว้จริงจาก Input Panel มาใช้แทนเสมอ
-            fixed_freq = v.input_panel.input_freq.value()
+            # [แก้ไข] เดิมดึง fixed_freq = v.input_panel.input_freq.value() ค่าเดียวมาแปะให้
+            # ทุกรอบเท่ากันหมด ใช้ได้ตอน input_freq ยังถูกล็อกอยู่เท่านั้น — ตอนนี้ input_freq
+            # ปลดล็อกแล้ว (ผู้ใช้เปลี่ยนความถี่วัดชิ้นงานเดิมระหว่าง session ได้) จึงต้องใช้
+            # ความถี่ที่ถูก "stamp" ไว้กับข้อมูลดิบของแต่ละรอบเองแทน (self.single_runs เก็บเป็น
+            # (pri, sec, freq) ต่อ sample — freq มาจาก settings snapshot ตอนกด Start ของรอบนั้น
+            # ไม่ใช่อ่าน UI สด) แต่ละรอบจึงคงความถี่ที่วัดจริงไว้ถูกต้องแม้จะเปลี่ยน UI ไปแล้วก็ตาม
+            #
             # [แก้ไข] ส่งเป็น "กลุ่มต่อรอบ" (list ของ list) แทนที่จะรวมทุกรอบเป็น flat list เดียว
             # เพื่อให้ Statistics Table คำนวณสถิติแยกทีละรอบ (1 ครั้งกด Start = 1 แถว) ไม่ปนกัน
             # แม้ freq จะเท่าเดิมทุกรอบก็ตาม (raw_data_table ยังคง "ต่อข้อมูล" ทุกแถวตามเดิม)
             raw_records = [
-                [{'freq': fixed_freq, 'primary': p, 'secondary': s} for p, s in run]
+                [{'freq': f, 'primary': p, 'secondary': s} for p, s, f in run]
                 for run in self.single_runs
             ]
         else:
@@ -920,6 +928,7 @@ class AppController(QObject):
             "mode": v.input_panel.combo_scpi_mode.currentText() or "-",
             "signal": f"{volt:g} {unit}",
             "measurement_time": measurement_time or "-",
+            "meas_time": v.input_panel.combo_time.currentText() or "-",
             "avg": v.input_panel.input_avg.value(),
             "cable": v.input_panel.combo_cable.currentText(),
             "imp_range": v.input_panel.combo_range.currentText(),
@@ -969,6 +978,25 @@ class AppController(QObject):
         self.log.info("🗑 ล้างข้อมูลกราฟและตารางสถิติเรียบร้อย")
         self.update_session_lock()
 
+    # ข้อความ tooltip ที่ใส่ตอน field ถูกล็อกไว้ — บอกเหตุผล + วิธีปลดล็อกชัดเจน
+    # กันผู้ใช้งงว่าทำไมกดแก้ค่าไม่ได้ (แค่ setEnabled(False) เฉยๆ ไม่บอกเหตุผลอะไรเลย)
+    _LOCK_TOOLTIP = ("🔒 ค่านี้ถูกล็อกไว้ เพราะมีข้อมูลค้างอยู่ในโหมด SINGLE ที่กำลัง \"ต่อข้อมูล\" กันอยู่ "
+                      "(เปลี่ยนค่านี้กลางคันจะทำให้ข้อมูลรอบเก่ากับรอบใหม่วัดภายใต้เงื่อนไขไม่เหมือนกัน)\n"
+                      "กด Clear Graph ก่อน ถ้าต้องการแก้ไขค่านี้")
+
+    def _set_locked(self, widget, should_lock: bool):
+        """[NEW] setEnabled() + จัดการ tooltip ให้ในตัวเดียว — เก็บ tooltip เดิมไว้ใน
+        property ของ widget เอง (ไม่ต้องมี dict แยกใน AppController) แล้วคืนค่ากลับตอนปลดล็อก"""
+        if should_lock:
+            if widget.property("_orig_tooltip") is None:
+                widget.setProperty("_orig_tooltip", widget.toolTip())
+            widget.setToolTip(self._LOCK_TOOLTIP)
+        else:
+            orig = widget.property("_orig_tooltip")
+            if orig is not None:
+                widget.setToolTip(orig)
+        widget.setEnabled(not should_lock)
+
     def update_session_lock(self):
         v = self.view
         has_data = len(self.graph_x_data) > 0
@@ -983,6 +1011,33 @@ class AppController(QObject):
         v.adv_panel.chk_dev_ppm_enable.setEnabled(not should_lock)
         ppm_inner_enabled = v.adv_panel.chk_dev_ppm_enable.isChecked() and not should_lock
         v.adv_panel.widget_dev_inner.setEnabled(ppm_inner_enabled)
+
+        # [NEW] ขยาย lock ให้ครอบคลุมทุกช่องที่มีผลต่อผลวัด/แสดงอยู่ใน Measurement Session
+        # Info Bar (raw_data_table.py: SESSION_INFO_FIELDS) เดิมล็อกแค่ scpi_mode/run_mode/
+        # freq-list ทำให้ยังแก้ signal level, avg, cable, range ระหว่างมีข้อมูลค้างอยู่ได้ —
+        # พอกดวัดซ้ำ ค่าที่โชว์ใน Session Info Bar จะถูกเขียนทับด้วยค่าล่าสุดเงียบๆ ทำให้ข้อมูล
+        # รอบเก่ากับ metadata ที่แสดงอยู่ไม่ตรงกันจริง (ดูรายละเอียดที่คุยกันไว้ก่อนหน้านี้)
+        #
+        # เพิ่ม input_freq (ความถี่คงที่ของโหมด SINGLE) เข้ามาด้วย แม้จะไม่ได้อยู่ใน
+        # SESSION_INFO_FIELDS โดยตรง เพราะ update_statistics_table() ดึงค่านี้ "สด"
+        # มาแปะให้ทุกรอบที่สะสมไว้เท่ากันหมดเสมอ (fixed_freq = input_freq.value()) ถ้าปล่อย
+        # ให้เปลี่ยนได้ระหว่างมีข้อมูลค้าง รอบเก่าจะถูกเปลี่ยนป้ายความถี่ผิดตามไปด้วยทันที
+        # [แก้ไข] ตามที่คุยกันไว้ — ปลดล็อก input_freq เพื่อให้ผู้ใช้เปลี่ยนความถี่วัดอุปกรณ์
+        # ชิ้นเดิมได้ระหว่าง session (เช่น อยากดูค่าที่ 1kHz แล้ว 10kHz ของชิ้นงานเดียวกัน)
+        # ทำได้ปลอดภัยเพราะตอนนี้แต่ละรอบ (self.single_runs[-1]) ถูก stamp ความถี่ที่ใช้จริง
+        # ของรอบนั้นไว้กับข้อมูลดิบเลย (มาจาก settings snapshot ตอนกด Start ผ่าน worker ไม่ใช่
+        # อ่านค่า UI ปัจจุบันสดๆ ตอนคำนวณสถิติ) รอบเก่าจึงไม่มีทางถูกเปลี่ยนป้ายความถี่ผิดอีก
+        # แม้จะเปลี่ยน input_freq ก่อนกด Start รอบถัดไปก็ตาม — ดู update_statistics_table()
+        for widget in (
+            v.input_panel.input_volt,        # Signal Level (ตัวเลข)
+            v.input_panel.combo_level_mode,  # Signal Level (Vrms/Arms)
+            v.input_panel.chk_alc,           # ALC
+            v.input_panel.combo_time,        # Meas Time (Aperture: SHORT/MEDIUM/LONG)
+            v.input_panel.input_avg,         # Averaging
+            v.input_panel.combo_cable,       # Cable Length
+            v.input_panel.combo_range,       # Range
+        ):
+            self._set_locked(widget, should_lock)
 
         if not should_lock:
             v.input_panel.input_start_freq.setEnabled(run_mode == "SWEEP")
@@ -1419,10 +1474,19 @@ class AppController(QObject):
         self.graph_raw_pri_y = list(results.get("graph_raw_pri_y", []))
         self.graph_raw_sec_y = list(results.get("graph_raw_sec_y", []))
         # [NEW] คืนค่ากลุ่มข้อมูลดิบแยกตามรอบ (ใช้คำนวณ Statistics Table ต่อรอบใน SINGLE mode)
-        # ไฟล์เก่าก่อนมีฟีเจอร์นี้จะไม่มี key นี้ -> fallback เป็น 1 รอบรวมทั้งหมด (พฤติกรรมเดิม)
-        self.single_runs = [list(map(tuple, run)) for run in results.get(
+        # แต่ละ sample เก็บเป็น (pri, sec, freq) — freq ของรอบนั้นๆ โดยเฉพาะ (รองรับกรณี
+        # เปลี่ยนความถี่ระหว่าง session ได้ตั้งแต่ input_freq ถูกปลดล็อก)
+        # ไฟล์เก่าก่อนมีฟีเจอร์นี้จะไม่มี key "single_runs" เลย หรือมีแต่เป็น 2-tuple (pri, sec)
+        # ไม่มี freq (เก็บตอนความถี่ยังล็อกคงที่ทั้ง session) -> เติม freq จากค่าที่ Save ไว้ใน
+        # inputs["freq"] ให้ทุก sample เท่ากันหมด (พฤติกรรมเดิมตอนนั้นถูกอยู่แล้ว)
+        saved_freq = inputs.get("freq", 0)
+        raw_single_runs = results.get(
             "single_runs", [list(zip(self.graph_raw_pri_y, self.graph_raw_sec_y))]
-        )]
+        )
+        self.single_runs = [
+            [tuple(s) if len(s) == 3 else (s[0], s[1], saved_freq) for s in run]
+            for run in raw_single_runs
+        ]
 
         self.setup_graph_labels()
         is_list_or_sweep = run_mode in ("LIST", "SWEEP")

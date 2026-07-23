@@ -19,7 +19,6 @@ class RawDataTable(QWidget):
     SESSION_INFO_FIELDS = [
         ("mode",             "SCPI Mode"),
         ("signal",           "Signal Level"),
-        ("measurement_time", "Measured At"),
         ("meas_time",        "Meas Time (Aperture)"),
         ("avg",              "Averaging"),
         ("cable",            "Cable Length"),

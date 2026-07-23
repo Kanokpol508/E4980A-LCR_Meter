@@ -113,7 +113,7 @@ class FrequencyListWidget(QWidget):
         row_layout.setContentsMargins(0, 0, 0, 0)
 
         lbl = QLabel(f"Frequency {index}")
-        lbl.setFixedWidth(85)
+        lbl.setFixedWidth(95)
 
         input_field = QLineEdit()
         input_field.setFixedWidth(FREQ_FIELD_WIDTH)
@@ -190,7 +190,7 @@ class FrequencyListWidget(QWidget):
 
     def _renumber_labels(self):
         for i, r in enumerate(self._rows):
-            r['label'].setText(f"Freq {i + 1} (ความถี่ที่ {i + 1})")
+            r['label'].setText(f"Frequency {i + 1}")
 
     def _check_and_warn(self):
         """ตรวจสอบว่ารายการความถี่กรอกครบทุกช่อง (ไม่มีช่องว่างค้าง) และค่าที่กรอก

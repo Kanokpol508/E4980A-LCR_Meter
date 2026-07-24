@@ -129,6 +129,7 @@ class AppController(QObject):
         # [NEW] ระบบ Save / View Save Result — ใช้ปุ่มเดิมที่อยู่ข้าง Measurement Result (lcd_display)
         v.lcd_display.btn_save.clicked.connect(self.handle_save_result)
         v.lcd_display.btn_view.clicked.connect(self.handle_view_save_result)
+        v.lcd_display.btn_export_excel.clicked.connect(self.handle_export_excel)
 
         v.input_panel.input_start_freq.valueChanged.connect(self.update_calculated_points)
         v.input_panel.input_stop_freq.valueChanged.connect(self.update_calculated_points)
@@ -1397,6 +1398,33 @@ class AppController(QObject):
         dialog = ViewSaveDialog(self.view)
         dialog.open_save_requested.connect(self.open_save)
         dialog.exec()
+
+    def handle_export_excel(self):
+        """เมื่อกดปุ่ม 'Export Excel' — เปิดป๊อปอัพ 3 ขั้นตอน (เลือก Save -> Record details -> ตั้งค่าไฟล์)
+        แล้ว export เป็นไฟล์ .xlsx ตามที่ผู้ใช้ตั้งค่าไว้"""
+        from gui.dialogs.export_excel_dialog import ExportExcelDialog
+        from data.file_exporter import export_measurements_to_excel
+
+        default_run_mode = self.get_current_run_mode()
+        dialog = ExportExcelDialog(self.view, default_run_mode=default_run_mode)
+        if dialog.exec() != ExportExcelDialog.DialogCode.Accepted:
+            return
+
+        try:
+            path = export_measurements_to_excel(
+                save_paths=dialog.selected_saves,
+                output_path=dialog.output_path,
+                include_stats=dialog.include_stats,
+                include_raw=dialog.include_raw,
+                record_details=dialog.record_details,
+            )
+        except (OSError, ValueError, KeyError) as e:
+            self.log.error(f"❌ Export Excel ล้มเหลว: {e}")
+            QMessageBox.critical(self.view, "Export ล้มเหลว", f"ไม่สามารถ Export ไฟล์ Excel ได้:\n{e}")
+            return
+
+        self.log.info(f"📊 Export Excel สำเร็จ: {path}")
+        QMessageBox.information(self.view, "Export สำเร็จ", f"Export ไฟล์ Excel เรียบร้อยแล้ว:\n{path}")
 
     def open_save(self, path: str):
         """โหลด Input + ผลลัพธ์จากไฟล์ Save ที่เลือก กลับมาแสดงในโปรแกรมทั้งหมด"""

@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QStandardPaths
 import pyqtgraph as pg
 import pyqtgraph.exporters
-from utils.helpers import NoScrollComboBox
+from utils.helpers import NoScrollComboBox, truncate_sci
 
 # แยก "ชื่อพารามิเตอร์" กับ "หน่วยในวงเล็บท้ายสุด" เช่น
 # "Resistance, R (Ω)" -> ("Resistance, R", "Ω")
@@ -349,7 +349,7 @@ class GraphDisplay(QWidget):
                 self.legend.addItem(self.curve_primary, self.pri_name)
             if self.chk_data_labels.isChecked():
                 for xi, yi in zip(label_x, pri_y):
-                    t = pg.TextItem(f'{yi:.5e}', color='#0a3d91', anchor=(0.5, 1.2))
+                    t = pg.TextItem(truncate_sci(yi), color='#0a3d91', anchor=(0.5, 1.2))
                     t.setPos(xi, yi)
                     self.plot_widget.addItem(t)
                     self._data_label_items.append(t)
@@ -365,7 +365,7 @@ class GraphDisplay(QWidget):
                 self.legend.addItem(self.curve_secondary, self.sec_name)
             if self.chk_data_labels.isChecked():
                 for xi, yi in zip(label_x, sec_y):
-                    t = pg.TextItem(f'{yi:.5e}', color='#8f0050', anchor=(0.5, -0.2))
+                    t = pg.TextItem(truncate_sci(yi), color='#8f0050', anchor=(0.5, -0.2))
                     t.setPos(xi, yi)
                     self.plot_widget.addItem(t)
                     self._data_label_items.append(t)

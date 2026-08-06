@@ -63,7 +63,7 @@ class ConnectionPanel(QWidget):
     def set_connected_ui(self, connected: bool, resource_text: str = ""):
         """ปรับหน้าตาปุ่ม/สถานะให้ตรงกับสถานะการเชื่อมต่อปัจจุบัน"""
         if connected:
-            self.lbl_status.setText(f"\U0001F7E2 Connected: {resource_text}")
+            self.lbl_status.setText("\U0001F7E2 Connected")
             self.lbl_status.setStyleSheet("font-weight: bold; color: #22c55e;")
         else:
             self.lbl_status.setText("\u26aa Not Connected")

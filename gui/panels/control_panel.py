@@ -47,22 +47,28 @@ class ControlPanel(QWidget):
         self.lbl_warn_visa = QLabel("⚠️ กรุณากด CONNECT เพื่อเชื่อมต่อเครื่องมือวัดก่อน")
         self.lbl_warn_dev_start = QLabel("⚠️ ต้องกรอก Primary Ref หรือ Secondary Ref อย่างน้อย 1 ค่า")
         self.lbl_warn_freqlist_start = QLabel("⚠️ กรุณากรอกรายการความถี่ (Frequency List) ก่อนเริ่มวัด")
+        self.lbl_warn_correction_start = QLabel("⚠️ กรุณาทำ OPEN Correction และ SHORT Correction ให้เสร็จก่อนเริ่มวัด")
 
         self.lbl_warn_visa.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_warn_dev_start.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_warn_dev_start.setWordWrap(True)
         self.lbl_warn_freqlist_start.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_warn_freqlist_start.setWordWrap(True)
+        self.lbl_warn_correction_start.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_warn_correction_start.setWordWrap(True)
 
         self.lbl_warn_visa.setVisible(False)
         self.lbl_warn_dev_start.setVisible(False)
         self.lbl_warn_freqlist_start.setVisible(False)
+        self.lbl_warn_correction_start.setVisible(False)
 
         self.lbl_warn_visa.setStyleSheet("color: #ff4444; font-weight: bold;")
         self.lbl_warn_dev_start.setStyleSheet("color: #ff4444; font-weight: bold;")
         self.lbl_warn_freqlist_start.setStyleSheet("color: #ff4444; font-weight: bold;")
+        self.lbl_warn_correction_start.setStyleSheet("color: #ff4444; font-weight: bold;")
 
         layout.addLayout(grid_run)
         layout.addWidget(self.lbl_warn_visa)
         layout.addWidget(self.lbl_warn_dev_start)
         layout.addWidget(self.lbl_warn_freqlist_start)
+        layout.addWidget(self.lbl_warn_correction_start)

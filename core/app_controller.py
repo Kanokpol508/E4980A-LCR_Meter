@@ -21,6 +21,7 @@ class AppController(QObject):
         self.is_ppm_error = False               # ป้องกัน AttributeError: เปิด PPM แต่ไม่กรอก Ref
         self.is_visa_error = True
         self.is_freqlist_error = False          # ป้องกัน AttributeError
+        self.is_correction_error = True         # [NEW] บังคับให้ทำ OPEN + SHORT Correction ก่อนกด START ได้
         self._stopped_by_user = False           # [NEW] แยกกรณีวัดจบเองกับผู้ใช้กด Stop เอง (กันป๊อปอัพเด้งตอนกด Stop)
 
         self.worker = None
@@ -437,6 +438,7 @@ class AppController(QObject):
             QMessageBox.critical(self.view, "Correction ล้มเหลว", f"❌ {msg}")
 
         self.current_corr_type = None
+        self.check_correction_status()  # [NEW] อัปเดตสถานะปุ่ม START ทุกครั้งที่ Correction เสร็จ (สำเร็จหรือล้มเหลว)
 
     def _reset_correction_status(self):
         """
@@ -468,6 +470,8 @@ class AppController(QObject):
             self.log.warning(
                 "⚠️ การตั้งค่าเปลี่ยน — SHORT Correction อาจไม่ valid แล้ว กรุณาทำ Correction ใหม่"
             )
+
+        self.check_correction_status()  # [NEW] อัปเดตสถานะปุ่ม START ทันทีที่ Correction ถูก invalidate
 
     def handle_clear_graph(self):
         reply = QMessageBox.question(
@@ -562,7 +566,7 @@ class AppController(QObject):
         # ป้องกัน edge case ที่ปุ่ม Start เปิดได้ทั้งที่มี error ค้างอยู่
         # (เช่น state ไม่ sync กัน หรือ race condition ระหว่าง signal)
         # เป็น safety net ชั้นที่ 2 ถัดจาก update_start_button_state() ที่ disable ปุ่มไว้
-        if self.is_ppm_error or self.is_visa_error or self.is_freqlist_error:
+        if self.is_ppm_error or self.is_visa_error or self.is_freqlist_error or self.is_correction_error:
             self.log.warning("⚠️ ไม่สามารถเริ่มวัดได้ — ยังมีข้อผิดพลาดค้างอยู่ กรุณาตรวจสอบและแก้ไขก่อน")
             return
 
@@ -1113,12 +1117,27 @@ class AppController(QObject):
         for display_text, scpi_code in modes:
             self.view.input_panel.combo_scpi_mode.addItem(f"{scpi_code} ({display_text})", userData=scpi_code)
 
+    def check_correction_status(self):
+        """[NEW] เช็คว่าทำ OPEN Correction และ SHORT Correction ครบทั้งคู่หรือยัง
+        ใช้ text บนปุ่มเป็นแหล่งข้อมูลจริง (single source of truth) เหมือนกับ
+        _reset_correction_status() เพื่อไม่ให้ status สองที่ไม่ตรงกัน"""
+        adv = self.view.adv_panel
+        open_is_ok = adv.btn_open_corr.text() == "OPEN Correction (OK)"
+        short_is_ok = adv.btn_short_corr.text() == "SHORT Correction (OK)"
+        self.is_correction_error = not (open_is_ok and short_is_ok)
+        self.update_start_button_state()
+
     def update_start_button_state(self):
         v = self.view
-        is_blocked = self.is_ppm_error or self.is_visa_error or self.is_freqlist_error
+        is_blocked = (self.is_ppm_error or self.is_visa_error or self.is_freqlist_error
+                      or self.is_correction_error)
         v.ctrl_panel.lbl_warn_visa.setVisible(self.is_visa_error)
         v.ctrl_panel.lbl_warn_dev_start.setVisible(self.is_ppm_error)
         v.ctrl_panel.lbl_warn_freqlist_start.setVisible(self.is_freqlist_error)
+        # ไม่ต้องซ้ำเตือนถ้ายังต่อเครื่องไม่ได้ — โชว์เตือน Correction เฉพาะตอนต่อเครื่องแล้ว
+        v.ctrl_panel.lbl_warn_correction_start.setVisible(
+            self.is_correction_error and not self.is_visa_error
+        )
 
         if is_blocked:
             v.ctrl_panel.btn_start.setText("🔒 START")

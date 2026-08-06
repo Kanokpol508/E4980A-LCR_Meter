@@ -590,16 +590,16 @@ class InputPanel(QWidget):
         v_signal.setSpacing(8)
 
         self.input_volt = CleanDoubleSpinBox()
-        self.input_volt.setRange(0.0001, 2.0)   # E4980A (ไม่มี Option 001) สูงสุด 2.0 Vrms / Arms
+        self.input_volt.setRange(0.0001, 20.0)   # E4980A (Option 001) สูงสุด 20 V / A
         self.input_volt.setDecimals(4)
         self.input_volt.setSingleStep(0.1)
         self.input_volt.setValue(1.0)
         self.input_volt.setFixedWidth(VOLT_FIELD_WIDTH + 10)
 
-        # Dropdown หน่วย: Vrms (Voltage) หรือ Arms (Current)
+        # Dropdown หน่วย: V (Voltage) หรือ A (Current)
         self.combo_level_mode = NoScrollComboBox()
-        self.combo_level_mode.addItem("Vrms", userData="Voltage")
-        self.combo_level_mode.addItem("Arms", userData="Current")
+        self.combo_level_mode.addItem("V", userData="Voltage")
+        self.combo_level_mode.addItem("A", userData="Current")
         self.combo_level_mode.setFixedWidth(105)
 
         # Label อยู่แถวบน, SpinBox + Dropdown อยู่แถวล่าง
@@ -615,7 +615,7 @@ class InputPanel(QWidget):
         self.chk_alc = QCheckBox("Enable ALC (Automatic Level Control)")
         self.chk_alc.setToolTip(
             "ALC ทำให้ระดับสัญญาณ ณ จุดที่ชิ้นงาน เท่ากับค่าที่ตั้งไว้จริงๆ\n"
-            "แนะนำเปิดเมื่อวัด Inductor ด้วยโหมด Arms\n"
+            "แนะนำเปิดเมื่อวัด Inductor ด้วยโหมด A\n"
             "เพื่อให้กระแสทดสอบคงที่ตลอดการวัดทุกความถี่"
         )
 

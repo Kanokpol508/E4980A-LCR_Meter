@@ -200,8 +200,8 @@ class E4980A:
     def set_signal_level(self, level: float, mode: str = 'Voltage'):
         """
         ตั้งระดับสัญญาณทดสอบ (Test Signal Level)
-        - mode = 'Voltage' -> ตั้งแรงดัน AC (หน่วย Vrms) ใช้กับ Capacitor
-        - mode = 'Current' -> ตั้งกระแส AC (หน่วย Arms) ใช้กับ Inductor
+        - mode = 'Voltage' -> ตั้งแรงดัน AC (หน่วย V) ใช้กับ Capacitor
+        - mode = 'Current' -> ตั้งกระแส AC (หน่วย A) ใช้กับ Inductor
         คำสั่ง SCPI: :VOLTage:LEVel หรือ :CURRent:LEVel ตามโหมด
         """
         if not self.is_connected:

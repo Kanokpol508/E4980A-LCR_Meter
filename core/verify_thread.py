@@ -79,10 +79,10 @@ class VerifyWorker(QThread):
             level_mode = s.get('level_mode', 'Voltage')
             if level_mode == 'Current':
                 act_level = inst.query(":CURRent:LEVel?").strip()
-                add_res("Signal Level (Arms)", s['volt'], act_level, self.check_float_match(s['volt'], act_level))
+                add_res("Signal Level (A)", s['volt'], act_level, self.check_float_match(s['volt'], act_level))
             else:
                 act_level = inst.query(":VOLTage:LEVel?").strip()
-                add_res("Signal Level (Vrms)", s['volt'], act_level, self.check_float_match(s['volt'], act_level))
+                add_res("Signal Level (V)", s['volt'], act_level, self.check_float_match(s['volt'], act_level))
 
             act_alc = inst.query(":AMPLitude:ALC?").strip()
             exp_alc = "1" if s.get('alc_enabled', False) else "0"

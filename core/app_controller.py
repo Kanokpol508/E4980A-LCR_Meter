@@ -107,7 +107,7 @@ class AppController(QObject):
         v.conn_panel.btn_connect.clicked.connect(self.handle_connect)
         v.conn_panel.btn_disconnect.clicked.connect(self.handle_disconnect)
 
-        # [NEW] ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก Vrms เป็น Arms ให้ไปปรับเพดานตัวเลขทันที
+        # [NEW] ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก V เป็น A ให้ไปปรับเพดานตัวเลขทันที
         v.input_panel.combo_level_mode.currentIndexChanged.connect(self.update_hardware_limits)
 
         # PPM Reference: เปิด/ปิด checkbox และ validate ค่า Ref ที่กรอก
@@ -223,18 +223,18 @@ class AppController(QObject):
         v = self.view
         level_mode = v.input_panel.combo_level_mode.currentData()
         
-        # สมมติฐาน: เป็นเครื่องรุ่นมาตรฐาน (ไม่มี Option 001)
+        # เครื่องรุ่นมี Option 001 (Power/DC Bias Enhance): แรงดันสูงสุด 20 V
         if level_mode == "Voltage":
-            v.input_panel.input_volt.setMaximum(2.0)
-            v.input_panel.input_volt.setToolTip("โหมดแรงดัน: จ่ายสัญญาณได้สูงสุด 2.0 Vrms (เครื่องรุ่นมาตรฐาน)")
-        else: # โหมด Current (Arms)
-            v.input_panel.input_volt.setMaximum(0.02) # 20 mArms
-            v.input_panel.input_volt.setToolTip("โหมดกระแส: จ่ายสัญญาณได้สูงสุด 0.02 Arms หรือ 20 mArms (เครื่องรุ่นมาตรฐาน)")
+            v.input_panel.input_volt.setMaximum(20.0)
+            v.input_panel.input_volt.setToolTip("โหมดแรงดัน: จ่ายสัญญาณได้สูงสุด 20 V (Option 001)")
+        else: # โหมด Current (A) - เครื่องรุ่นมี Option 001 (Power/DC Bias Enhance): กระแสสูงสุด 0.2 A
+            v.input_panel.input_volt.setMaximum(0.2) # 200 mA
+            v.input_panel.input_volt.setToolTip("โหมดกระแส: จ่ายสัญญาณได้สูงสุด 0.2 A หรือ 200 mA (Option 001)")
             
-            # ป้องกันกรณีผู้ใช้กรอก 1.0 Vrms ทิ้งไว้ พอสลับเป็น Arms ค่าจะเกินสเปค
-            # ให้ปัดตัวเลขลงมาที่ 0.02 อัตโนมัติ
-            if v.input_panel.input_volt.value() > 0.02:
-                v.input_panel.input_volt.setValue(0.02)
+            # ป้องกันกรณีผู้ใช้กรอก 1.0 V ทิ้งไว้ พอสลับเป็น A ค่าจะเกินสเปค
+            # ให้ปัดตัวเลขลงมาที่ 0.2 อัตโนมัติ
+            if v.input_panel.input_volt.value() > 0.2:
+                v.input_panel.input_volt.setValue(0.2)
 
     def scan_visa_ports(self):
         self.view.conn_panel.combo_visa.clear()
@@ -651,7 +651,7 @@ class AppController(QObject):
 
         mode_label = {"SINGLE": "วัดจุดเดียว", "SWEEP": "Sweep", "LIST": "List"}.get(run_mode, run_mode)
         scpi = settings.get('scpi_mode', '-')
-        level_unit = "Arms" if settings.get('level_mode') == 'Current' else "Vrms"
+        level_unit = "A" if settings.get('level_mode') == 'Current' else "V"
         if run_mode == "SINGLE":
             freq_info = f"{settings.get('freq', '-')} Hz"
         elif run_mode == "SWEEP":
@@ -919,7 +919,7 @@ class AppController(QObject):
         v = self.view
 
         level_mode = v.input_panel.combo_level_mode.currentData()
-        unit = "Arms" if level_mode == "Current" else "Vrms"
+        unit = "A" if level_mode == "Current" else "V"
         volt = v.input_panel.input_volt.value()
 
         ppm_pri = v.adv_panel.input_dev_pri.text().strip()
@@ -1031,7 +1031,7 @@ class AppController(QObject):
         # แม้จะเปลี่ยน input_freq ก่อนกด Start รอบถัดไปก็ตาม — ดู update_statistics_table()
         for widget in (
             v.input_panel.input_volt,        # Signal Level (ตัวเลข)
-            v.input_panel.combo_level_mode,  # Signal Level (Vrms/Arms)
+            v.input_panel.combo_level_mode,  # Signal Level (V/A)
             v.input_panel.chk_alc,           # ALC
             v.input_panel.combo_time,        # Meas Time (Aperture: SHORT/MEDIUM/LONG)
             v.input_panel.input_avg,         # Averaging

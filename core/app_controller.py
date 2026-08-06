@@ -10,6 +10,7 @@ from core.measurement_thread import MeasurementWorker
 from core.correction_thread import CorrectionWorker
 from hardware.lcr_meter import E4980A
 from data.data_processor import calculate_frequency_stats
+from utils.helpers import truncate_sci
 from core import save_manager
 
 class AppController(QObject):
@@ -698,8 +699,10 @@ class AppController(QObject):
         self.graph_raw_sec_y.append(raw_sec)
 
         # กราฟและ LCD แสดงค่าดิบเสมอ (ไม่มี Graph Deviation แล้ว)
-        v.lcd_display.lbl_pri_val.setText(f"{raw_pri:.5e}")
-        v.lcd_display.lbl_sec_val.setText(f"{raw_sec:.5e}")
+        # [แก้ไข] เดิม f"{raw_pri:.5e}" ปัดเศษ (round) เหลือ 5 ตำแหน่ง เปลี่ยนเป็น
+        # truncate_sci() ตัดทิ้ง ไม่ปัดเศษ 9 ตำแหน่ง ให้หลักการเดียวกับ Raw Data Table
+        v.lcd_display.lbl_pri_val.setText(truncate_sci(raw_pri, 9))
+        v.lcd_display.lbl_sec_val.setText(truncate_sci(raw_sec, 9))
 
         run_mode = self.get_current_run_mode()
         is_single = (run_mode == "SINGLE")
@@ -782,10 +785,10 @@ class AppController(QObject):
             parts = []
             if v.freq_summary_graph.is_plot_primary_enabled():
                 pri_name = self._format_param_display(v.freq_summary_graph.pri_name)
-                parts.append(f"{pri_name}: {raw_pri:.5e}")
+                parts.append(f"{pri_name}: {truncate_sci(raw_pri, 9)}")
             if v.freq_summary_graph.is_plot_secondary_enabled():
                 sec_name = self._format_param_display(v.freq_summary_graph.sec_name)
-                parts.append(f"{sec_name}: {raw_sec:.5e}")
+                parts.append(f"{sec_name}: {truncate_sci(raw_sec, 9)}")
 
             if parts:
                 reading_text = ", ".join(parts) + f" | Freq: {freq_display}"

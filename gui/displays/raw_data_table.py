@@ -6,6 +6,15 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QTabl
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QBrush
 
+from utils.helpers import truncate_sci
+
+# [NEW] จำนวนทศนิยม (นัยสำคัญ) ที่ใช้แสดงค่า Primary/Secondary ในตาราง — ตั้งไว้ที่ 9
+# ตำแหน่งให้ตรงกับความละเอียดจริงที่เครื่อง E4980A ส่งกลับมาทาง :FETCh? (รูปแบบ
+# ค่าเริ่มต้นของเครื่องคือ 9 หลักหลังจุดทศนิยม เช่น "+1.059517689E-24" ตามคู่มือ)
+# มากกว่านี้จะเป็นแค่ floating-point noise จากการแปลง string -> float ไม่ใช่นัยสำคัญ
+# จริงจากเครื่องแล้ว
+RAW_VALUE_DECIMALS = 9
+
 class RawDataTable(QWidget):
     """
     ตารางแสดงข้อมูลดิบ (Raw Data) ที่อ่านได้จากเครื่องแบบ Real-time
@@ -146,15 +155,19 @@ class RawDataTable(QWidget):
         self.table.setItem(row_idx, 2, item_sample)
 
         # 3: Primary
+        # [แก้ไข] เดิม f"{pri:.5e}" ปัดเศษ (round) และตัดความละเอียดเหลือแค่ 5 ตำแหน่ง
+        # เปลี่ยนมาใช้ truncate_sci() ที่ "ตัดทิ้ง" ไม่ปัดเศษ (ตรงกับหลักการเดียวกับ
+        # Data Labels ในกราฟ) และเพิ่มเป็น 9 ตำแหน่งเพื่อเก็บนัยสำคัญให้มากที่สุด
+        # เท่าที่เครื่องส่งมาจริง (ดู RAW_VALUE_DECIMALS ด้านบน)
         pri = data.get('primary')
-        pri_str = f"{pri:.5e}" if isinstance(pri, (int, float)) else str(pri)
+        pri_str = truncate_sci(pri, RAW_VALUE_DECIMALS) if isinstance(pri, (int, float)) else str(pri)
         item_pri = QTableWidgetItem(pri_str)
         item_pri.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setItem(row_idx, 3, item_pri)
 
         # 4: Secondary
         sec = data.get('secondary')
-        sec_str = f"{sec:.5e}" if isinstance(sec, (int, float)) else str(sec)
+        sec_str = truncate_sci(sec, RAW_VALUE_DECIMALS) if isinstance(sec, (int, float)) else str(sec)
         item_sec = QTableWidgetItem(sec_str)
         item_sec.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setItem(row_idx, 4, item_sec)

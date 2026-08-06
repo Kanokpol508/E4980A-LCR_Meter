@@ -4,6 +4,8 @@
 import math
 import statistics
 
+from utils.helpers import truncate_sci
+
 
 # ==========================================================
 # ฟังก์ชันช่วยคำนวณ (Private helpers)
@@ -77,7 +79,12 @@ def _calc_stats_block(values: list, ref=None) -> dict:
 def _fmt(val, sci: bool = True) -> str:
     if val is None:
         return "-"
-    return f"{val:.5e}" if sci else f"{val:.4f}"
+    # [แก้ไข] เดิมใช้ f"{val:.5e}" ซึ่งปัดเศษ (round) และเก็บแค่ 5 ตำแหน่ง — ตอนนี้ใช้
+    # truncate_sci() แทน (ตัดทิ้ง ไม่ปัดเศษ) พร้อมเพิ่มเป็น 9 ตำแหน่ง ให้เป็นหลักการ
+    # เดียวกับ Raw Data Table (utils/helpers.RAW_VALUE_DECIMALS ใน raw_data_table.py)
+    # เพราะค่าพวกนี้ (Mean, SD, Min, Max) ถูกใช้ทั้งในตารางสถิติบนหน้าจอ และ export
+    # ออกไปเป็นรายงาน Excel จริง จึงควรแม่นยำ/สม่ำเสมอเท่ากับ Raw Data
+    return truncate_sci(val, 9) if sci else f"{val:.4f}"
 
 
 def _fmt_ppm(val) -> str:

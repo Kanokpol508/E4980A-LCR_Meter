@@ -127,11 +127,23 @@ class _EngAxisItem(pg.AxisItem):
         finite_vals = [rv for rv in raw_vals if rv is not None]
         max_abs = max((abs(rv) for rv in finite_vals), default=0)
 
-        factor, suffix = 1, ''
-        for f, s in self._SUFFIXES:
+        factor, suffix, tier_idx = 1, '', 3  # index 3 = (1, '') ในตาราง _SUFFIXES ด้านล่าง
+        for i, (f, s) in enumerate(self._SUFFIXES):
             if max_abs >= f:
-                factor, suffix = f, s
+                factor, suffix, tier_idx = f, s, i
                 break
+
+        # [แก้ไข] เดิมเลือกหน่วยจากค่ามากสุด (max_abs) เพียงอย่างเดียว ทำให้ช่วงค่าที่
+        # "คาบเส้นแบ่งหน่วยพอดี" ถูกบังคับหารด้วย 1000 ทั้งชุด กลายเป็นตัวเลขเศษส่วน
+        # อ่านยากอย่าง "0.99998k" ทั้งที่แสดงแบบเลขล้วน "999.98" อ่านง่ายกว่ามาก —
+        # ตอนนี้เช็คค่าที่เล็กที่สุด (min_abs) ด้วย ถ้าเมื่อย่อหน่วยแล้วเหลือน้อยกว่า 1
+        # (กลายเป็นเศษส่วน) ให้ถอยกลับไปใช้หน่วยที่เล็กลงเรื่อยๆ จนกว่าค่าทุกจุดจะแสดง
+        # เป็นเลขเต็ม (>= 1) ในหน่วยนั้น
+        nonzero_vals = [abs(rv) for rv in finite_vals if rv != 0]
+        min_abs = min(nonzero_vals) if nonzero_vals else max_abs
+        while tier_idx < len(self._SUFFIXES) - 1 and factor > 0 and (min_abs / factor) < 1:
+            tier_idx += 1
+            factor, suffix = self._SUFFIXES[tier_idx]
 
         # จำนวนทศนิยมคำนวณจาก spacing จริงของ tick เทียบกับหน่วยที่เลือก
         if self.logMode and len(finite_vals) >= 2:
@@ -143,9 +155,28 @@ class _EngAxisItem(pg.AxisItem):
 
         if factor and step > 0:
             step_in_units = step / factor
-            decimals = 0 if step_in_units >= 1 else min(4, max(0, math.ceil(-math.log10(step_in_units))))
+            decimals = 0 if step_in_units >= 1 else max(0, math.ceil(-math.log10(step_in_units)))
         else:
             decimals = 0
+
+        # [แก้ไข] เดิม cap ทศนิยมไว้ที่ 4 ตำแหน่งเสมอ ทำให้ช่วงค่าที่แคบมากๆ ปัดชนกัน
+        # จนโชว์ label ซ้ำกัน ดูเหมือนแกนผิดเพี้ยนไม่ตรงกับกราฟ ตอนนี้เพิ่มทศนิยมทีละ 1
+        # จนกว่า label ของทุก tick จะไม่ซ้ำกันแล้ว (หรือชนเพดานความปลอดภัยที่ 6 ตำแหน่ง
+        # กันเคสหลุดจริงๆ ไม่ให้ตัวเลขยาวจนอ่านไม่ได้)
+        if factor and finite_vals:
+            scaled_vals = [rv / factor for rv in finite_vals]
+            while decimals < 6:
+                seen = set()
+                collided = False
+                for sv in scaled_vals:
+                    label = f"{sv:.{decimals}f}"
+                    if label in seen:
+                        collided = True
+                        break
+                    seen.add(label)
+                if not collided:
+                    break
+                decimals += 1
 
         strings = []
         for rv in raw_vals:

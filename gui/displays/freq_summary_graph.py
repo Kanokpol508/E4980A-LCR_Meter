@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QStandardPaths
 import pyqtgraph as pg
 import pyqtgraph.exporters
-from utils.helpers import NoScrollComboBox, truncate_sci
+from utils.helpers import NoScrollComboBox, pick_series_unit, format_with_unit
 
 # แยก "ชื่อพารามิเตอร์" กับ "หน่วยในวงเล็บท้ายสุด" เช่น
 # "Resistance, R (Ω)" -> ("Resistance, R", "Ω")
@@ -127,11 +127,23 @@ class _EngAxisItem(pg.AxisItem):
         finite_vals = [rv for rv in raw_vals if rv is not None]
         max_abs = max((abs(rv) for rv in finite_vals), default=0)
 
-        factor, suffix = 1, ''
-        for f, s in self._SUFFIXES:
+        factor, suffix, tier_idx = 1, '', 3  # index 3 = (1, '') ในตาราง _SUFFIXES ด้านล่าง
+        for i, (f, s) in enumerate(self._SUFFIXES):
             if max_abs >= f:
-                factor, suffix = f, s
+                factor, suffix, tier_idx = f, s, i
                 break
+
+        # [แก้ไข] เดิมเลือกหน่วยจากค่ามากสุด (max_abs) เพียงอย่างเดียว ทำให้ช่วงค่าที่
+        # "คาบเส้นแบ่งหน่วยพอดี" เช่น 999.96-1000.06 Ω (คาบ 1000 ซึ่งเป็นเส้นแบ่งของ 'k')
+        # ถูกบังคับหารด้วย 1000 ทั้งชุด กลายเป็นตัวเลขเศษส่วนอ่านยากอย่าง "0.99998k"
+        # ทั้งที่แสดงแบบเลขล้วน "999.98" อ่านง่ายกว่ามาก — ตอนนี้เช็คค่าที่เล็กที่สุด
+        # (min_abs) ด้วย ถ้าเมื่อย่อหน่วยแล้วเหลือน้อยกว่า 1 (กลายเป็นเศษส่วน) ให้ถอย
+        # กลับไปใช้หน่วยที่เล็กลงเรื่อยๆ จนกว่าค่าทุกจุดจะแสดงเป็นเลขเต็ม (>= 1) ในหน่วยนั้น
+        nonzero_vals = [abs(rv) for rv in finite_vals if rv != 0]
+        min_abs = min(nonzero_vals) if nonzero_vals else max_abs
+        while tier_idx < len(self._SUFFIXES) - 1 and factor > 0 and (min_abs / factor) < 1:
+            tier_idx += 1
+            factor, suffix = self._SUFFIXES[tier_idx]
 
         # จำนวนทศนิยมคำนวณจาก spacing จริงของ tick เทียบกับหน่วยที่เลือก
         # กันตัวเลขงอกเป็นเศษเวลา zoom เข้าไปดูช่วงแคบๆ
@@ -144,9 +156,29 @@ class _EngAxisItem(pg.AxisItem):
 
         if factor and step > 0:
             step_in_units = step / factor
-            decimals = 0 if step_in_units >= 1 else min(4, max(0, math.ceil(-math.log10(step_in_units))))
+            decimals = 0 if step_in_units >= 1 else max(0, math.ceil(-math.log10(step_in_units)))
         else:
             decimals = 0
+
+        # [แก้ไข] เดิม cap ทศนิยมไว้ที่ 4 ตำแหน่งเสมอ ทำให้ช่วงค่าที่แคบมากๆ (เช่น
+        # 999.95-1000.05 Ω ที่ถูกย่อเป็นหน่วย k) ปัดชนกันจนโชว์ label ซ้ำกัน (ทั้งคู่
+        # กลายเป็น "1.0000k") ดูเหมือนแกนผิดเพี้ยนไม่ตรงกับกราฟ
+        # ตอนนี้เพิ่มทศนิยมทีละ 1 จนกว่า label ของทุก tick จะไม่ซ้ำกันแล้ว (หรือชน
+        # เพดานความปลอดภัยที่ 6 ตำแหน่ง กันเคสหลุดจริงๆ ไม่ให้ตัวเลขยาวจนอ่านไม่ได้)
+        if factor and finite_vals:
+            scaled_vals = [rv / factor for rv in finite_vals]
+            while decimals < 6:
+                seen = set()
+                collided = False
+                for sv in scaled_vals:
+                    label = f"{sv:.{decimals}f}"
+                    if label in seen:
+                        collided = True
+                        break
+                    seen.add(label)
+                if not collided:
+                    break
+                decimals += 1
 
         strings = []
         for rv in raw_vals:
@@ -463,8 +495,9 @@ class FreqSummaryGraph(QWidget):
             else:
                 self.errbar_pri.setVisible(False)
             if self.chk_data_labels.isChecked():
+                factor, suffix, decimals = pick_series_unit(means.tolist())
                 for x, y in zip(label_x, means):
-                    t = pg.TextItem(truncate_sci(y), color='#0a3d91', anchor=(0.5, 1.2))
+                    t = pg.TextItem(format_with_unit(y, factor, suffix, decimals, show_suffix=False), color='#0a3d91', anchor=(0.5, 1.2))
                     t.setPos(x, y)
                     self.plot_widget.addItem(t)
                     self._data_label_items.append(t)
@@ -487,8 +520,9 @@ class FreqSummaryGraph(QWidget):
             else:
                 self.errbar_sec.setVisible(False)
             if self.chk_data_labels.isChecked():
+                factor, suffix, decimals = pick_series_unit(means.tolist())
                 for x, y in zip(label_x, means):
-                    t = pg.TextItem(truncate_sci(y), color='#8f0050', anchor=(0.5, -0.2))
+                    t = pg.TextItem(format_with_unit(y, factor, suffix, decimals, show_suffix=False), color='#8f0050', anchor=(0.5, -0.2))
                     t.setPos(x, y)
                     self.plot_widget.addItem(t)
                     self._data_label_items.append(t)

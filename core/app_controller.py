@@ -112,6 +112,14 @@ class AppController(QObject):
         # [NEW] ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก V เป็น A ให้ไปปรับเพดานตัวเลขทันที
         v.input_panel.combo_level_mode.currentIndexChanged.connect(self.update_hardware_limits)
 
+        # [NEW] ผูกสัญญาณความถี่ทุกโหมด (SINGLE/SWEEP/LIST) + เปลี่ยนโหมดการรัน
+        # ให้ไปเช็คเงื่อนไข Voltage max 15V/20V ใหม่ทุกครั้งที่ความถี่หรือโหมดเปลี่ยน
+        # (ตามคู่มือ Table 3-12: Freq > 1 MHz จำกัด Voltage ไว้ที่ 15 Vrms)
+        v.input_panel.combo_run_mode.currentIndexChanged.connect(self.update_hardware_limits)
+        v.input_panel.input_freq.valueChanged.connect(self.update_hardware_limits)
+        v.input_panel.input_stop_freq.valueChanged.connect(self.update_hardware_limits)
+        v.input_panel.input_freq_list.freq_changed.connect(self.update_hardware_limits)
+
         # PPM Reference: เปิด/ปิด checkbox และ validate ค่า Ref ที่กรอก
         v.adv_panel.chk_dev_ppm_enable.stateChanged.connect(self.toggle_ppm)
         v.adv_panel.input_dev_pri.textChanged.connect(self.validate_ppm_ref)
@@ -220,23 +228,71 @@ class AppController(QObject):
         total = s + d
         v.input_panel.lbl_total_rounds_sweep.setText(f"{total} Times/Frequency \n (Discard {d} + Measure {s})")
 
+    def get_max_test_frequency(self) -> float:
+        """คืนค่าความถี่สูงสุดที่ 'มีผลจริง' กับการวัดในโหมดปัจจุบัน (Hz)
+        ใช้เช็คเงื่อนไข Voltage max 15V/20V ตามคู่มือ (Table 3-12 footnote 1: > 1 MHz -> 15 Vrms)
+        - SINGLE: ใช้ความถี่จุดเดียวที่กรอก
+        - SWEEP : ใช้ Stop Frequency (ค่าสูงสุดของช่วงสแกน)
+        - LIST  : ใช้ค่าสูงสุดในรายการความถี่ทั้งหมด (ถ้ายังไม่กรอกเลย ใช้ 0)
+        """
+        v = self.view
+        run_mode = v.input_panel.combo_run_mode.currentData()
+        if run_mode == "SWEEP":
+            return v.input_panel.input_stop_freq.value()
+        elif run_mode == "LIST":
+            freqs = v.input_panel.input_freq_list.get_frequencies()
+            return max(freqs) if freqs else 0.0
+        else:  # SINGLE
+            return v.input_panel.input_freq.value()
+
     def update_hardware_limits(self):
-        """อัปเดตเพดานสูงสุดของกล่องกรอกระดับสัญญาณ ตามโหมด V/I ที่ผู้ใช้เลือก"""
+        """อัปเดตเพดาน Min/Max ของกล่องกรอกระดับสัญญาณ ตามโหมด V/I และความถี่ที่ผู้ใช้ตั้งไว้
+        อ้างอิงคู่มือ E4980A/AL User Guide (Option 001 - Power/DC Bias Enhance):
+        - Table 3-12 (Voltage): 0.1 mVrms - 20 Vrms, แต่ถ้า Test Frequency > 1 MHz จะตั้งได้สูงสุดแค่ 15 Vrms
+        - Table 3-13 (Current): 50 uArms - 100 mArms
+        """
         v = self.view
         level_mode = v.input_panel.combo_level_mode.currentData()
-        
-        # เครื่องรุ่นมี Option 001 (Power/DC Bias Enhance): แรงดันสูงสุด 20 V
+
         if level_mode == "Voltage":
-            v.input_panel.input_volt.setMaximum(20.0)
-            v.input_panel.input_volt.setToolTip("โหมดแรงดัน: จ่ายสัญญาณได้สูงสุด 20 V (Option 001)")
-        else: # โหมด Current (A) - เครื่องรุ่นมี Option 001 (Power/DC Bias Enhance): กระแสสูงสุด 0.2 A
-            v.input_panel.input_volt.setMaximum(0.2) # 200 mA
-            v.input_panel.input_volt.setToolTip("โหมดกระแส: จ่ายสัญญาณได้สูงสุด 0.2 A หรือ 200 mA (Option 001)")
-            
-            # ป้องกันกรณีผู้ใช้กรอก 1.0 V ทิ้งไว้ พอสลับเป็น A ค่าจะเกินสเปค
-            # ให้ปัดตัวเลขลงมาที่ 0.2 อัตโนมัติ
-            if v.input_panel.input_volt.value() > 0.2:
-                v.input_panel.input_volt.setValue(0.2)
+            VOLT_MIN = 0.0001   # 0.1 mVrms (หน้า 2 Overview + Table 3-12)
+            max_freq = self.get_max_test_frequency()
+            if max_freq > 1_000_000.0:
+                volt_max = 15.0
+                tip = "โหมดแรงดัน: ความถี่ตั้งไว้เกิน 1 MHz จ่ายสัญญาณได้สูงสุด 15 V (Option 001, ตามคู่มือ Table 3-12)"
+            else:
+                volt_max = 20.0
+                tip = "โหมดแรงดัน: จ่ายสัญญาณได้ 0.1 mV - 20 V (Option 001, ตามคู่มือ Table 3-12)"
+
+            # ต้องตั้ง Decimals ก่อน setRange เสมอ ไม่งั้น Qt จะปัดค่า Min/Max ตามจำนวนทศนิยมเดิมก่อนหน้า
+            # (Voltage ละเอียดสุด 100uVrms/1mVrms ตาม Table 3-12 -> 4 ตำแหน่งพอ)
+            v.input_panel.input_volt.setDecimals(4)
+            v.input_panel.input_volt.setRange(VOLT_MIN, volt_max)
+            v.input_panel.input_volt.setToolTip(tip)
+
+            # ถ้าค่าที่กรอกไว้เดิมเกินเพดานใหม่ (เช่น ลดความถี่จาก 15V กลับมาแล้วเกิน 15V) ให้ปัดลงอัตโนมัติ
+            if v.input_panel.input_volt.value() > volt_max:
+                v.input_panel.input_volt.setValue(volt_max)
+
+        else:  # โหมด Current (A)
+            CURR_MIN = 0.00005  # 50 uArms (หน้า 2 Overview)
+            CURR_MAX = 0.1      # 100 mArms (Table 3-13 แถวสุดท้าย + ตรงกับ SCPI :CURRent:LEVel Range "0 to 100m")
+
+            # BUGFIX: ต้องตั้ง Decimals เป็น 5 ตำแหน่งก่อน setRange เสมอ
+            # เดิมใช้ decimals=4 ทำให้ Qt ปัด Min 0.00005 (50uA) ขึ้นเป็น 0.0001 (100uA) โดยไม่รู้ตัว
+            # ทำให้ผู้ใช้กรอกค่าช่วง 50-99 uA ไม่ได้เลยทั้งที่เครื่องรองรับ (Table 3-13)
+            v.input_panel.input_volt.setDecimals(5)
+            v.input_panel.input_volt.setRange(CURR_MIN, CURR_MAX)
+            v.input_panel.input_volt.setToolTip(
+                "โหมดกระแส: จ่ายสัญญาณได้ 50 uA - 100 mA (Option 001, ตามคู่มือ Table 3-13)"
+            )
+
+            # ป้องกันกรณีผู้ใช้กรอกค่าฝั่ง Voltage ทิ้งไว้ (เช่น 1.0) พอสลับเป็น A ค่าจะเกินสเปค
+            # ให้ปัดตัวเลขลงมาที่เพดานใหม่โดยอัตโนมัติ
+            if v.input_panel.input_volt.value() > CURR_MAX:
+                v.input_panel.input_volt.setValue(CURR_MAX)
+            elif v.input_panel.input_volt.value() < CURR_MIN:
+                v.input_panel.input_volt.setValue(CURR_MIN)
 
     def scan_visa_ports(self):
         self.view.conn_panel.combo_visa.clear()

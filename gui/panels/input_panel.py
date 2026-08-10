@@ -590,7 +590,11 @@ class InputPanel(QWidget):
         v_signal.setSpacing(8)
 
         self.input_volt = CleanDoubleSpinBox()
-        self.input_volt.setRange(0.0001, 20.0)   # E4980A (Option 001) สูงสุด 20 V / A
+        # ช่วงกว้างสุดเผื่อไว้ตอนสร้าง widget (0.1mV ต่ำสุดฝั่ง Voltage - 20V สูงสุดฝั่ง Voltage)
+        # ค่า Min/Max จริงตามโหมด V/A และความถี่ปัจจุบัน จะถูกกำหนดโดย update_hardware_limits()
+        # อ้างอิงคู่มือ E4980A Option 001: Table 3-12 (Voltage 0.1mV-20Vrms, ≤15Vrms ถ้า Freq>1MHz)
+        # และ Table 3-13 (Current 50uA-100mArms)
+        self.input_volt.setRange(0.00005, 20.0)
         self.input_volt.setDecimals(4)
         self.input_volt.setSingleStep(0.1)
         self.input_volt.setValue(1.0)

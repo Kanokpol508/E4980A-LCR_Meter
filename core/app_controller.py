@@ -120,6 +120,11 @@ class AppController(QObject):
         v.input_panel.input_stop_freq.valueChanged.connect(self.update_hardware_limits)
         v.input_panel.input_freq_list.freq_changed.connect(self.update_hardware_limits)
 
+        # [NEW] เช็คเงื่อนไข Range 100mΩ ทุกครั้งที่ผู้ใช้เปลี่ยน Range เอง หรือพิมพ์ค่า Signal Level เอง
+        # (แยกจาก update_hardware_limits เพื่อไม่ให้ setRange() ข้างในนั้น trigger ตัวเองซ้ำวนลูป)
+        v.input_panel.combo_range.currentIndexChanged.connect(self.check_range_signal_level_conflict)
+        v.input_panel.input_volt.valueChanged.connect(self.check_range_signal_level_conflict)
+
         # PPM Reference: เปิด/ปิด checkbox และ validate ค่า Ref ที่กรอก
         v.adv_panel.chk_dev_ppm_enable.stateChanged.connect(self.toggle_ppm)
         v.adv_panel.input_dev_pri.textChanged.connect(self.validate_ppm_ref)
@@ -293,6 +298,42 @@ class AppController(QObject):
                 v.input_panel.input_volt.setValue(CURR_MAX)
             elif v.input_panel.input_volt.value() < CURR_MIN:
                 v.input_panel.input_volt.setValue(CURR_MIN)
+
+        # ตรวจสอบเงื่อนไข Range 0.1Ω ทุกครั้งที่ Level/Frequency เปลี่ยน เพราะเงื่อนไขนี้อิง Signal Level
+        self.check_range_signal_level_conflict()
+
+    def check_range_signal_level_conflict(self):
+        """เช็คเงื่อนไข Range 0.1Ω ตามคู่มือหน้า 51 (footnote 1 ของ Available impedance range)
+        และ Figure 3-4/3-5/3-6 (Effective measurement range) ซึ่งระบุเกณฑ์คู่กันเสมอว่า
+        "Test signal level > 2 V or 0.02 A" กล่าวคือ 0.02 A คือค่าเทียบเท่าของ 2V ในโหมดกระแส
+        ถ้าผู้ใช้เลือก Range = 0.1Ω พร้อมกับตั้ง Signal Level <= 2V (โหมด Voltage) หรือ <= 0.02 A
+        (โหมด Current) ให้เตือนและดีดกลับเป็น AUTO เพื่อกันไม่ให้ส่ง SCPI ที่ขัดแย้งกันไปเครื่อง
+        """
+        v = self.view
+        range_val = v.input_panel.combo_range.currentData()
+        if range_val != 0.1:
+            return  # ไม่ได้เลือก 0.1Ω ไม่ต้องเช็ค
+
+        level_mode = v.input_panel.combo_level_mode.currentData()
+        level_value = v.input_panel.input_volt.value()
+
+        # โหมด Voltage: เกณฑ์ตรงตามคู่มือคือ <= 2 V
+        # โหมด Current: เกณฑ์เทียบเท่าคือ <= 0.02 A ตามที่คู่มือระบุคู่กันเสมอในทุก figure
+        is_conflict = (
+            (level_mode == "Voltage" and level_value <= 2.0)
+            or (level_mode == "Current" and level_value <= 0.02)
+        )
+
+        if is_conflict:
+            unit = "V" if level_mode == "Voltage" else "A"
+            threshold = "2 V" if level_mode == "Voltage" else "0.02 A"
+            QMessageBox.warning(
+                v,
+                "Range ไม่ถูกต้อง",
+                f"ไม่สามารถใช้ Range 0.1 Ω ได้ เมื่อ Test Signal Level <= {threshold}\n"
+                "ระบบจะเปลี่ยน Range กลับเป็น AUTO ให้อัตโนมัติ"
+            )
+            self._set_combo_by_data(v.input_panel.combo_range, "AUTO")
 
     def scan_visa_ports(self):
         self.view.conn_panel.combo_visa.clear()

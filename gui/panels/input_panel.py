@@ -651,6 +651,8 @@ class InputPanel(QWidget):
 
         self.combo_range = NoScrollComboBox()
         self.combo_range.addItem("AUTO", userData="AUTO")
+        # 100 mΩ ใช้ได้เฉพาะเครื่องที่มี Option 001 และห้ามใช้เมื่อ Test Signal Level <= 2V (คู่มือหน้า 51 footnote 1)
+        self.combo_range.addItem("0.1 Ω", userData=0.1)
         self.combo_range.addItem("1 Ω", userData=1)
         self.combo_range.addItem("10 Ω", userData=10)
         self.combo_range.addItem("100 Ω", userData=100)

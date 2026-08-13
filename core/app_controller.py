@@ -524,7 +524,7 @@ class AppController(QObject):
         if success:
             self.log.info(f"{self.current_corr_type} Correction ✅ สำเร็จ")
             QMessageBox.information(self.view, "Correction สำเร็จ", f"✅ {msg}")
-            green_style = "background-color: #10b981; color: white; border: none;"
+            green_style = "background-color: #A8E6C1; color: #14532D; border: 1px solid #7FD9A0;"
             if self.current_corr_type == "OPEN":
                 self.view.adv_panel.btn_open_corr.setStyleSheet(green_style)
                 self.view.adv_panel.btn_open_corr.setText("OPEN Correction (OK)")

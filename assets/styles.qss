@@ -1,25 +1,28 @@
 /* ไฟล์เก็บโค้ดตกแต่งสีและหน้าตา UI (คล้าย CSS ของฝั่ง Web) */
-
 /* ==========================================
-   1. สีพื้นหลังของหน้าต่างหลัก (ฝั่งขวา)
+   ธีม: สีขาวสบายตา (Pastel White Theme)
+   อ้างอิงโทนสีพาสเทลจากตัวอย่างที่ผู้ใช้ส่งมา:
+   ฟ้าพาสเทล #B6E3E9 / #AACCE2 / #789CCE, ม่วงพาสเทล #B19CD8 / #D9C4EC,
+   ชมพูพาสเทล #FDAFAB / #FADEE1, พื้นหลังขาวสบายตา #FBFAF8
 ========================================== */
+
 QWidget {
     font-family: "Segoe UI", "Helvetica Neue", sans-serif;
-    font-size: 12px;                 
-    color: #ffffff;                                         /* สีตัวอักษรขาว */
-    font-weight: bold;                                      /* บังคับให้ตัวหนังสือทุกส่วนดูหนาขึ้นกว่าปกติ */
+    font-size: 12px;
+    color: #33415C;
+    font-weight: bold;
 }
 
 QMainWindow, QDialog, QWidget#centralwidget {
-    background-color: #2b1b4d;                              /* สีพื้นหลังกราฟและจอ LCD */
+    background-color: #FBFAF8;
 }
 
 /* ==========================================
    2. พื้นหลังฝั่งซ้าย (Input Panel)
 ========================================== */
 QWidget#leftPanel {
-    background-color: #2b1b4d;                              /* พื้นหลังหลังกล่อง */
-    border-right: 1px solid #4c307a;                        /* เส้นคั่นบางๆ ระหว่างฝั่งซ้ายและขวา */
+    background-color: #FFFFFF;
+    border-right: 1px solid #D9F1F1;
 }
 
 QWidget#leftPanel QScrollArea,
@@ -37,66 +40,66 @@ QLabel, QHBoxLayout, QVBoxLayout, QGridLayout {
    3. กล่องจัดกลุ่ม (บล็อกเมนู)
 ========================================== */
 QGroupBox, QWidget#leftPanel QGroupBox {
-    background-color: #172445;                              
-    border: 1px solid #2d4578;                              
-    border-top: 2px solid #8b5cf6;                          
-    border-radius: 6px;
-    margin-top: 32px;                                       
-    margin-bottom: 16px;                                    
-    padding: 20px 10px 12px 10px;                           
+    background-color: #FFFFFF;
+    border: 1px solid #D6E4F0;
+    border-top: 2px solid #B19CD8;
+    border-radius: 8px;
+    margin-top: 32px;
+    margin-bottom: 16px;
+    padding: 20px 10px 12px 10px;
 }
 
 QGroupBox::title {
-    color: #ffffff;                                         
-    font-size: 16px;                                        
-    font-weight: 900;                                       
+    color: #2C3A5C;
+    font-size: 16px;
+    font-weight: 900;
     subcontrol-origin: margin;
-    subcontrol-position: top left; 
-    left: 12px;                      
-    padding: 5px 14px;                                      
-    background-color: #0066CC;                              
-    border: 1px solid #3b82f6;                              
-    border-radius: 4px;              
+    subcontrol-position: top left;
+    left: 12px;
+    padding: 5px 14px;
+    background-color: #D9C4EC;
+    border: 1px solid #C0AFE2;
+    border-radius: 6px;
 }
 
 QGroupBox:disabled {
-    background-color: #0a101f;
-    border-color: #172445;
-    border-top: 1px solid #172445;
+    background-color: #F4F5F7;
+    border-color: #E7EAEF;
+    border-top: 1px solid #E7EAEF;
 }
 
 QGroupBox:disabled::title {
-    color: #475569;
-    background-color: #2b1b4d;                              
-    border: 1px solid #172445;
+    color: #A3ADC2;
+    background-color: #EDEFF3;
+    border: 1px solid #E7EAEF;
 }
 
 QLabel:disabled {
-    color: #475569;
+    color: #A3ADC2;
 }
 
 /* ==========================================
    4. ช่องป้อนข้อมูล (Inputs)
 ========================================== */
-QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
-    background-color: #090e1f;                              
-    border: 1px solid #3b82f6;                              
-    border-radius: 4px;
-    padding: 6px 10px;                
-    color: #ffffff;                                         
-    font-size: 13px;                 
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit, QPlainTextEdit {
+    background-color: #FFFFFF;
+    border: 1px solid #AACCE2;
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: #2C3A5C;
+    font-size: 13px;
     font-weight: bold;
 }
 
-QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
-    border: 2px solid #8b5cf6;                              
-    background-color: #0f1836;       
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus, QTextEdit:focus, QPlainTextEdit:focus {
+    border: 2px solid #B19CD8;
+    background-color: #F7F5FC;
 }
 
-QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QComboBox:disabled {
-    color: #475569;
-    background-color: #0a101f;
-    border: 1px solid #172445;
+QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QComboBox:disabled, QTextEdit:disabled, QPlainTextEdit:disabled {
+    color: #A3ADC2;
+    background-color: #F4F5F7;
+    border: 1px solid #E7EAEF;
 }
 
 /* ==========================================
@@ -106,101 +109,109 @@ QComboBox {
     padding-right: 30px;
 }
 QComboBox::drop-down {
-    background-color: #121d38;                              
-    border-left: 1px solid #3b82f6;                         
-    border-top-right-radius: 3px;
-    border-bottom-right-radius: 3px;
+    background-color: #EAF3FA;
+    border-left: 1px solid #AACCE2;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
     width: 28px;
 }
 QComboBox::drop-down:disabled {
-    background-color: transparent;                          
-    border-left: none;                                      
+    background-color: transparent;
+    border-left: none;
+}
+QComboBox QAbstractItemView {
+    background-color: #FFFFFF;
+    color: #2C3A5C;
+    border: 1px solid #AACCE2;
+    selection-background-color: #D9C4EC;
+    selection-color: #2C3A5C;
+    outline: none;
 }
 
 /* ==========================================
    SpinBox: สัญลักษณ์ "+" และ "-"
 ========================================== */
 QSpinBox, QDoubleSpinBox {
-    qproperty-buttonSymbols: 1; 
-    padding-right: 10px;             
+    qproperty-buttonSymbols: 1;
+    padding-right: 10px;
 }
 
 /* ==========================================
    ปุ่มกดทั่วไป และ โหมด (Single/Sweep)
 ========================================== */
 QPushButton {
-    background-color: #121d38;                              
-    color: #ffffff;                  
-    border: 1px solid #3b82f6;       
-    border-radius: 4px;
-    padding: 6px 12px;               
+    background-color: #EAF3FA;
+    color: #2C3A5C;
+    border: 1px solid #AACCE2;
+    border-radius: 6px;
+    padding: 6px 12px;
     font-weight: bold;
 }
 
 QPushButton:hover {
-    background-color: #2563eb;                              
-    border-color: #60a5fa;
-    color: white;
+    background-color: #AACCE2;
+    border-color: #789CCE;
+    color: #1B2740;
 }
 
 QPushButton:checked {
-    background-color: #8b5cf6;                              
-    color: white;
-    border: 1px solid #a855f7;       
+    background-color: #B19CD8;
+    color: #FFFFFF;
+    border: 1px solid #9379C2;
 }
 
 QPushButton:disabled {
-    background-color: #2b1b4d;       
-    color: #475569;
-    border: 1px solid #172445;
+    background-color: #F4F5F7;
+    color: #A3ADC2;
+    border: 1px solid #E7EAEF;
 }
 
 QPushButton:checked:disabled {
-    background-color: #172445;       
-    color: #64748b;
-    border: 1px solid #2d4578;
+    background-color: #E4DCF2;
+    color: #B7AED0;
+    border: 1px solid #D6C9EB;
 }
 
 /* ==========================================
-   ปุ่ม OPEN / SHORT Correction (สีส้ม)
+   ปุ่ม OPEN / SHORT Correction (สีส้มพาสเทล)
 ========================================== */
 QPushButton#btnOpenCorr, QPushButton#btnShortCorr {
-    background-color: #FF9900;       /* สีส้ม */
-    color: #000000;                  /* ตัวอักษรดำ */
-    border: 1px solid #cc7a00;
+    background-color: #FFD9A6;
+    color: #5A3B00;
+    border: 1px solid #F0B860;
 }
 
 QPushButton#btnOpenCorr:hover, QPushButton#btnShortCorr:hover {
-    background-color: #ffaa33;       /* สีส้มสว่างขึ้นตอนชี้เมาส์ */
+    background-color: #FFC98A;
 }
 
 /* ==========================================
    ปุ่ม START / STOP
 ========================================== */
 QPushButton#btnStart {
-    background-color: #10b981;                              
-    color: white;
+    background-color: #A8E6C1;
+    color: #14532D;
     font-size: 16px;
-    border: none;
+    border: 1px solid #7FD9A0;
     font-weight: bold;
 }
 QPushButton#btnStart:hover {
-    background-color: #059669;       
+    background-color: #8FDBAD;
 }
 QPushButton#btnStart:disabled {
-    background-color: #606671;                              
-    color: #ffffff;
+    background-color: #E5E7EB;
+    color: #A3ADC2;
 }
 
 QPushButton#btnStop {
-    background-color: #ef4444;                              
-    color: white;
+    background-color: #FDAFAB;
+    color: #7A1F1B;
     font-size: 16px;
-    border: none;
+    border: 1px solid #F58E89;
     font-weight: bold;
 }
 QPushButton#btnStop:hover {
-    background-color: #dc2626;
+    background-color: #FA9691;
 }
 
 /* ==========================================
@@ -208,106 +219,107 @@ QPushButton#btnStop:hover {
 ========================================== */
 QCheckBox {
     spacing: 8px;
-    color: #ffffff;
+    color: #2C3A5C;
     font-weight: bold;
     background-color: transparent;
 }
 QCheckBox::indicator {
     width: 16px;
     height: 16px;
-    border-radius: 3px;
-    border: 1px solid #3b82f6;       
-    background-color: #090e1f;
+    border-radius: 4px;
+    border: 1px solid #AACCE2;
+    background-color: #FFFFFF;
 }
 QCheckBox::indicator:hover {
-    border: 1px solid #8b5cf6;                              
+    border: 1px solid #B19CD8;
 }
 QCheckBox::indicator:checked {
-    background-color: #10b981;                              
-    border: 2px solid #059669;
+    background-color: #A8E6C1;
+    border: 2px solid #7FD9A0;
 }
 
 QCheckBox:disabled {
-    color: #475569;
+    color: #A3ADC2;
 }
 QCheckBox::indicator:disabled {
-    background-color: #0a101f;
-    border: 1px solid #172445;
+    background-color: #F4F5F7;
+    border: 1px solid #E7EAEF;
 }
 QCheckBox::indicator:checked:disabled {
-    background-color: #172445;
-    border: 1px solid #2d4578;
+    background-color: #E7EAEF;
+    border: 1px solid #DCE1E8;
 }
 
 /* ==========================================
    ตาราง (Verify Dialog)
 ========================================== */
 QTableWidget {
-    background-color: #040814;
-    alternate-background-color: #0a101f; 
-    color: #ffffff;
-    gridline-color: #172445;
-    border: 1px solid #172445;
+    background-color: #FFFFFF;
+    alternate-background-color: #F3F8FB;
+    color: #2C3A5C;
+    gridline-color: #E7EAEF;
+    border: 1px solid #E7EAEF;
 }
 QHeaderView::section {
-    background-color: #172445;                              
-    color: #38bdf8;                                         
+    background-color: #D9F1F1;
+    color: #2C3A5C;
     padding: 6px;
-    border: 1px solid #172445;
+    border: 1px solid #C9E7E7;
     font-weight: bold;
 }
 QTableWidget::item:selected {
-    background-color: #8b5cf6;                              
-    color: white;
+    background-color: #D9C4EC;
+    color: #2C3A5C;
 }
 
 /* ==========================================
    หน้าจอ LCD (Measurement Result)
 ========================================== */
 QGroupBox#lcdGroup {
-    background-color: #000000;                              
-    border: 1px solid #172445;
-    border-top: 2px solid #38bdf8;                          
+    background-color: #F7FBFC;
+    border: 1px solid #D6E4F0;
+    border-top: 2px solid #789CCE;
 }
 
 QGroupBox#lcdGroup::title {
-    background-color: #0066CC;
-    color: #ffffff;
-    border: 1px solid #3b82f6;
+    background-color: #789CCE;
+    color: #FFFFFF;
+    border: 1px solid #6A8AC0;
     font-size: 16px;
     font-weight: 900;
 }
 
 QLabel#lblPriTitle, QLabel#lblSecTitle {
-    color: #00FF33;                                         
+    color: #5B7FB5;
     font-weight: bold;
 }
 
 QLabel#lblPriVal, QLabel#lblSecVal {
-    color: #00FF33;                                         
-    font-size: 32px;                 
+    color: #2E5C8A;
+    font-size: 32px;
     font-weight: bold;
 }
 
 /* ==========================================
-   5. แถบเลื่อน (Scrollbar)
+   5. แถบเลื่อน (Scrollbar) — สีเหลืองเด่นชัด ให้ผู้ใช้เห็นชัดว่าเลื่อนดูข้อมูลเพิ่มได้
 ========================================== */
 QScrollBar:vertical {
-    background-color: rgba(10, 16, 31, 0.4);                
-    width: 10px;                                            
+    background-color: #F0F3F6;
+    width: 12px;
     margin: 0px;
-    border-radius: 5px;
+    border-radius: 6px;
 }
 QScrollBar::handle:vertical {
-    background-color: #FF9900;                              
-    min-height: 30px;                                       
-    border-radius: 5px;                                     
+    background-color: #FFE066;
+    min-height: 30px;
+    border-radius: 6px;
+    border: 1px solid #F2C744;
 }
 QScrollBar::handle:vertical:hover {
-    background-color: #FF9933;                              
+    background-color: #FFEB99;
 }
 QScrollBar::handle:vertical:pressed {
-    background-color: #FFA500;                              
+    background-color: #F2C744;
 }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0px;
@@ -317,92 +329,73 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
     background: none;
 }
 
+QScrollBar:horizontal {
+    background-color: #F0F3F6;
+    height: 12px;
+    margin: 0px;
+    border-radius: 6px;
+}
+QScrollBar::handle:horizontal {
+    background-color: #FFE066;
+    min-width: 30px;
+    border-radius: 6px;
+    border: 1px solid #F2C744;
+}
+QScrollBar::handle:horizontal:hover {
+    background-color: #FFEB99;
+}
+QScrollBar::handle:horizontal:pressed {
+    background-color: #F2C744;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+    background: none;
+}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: none;
+}
+
 /* ==========================================
    6. ส่วนตกแต่งเพิ่มเติมสำหรับฟีเจอร์ใหม่
-   (แต่ละปุ่มแยก block ชัดเจน แก้สีทีละปุ่มได้อิสระ)
 ========================================== */
-
-/* --- ปุ่ม Verify & Apply --- */
-QPushButton#btnVerify {
-    background-color: #3b82f6;
-    color: white;
-    border: 1px solid #2563eb;
-    border-radius: 4px;
+QPushButton#btnVerify, QPushButton#btnClearData, QPushButton#btnSaveResult,
+QPushButton#btnViewSaveResult, QPushButton#btnExportExcel {
+    background-color: #AACCE2;
+    color: #1B2740;
+    border: 1px solid #789CCE;
+    border-radius: 6px;
 }
-QPushButton#btnVerify:hover {
-    background-color: #60a5fa;
-}
-
-/* --- ปุ่ม Clear Data --- */
-QPushButton#btnClearData {
-    background-color: #3b82f6;
-    color: white;
-    border: 1px solid #2563eb;
-    border-radius: 4px;
-}
-QPushButton#btnClearData:hover {
-    background-color: #60a5fa;
-}
-
-/* --- ปุ่ม Save Result --- */
-QPushButton#btnSaveResult {
-    background-color: #3b82f6;
-    color: white;
-    border: 1px solid #2563eb;
-    border-radius: 4px;
-}
-QPushButton#btnSaveResult:hover {
-    background-color: #60a5fa;
-}
-
-/* --- ปุ่ม View Save Result --- */
-QPushButton#btnViewSaveResult {
-    background-color: #3b82f6;
-    color: white;
-    border: 1px solid #2563eb;
-    border-radius: 4px;
-}
-QPushButton#btnViewSaveResult:hover {
-    background-color: #60a5fa;
-}
-
-/* --- ปุ่ม Export Excel --- */
-QPushButton#btnExportExcel {
-    background-color: #3b82f6;
-    color: white;
-    border: 1px solid #2563eb;
-    border-radius: 4px;
-}
-QPushButton#btnExportExcel:hover {
-    background-color: #60a5fa;
+QPushButton#btnVerify:hover, QPushButton#btnClearData:hover, QPushButton#btnSaveResult:hover,
+QPushButton#btnViewSaveResult:hover, QPushButton#btnExportExcel:hover {
+    background-color: #95C8D7;
 }
 
 /* ==========================================
    7. สีส่วนของ Tab ตรงOutputฝั่งขวา
 ========================================== */
 QTabBar::tab {
-    background-color: #172445;
-    color: #ffffff;
-    border: 1px solid #2d4578;
+    background-color: #F0F3F6;
+    color: #5A6B8C;
+    border: 1px solid #E1E6EC;
     border-bottom: none;
-    border-top-left-radius: 4px;
-    border-top-right-radius: 4px;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
     padding: 6px 14px;
     margin-right: 2px;
     font-weight: bold;
 }
 QTabBar::tab:selected {
-    background-color: #0066CC;
-    color: #ffffff;
-    border: 1px solid #3b82f6;
+    background-color: #D9F1F1;
+    color: #1B2740;
+    border: 1px solid #AACCE2;
     border-bottom: none;
 }
 QTabBar::tab:hover:!disabled {
-    background-color: #2d4578;
+    background-color: #E7F3F3;
 }
 QTabBar::tab:disabled {
-    background-color: #0a101f;
-    color: #475569;
-    border: 1px solid #172445;
+    background-color: #F7F8FA;
+    color: #C0C7D3;
+    border: 1px solid #EEF0F3;
     border-bottom: none;
 }

@@ -54,13 +54,13 @@ class LogDisplay(QWidget):
     # ลำดับ severity ที่ใช้เปรียบเทียบ Filter (ครอบคลุมทุก level ที่มี LEVEL_COLORS)
     _LEVEL_ORDER = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
-    # สีตาม Level (ใช้ hex color ให้เข้ากับ dark theme ของโปรแกรม)
+    # สีตาม Level (ใช้ hex color ให้เข้ากับ pastel white theme ของโปรแกรม)
     LEVEL_COLORS = {
-        "DEBUG":    "#888888",   # เทา
-        "INFO":     "#e2e8f0",   # ขาวนวล
-        "WARNING":  "#fbbf24",   # เหลืองอำพัน
-        "ERROR":    "#f87171",   # แดง
-        "CRITICAL": "#ff4444",   # แดงสด
+        "DEBUG":    "#9AA5B5",   # เทาอ่อน
+        "INFO":     "#33415C",   # กรมท่าอ่อน (อ่านง่ายบนพื้นขาว)
+        "WARNING":  "#C98A1F",   # ส้มอำพันเข้มพออ่านออกบนพื้นขาว
+        "ERROR":    "#D2544B",   # แดงพาสเทลเข้ม
+        "CRITICAL": "#B3261E",   # แดงเข้ม
     }
 
     # จำนวน record สูงสุดที่เก็บไว้ใน buffer (ใช้ร่วมกับ deque maxlen)
@@ -81,6 +81,7 @@ class LogDisplay(QWidget):
 
         lbl = QLabel("แสดงตั้งแต่ Level:")
         lbl.setFixedWidth(130)
+        lbl.setStyleSheet("color: #FFFFFF;")
         toolbar.addWidget(lbl)
 
         self.combo_level_filter = NoScrollComboBox()
@@ -111,8 +112,8 @@ class LogDisplay(QWidget):
         self.btn_copy.setFixedHeight(28)
         self.btn_copy.setToolTip("คัดลอกข้อความ log ที่แสดงอยู่ในหน้าจอทั้งหมด")
         self.btn_copy.setStyleSheet(
-            "QPushButton { background-color: #1e3a5f; color: #e2e8f0; border-radius: 4px; padding: 0 10px; }"
-            "QPushButton:hover { background-color: #2a4f7c; }"
+            "QPushButton { background-color: #AACCE2; color: #1B2740; border-radius: 4px; padding: 0 10px; border: 1px solid #789CCE; }"
+            "QPushButton:hover { background-color: #95C8D7; }"
         )
         self.btn_copy.clicked.connect(self.copy_log)
         toolbar.addWidget(self.btn_copy)
@@ -122,8 +123,8 @@ class LogDisplay(QWidget):
         self.btn_clear.setFixedHeight(28)
         self.btn_clear.setToolTip("ล้าง log ทั้งหมดที่แสดงอยู่และ buffer ภายใน")
         self.btn_clear.setStyleSheet(
-            "QPushButton { background-color: #334155; color: #e2e8f0; border-radius: 4px; padding: 0 10px; }"
-            "QPushButton:hover { background-color: #475569; }"
+            "QPushButton { background-color: #FADEE1; color: #7A1F1B; border-radius: 4px; padding: 0 10px; border: 1px solid #F5B8BC; }"
+            "QPushButton:hover { background-color: #F8C6CA; }"
         )
         self.btn_clear.clicked.connect(self.clear_log)
         toolbar.addWidget(self.btn_clear)
@@ -140,9 +141,9 @@ class LogDisplay(QWidget):
         self.text_area.setFont(font)
         self.text_area.setStyleSheet(
             "QTextEdit {"
-            "  background-color: #0f172a;"
-            "  color: #e2e8f0;"
-            "  border: 1px solid #334155;"
+            "  background-color: #FBFCFD;"
+            "  color: #33415C;"
+            "  border: 1px solid #D6E4F0;"
             "  border-radius: 4px;"
             "}"
         )
@@ -198,7 +199,7 @@ class LogDisplay(QWidget):
 
     def _append_colored_line(self, message: str, level: str):
         """เพิ่มบรรทัด log พร้อมสีตาม level เข้า QTextEdit แล้ว auto-scroll"""
-        color = self.LEVEL_COLORS.get(level, "#e2e8f0")
+        color = self.LEVEL_COLORS.get(level, "#33415C")
         cursor = self.text_area.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
 
@@ -233,7 +234,7 @@ class LogDisplay(QWidget):
         html_parts = []
         for msg, level in self._all_records:
             if self._passes_filter(level):
-                color = self.LEVEL_COLORS.get(level, "#e2e8f0")
+                color = self.LEVEL_COLORS.get(level, "#33415C")
                 html_parts.append(
                     f'<span style="color:{color}; {font_style}">'
                     f'{self._escape_html(msg)}</span><br>'

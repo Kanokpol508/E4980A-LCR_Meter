@@ -88,7 +88,7 @@ class AdvancedPanel(QWidget):
 
         self.lbl_dev_warning = QLabel("")
         self.lbl_dev_warning.setWordWrap(True)
-        self.lbl_dev_warning.setStyleSheet("color: #ff4444; font-weight: bold; font-size: 11px;")
+        self.lbl_dev_warning.setStyleSheet("color: #D2544B; font-weight: bold; font-size: 11px;")
         v_inner.addWidget(self.lbl_dev_warning)
 
         v_ppm.addWidget(self.widget_dev_inner)

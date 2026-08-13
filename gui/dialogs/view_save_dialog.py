@@ -69,19 +69,19 @@ class ViewSaveDialog(QDialog):
         h_buttons = QHBoxLayout()
 
         self.btn_open_save = QPushButton("Open Save")
-        self.btn_open_save.setStyleSheet(self._style("#22c55e", "#16a34a"))
+        self.btn_open_save.setStyleSheet(self._style("#7BC99A", "#5FAE81"))
         self.btn_open_save.clicked.connect(self._on_open_save)
 
         self.btn_open_folder = QPushButton("Open Folder")
-        self.btn_open_folder.setStyleSheet(self._style("#3b82f6", "#2563eb"))
+        self.btn_open_folder.setStyleSheet(self._style("#8FB8E0", "#6FA0D0"))
         self.btn_open_folder.clicked.connect(self._on_open_folder)
 
         self.btn_close = QPushButton("Close")
-        self.btn_close.setStyleSheet(self._style("#3b82f6", "#2563eb"))
+        self.btn_close.setStyleSheet(self._style("#8FB8E0", "#6FA0D0"))
         self.btn_close.clicked.connect(self.reject)
 
         self.btn_delete = QPushButton("DELETE Save")
-        self.btn_delete.setStyleSheet(self._style("#ef4444", "#dc2626"))
+        self.btn_delete.setStyleSheet(self._style("#F2908C", "#E2726D"))
         self.btn_delete.clicked.connect(self._on_delete_save)
 
         for b in (self.btn_open_save, self.btn_open_folder, self.btn_close, self.btn_delete):

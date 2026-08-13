@@ -16,8 +16,8 @@ from data.data_processor import (
 # สีกลุ่มคอลัมน์ — ให้โทนเดียวกับสีเส้นในกราฟ (Primary=น้ำเงิน, Secondary=ชมพู/แดง)
 # เพื่อให้ผู้ใช้จับคู่ "สีในตาราง" กับ "สีเส้นในกราฟ" ได้ทันทีโดยไม่ต้องอ่านชื่อคอลัมน์
 #
-# ใช้โทน "มืด" ให้เข้ากับธีมของแอป (ดู assets/styles.qss: พื้นหลังตาราง #040814,
-# ตัวอักษรสีขาว) แต่ต้องเข้มพอที่จะตัดกับพื้นเดิมที่มืดมากอยู่แล้วให้เห็นชัด
+# ใช้โทนพาสเทลขาวสบายตา (ดู assets/styles.qss: พื้นหลังตารางขาว #FFFFFF,
+# ตัวอักษรกรมท่าอ่อน #2C3A5C) — สีกลุ่มคอลัมน์ใช้พาสเทลอ่อนที่ยังตัดกับพื้นขาวได้ชัดเจน
 #
 # หมายเหตุสำคัญ: ตั้งใจไม่ใช้ item.setBackground() เพียงอย่างเดียว เพราะแอปนี้ตั้ง
 # QSS แบบ global ที่ QApplication (main.py: app.setStyleSheet(...)) — เมื่อมี QSS
@@ -26,14 +26,14 @@ from data.data_processor import (
 # กันดีใน Qt Style Sheets) จึงต้องบังคับวาดเองด้วย custom delegate/header ด้านล่าง
 # ==========================================
 _GROUP_COLORS = {
-    1: QColor("#1E293B"),  # กลุ่ม 1: Frequency, Samples (N) — เทาเข้มเป็นกลาง
-    2: QColor("#164E8C"),  # กลุ่ม 2: Primary (Mean/SD/Min/Max/%RSD/PPM/Type A) — น้ำเงิน (ตรงกับ COLOR_PRIMARY '#0066CC')
-    3: QColor("#8C1550"),  # กลุ่ม 3: Secondary (Mean/SD/Min/Max/%RSD/PPM/Type A) — แดงอมชมพู (ตรงกับ COLOR_SECONDARY '#CC0066')
+    1: QColor("#F0F3F6"),  # กลุ่ม 1: Frequency, Samples (N) — เทาอ่อนเป็นกลาง
+    2: QColor("#D9F1F1"),  # กลุ่ม 2: Primary (Mean/SD/Min/Max/%RSD/PPM/Type A) — ฟ้าพาสเทล
+    3: QColor("#FADEE1"),  # กลุ่ม 3: Secondary (Mean/SD/Min/Max/%RSD/PPM/Type A) — ชมพูพาสเทล
 }
 _GROUP_HEADER_COLORS = {
-    1: QColor("#334155"),
-    2: QColor("#1D4ED8"),
-    3: QColor("#BE185D"),
+    1: QColor("#C3D5E5"),
+    2: QColor("#AACCE2"),
+    3: QColor("#FDAFAB"),
 }
 
 
@@ -81,7 +81,7 @@ class _ColoredHeaderView(QHeaderView):
             painter.fillRect(rect, color)
             painter.restore()
             painter.save()
-            painter.setPen(QColor("#E2E8F0"))
+            painter.setPen(QColor("#2C3A5C"))
             text = self.model().headerData(logicalIndex, Qt.Orientation.Horizontal) if self.model() else ""
             painter.drawText(rect.adjusted(6, 0, -6, 0), Qt.AlignmentFlag.AlignCenter, str(text or ""))
             painter.restore()

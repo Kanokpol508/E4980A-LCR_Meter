@@ -35,9 +35,9 @@ class SaveNameDialog(QDialog):
         self.btn_new_save.setObjectName("btnNewSave")
         self.btn_new_save.setMinimumHeight(36)
         self.btn_new_save.setStyleSheet(
-            "QPushButton { background-color: #22c55e; color: white; border-radius: 6px; "
-            "font-weight: bold; padding: 6px 18px; border: 1px solid #16a34a; }"
-            "QPushButton:hover { background-color: #16a34a; }"
+            "QPushButton { background-color: #7BC99A; color: white; border-radius: 6px; "
+            "font-weight: bold; padding: 6px 18px; border: 1px solid #5FAE81; }"
+            "QPushButton:hover { background-color: #5FAE81; }"
         )
         self.btn_new_save.clicked.connect(self._on_confirm)
 
@@ -45,9 +45,9 @@ class SaveNameDialog(QDialog):
         self.btn_cancel.setObjectName("btnCancelSave")
         self.btn_cancel.setMinimumHeight(36)
         self.btn_cancel.setStyleSheet(
-            "QPushButton { background-color: #ef4444; color: white; border-radius: 6px; "
-            "font-weight: bold; padding: 6px 18px; border: 1px solid #dc2626; }"
-            "QPushButton:hover { background-color: #dc2626; }"
+            "QPushButton { background-color: #F2908C; color: white; border-radius: 6px; "
+            "font-weight: bold; padding: 6px 18px; border: 1px solid #E2726D; }"
+            "QPushButton:hover { background-color: #E2726D; }"
         )
         self.btn_cancel.clicked.connect(self.reject)
 

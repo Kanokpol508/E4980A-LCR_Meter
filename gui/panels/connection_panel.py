@@ -32,10 +32,10 @@ class ConnectionPanel(QWidget):
         self.btn_connect.setObjectName("btnConnect")
         self.btn_connect.setMinimumHeight(32)
         self.btn_connect.setStyleSheet(
-            "QPushButton#btnConnect { background-color: #22c55e; color: white; "
-            "border-radius: 6px; font-weight: bold; border: 1px solid #16a34a; }"
-            "QPushButton#btnConnect:hover { background-color: #16a34a; }"
-            "QPushButton#btnConnect:disabled { background-color: #4b5563; border: 1px solid #374151; color: #9ca3af; }"
+            "QPushButton#btnConnect { background-color: #A8E6C1; color: #14532D; "
+            "border-radius: 6px; font-weight: bold; border: 1px solid #7FD9A0; }"
+            "QPushButton#btnConnect:hover { background-color: #7FD9A0; }"
+            "QPushButton#btnConnect:disabled { background-color: #E5E7EB; border: 1px solid #D1D5DB; color: #A3ADC2; }"
         )
 
         self.btn_disconnect = QPushButton("DISCONNECT")
@@ -43,14 +43,14 @@ class ConnectionPanel(QWidget):
         self.btn_disconnect.setMinimumHeight(32)
         self.btn_disconnect.setEnabled(False)  # ปิดไว้ก่อน จนกว่าจะเชื่อมต่อสำเร็จ
         self.btn_disconnect.setStyleSheet(
-            "QPushButton#btnDisconnect { background-color: #ef4444; color: white; "
-            "border-radius: 6px; font-weight: bold; border: 1px solid #dc2626; }"
-            "QPushButton#btnDisconnect:hover { background-color: #dc2626; }"
-            "QPushButton#btnDisconnect:disabled { background-color: #4b5563; border: 1px solid #374151; color: #9ca3af; }"
+            "QPushButton#btnDisconnect { background-color: #FDAFAB; color: #7A1F1B; "
+            "border-radius: 6px; font-weight: bold; border: 1px solid #F58E89; }"
+            "QPushButton#btnDisconnect:hover { background-color: #F58E89; }"
+            "QPushButton#btnDisconnect:disabled { background-color: #E5E7EB; border: 1px solid #D1D5DB; color: #A3ADC2; }"
         )
 
         self.lbl_status = QLabel("\u26aa Not Connected")
-        self.lbl_status.setStyleSheet("font-weight: bold; color: #9ca3af;")
+        self.lbl_status.setStyleSheet("font-weight: bold; color: #8B95A8;")
 
         h_conn.addWidget(self.btn_connect)
         h_conn.addWidget(self.btn_disconnect)
@@ -64,10 +64,10 @@ class ConnectionPanel(QWidget):
         """ปรับหน้าตาปุ่ม/สถานะให้ตรงกับสถานะการเชื่อมต่อปัจจุบัน"""
         if connected:
             self.lbl_status.setText("\U0001F7E2 Connected")
-            self.lbl_status.setStyleSheet("font-weight: bold; color: #22c55e;")
+            self.lbl_status.setStyleSheet("font-weight: bold; color: #3E8E5E;")
         else:
             self.lbl_status.setText("\u26aa Not Connected")
-            self.lbl_status.setStyleSheet("font-weight: bold; color: #9ca3af;")
+            self.lbl_status.setStyleSheet("font-weight: bold; color: #8B95A8;")
 
         self.btn_connect.setEnabled(not connected)
         self.btn_disconnect.setEnabled(connected)

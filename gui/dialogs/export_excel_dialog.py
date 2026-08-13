@@ -108,14 +108,14 @@ class ExportExcelDialog(QDialog):
 
         h_buttons = QHBoxLayout()
         self.btn_next_1 = QPushButton("Next")
-        self.btn_next_1.setStyleSheet(_btn_style("#22c55e", "#16a34a"))
+        self.btn_next_1.setStyleSheet(_btn_style("#7BC99A", "#5FAE81"))
         self.btn_next_1.setMinimumHeight(36)
         self.btn_next_1.clicked.connect(self._on_page0_next)
 
         self.chk_add_record = QCheckBox("Add Record details")
 
         self.btn_close = QPushButton("Close")
-        self.btn_close.setStyleSheet(_btn_style("#3b82f6", "#2563eb"))
+        self.btn_close.setStyleSheet(_btn_style("#8FB8E0", "#6FA0D0"))
         self.btn_close.setMinimumHeight(36)
         self.btn_close.clicked.connect(self.reject)
 
@@ -236,17 +236,17 @@ class ExportExcelDialog(QDialog):
 
         h_buttons = QHBoxLayout()
         self.btn_next_2 = QPushButton("Next")
-        self.btn_next_2.setStyleSheet(_btn_style("#22c55e", "#16a34a"))
+        self.btn_next_2.setStyleSheet(_btn_style("#7BC99A", "#5FAE81"))
         self.btn_next_2.setMinimumHeight(36)
         self.btn_next_2.clicked.connect(self._on_page1_next)
 
         self.btn_back_2 = QPushButton("Back")
-        self.btn_back_2.setStyleSheet(_btn_style("#3b82f6", "#2563eb"))
+        self.btn_back_2.setStyleSheet(_btn_style("#8FB8E0", "#6FA0D0"))
         self.btn_back_2.setMinimumHeight(36)
         self.btn_back_2.clicked.connect(lambda: self.stack.setCurrentIndex(0))
 
         self.btn_cancel_2 = QPushButton("Cancel")
-        self.btn_cancel_2.setStyleSheet(_btn_style("#ef4444", "#dc2626"))
+        self.btn_cancel_2.setStyleSheet(_btn_style("#F2908C", "#E2726D"))
         self.btn_cancel_2.setMinimumHeight(36)
         self.btn_cancel_2.clicked.connect(self.reject)
 
@@ -294,7 +294,7 @@ class ExportExcelDialog(QDialog):
         self.input_location.setText(default_dir or str(Path.home()))
         self.input_location.setMinimumHeight(34)
         self.input_location.setReadOnly(True)  # แก้ไขได้ผ่านปุ่ม Browse เท่านั้น ป้องกันพิมพ์ path ผิด
-        self.input_location.setStyleSheet("background-color: #1e293b; color: #cbd5e1;")
+        self.input_location.setStyleSheet("background-color: #F0F3F6; color: #33415C;")
         self.btn_browse = QPushButton("📁 Browse")
         self.btn_browse.setMinimumHeight(34)
         self.btn_browse.clicked.connect(self._on_browse_location)
@@ -314,17 +314,17 @@ class ExportExcelDialog(QDialog):
 
         h_buttons = QHBoxLayout()
         self.btn_export = QPushButton("Export Excel")
-        self.btn_export.setStyleSheet(_btn_style("#22c55e", "#16a34a"))
+        self.btn_export.setStyleSheet(_btn_style("#7BC99A", "#5FAE81"))
         self.btn_export.setMinimumHeight(36)
         self.btn_export.clicked.connect(self._on_export_clicked)
 
         self.btn_back_3 = QPushButton("Back")
-        self.btn_back_3.setStyleSheet(_btn_style("#3b82f6", "#2563eb"))
+        self.btn_back_3.setStyleSheet(_btn_style("#8FB8E0", "#6FA0D0"))
         self.btn_back_3.setMinimumHeight(36)
         self.btn_back_3.clicked.connect(self._on_page2_back)
 
         self.btn_cancel_3 = QPushButton("Cancel")
-        self.btn_cancel_3.setStyleSheet(_btn_style("#ef4444", "#dc2626"))
+        self.btn_cancel_3.setStyleSheet(_btn_style("#F2908C", "#E2726D"))
         self.btn_cancel_3.setMinimumHeight(36)
         self.btn_cancel_3.clicked.connect(self.reject)
 

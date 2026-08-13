@@ -62,10 +62,10 @@ class ControlPanel(QWidget):
         self.lbl_warn_freqlist_start.setVisible(False)
         self.lbl_warn_correction_start.setVisible(False)
 
-        self.lbl_warn_visa.setStyleSheet("color: #ff4444; font-weight: bold;")
-        self.lbl_warn_dev_start.setStyleSheet("color: #ff4444; font-weight: bold;")
-        self.lbl_warn_freqlist_start.setStyleSheet("color: #ff4444; font-weight: bold;")
-        self.lbl_warn_correction_start.setStyleSheet("color: #ff4444; font-weight: bold;")
+        self.lbl_warn_visa.setStyleSheet("color: #D2544B; font-weight: bold;")
+        self.lbl_warn_dev_start.setStyleSheet("color: #D2544B; font-weight: bold;")
+        self.lbl_warn_freqlist_start.setStyleSheet("color: #D2544B; font-weight: bold;")
+        self.lbl_warn_correction_start.setStyleSheet("color: #D2544B; font-weight: bold;")
 
         layout.addLayout(grid_run)
         layout.addWidget(self.lbl_warn_visa)

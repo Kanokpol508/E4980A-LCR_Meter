@@ -79,7 +79,7 @@ class FrequencyListWidget(QWidget):
         # วางไว้ใต้แถวความถี่ล่าสุด เหนือปุ่ม "เพิ่มรายการความถี่" ตามที่ต้องการ
         self.lbl_incomplete = QLabel("")
         self.lbl_incomplete.setWordWrap(True)
-        self.lbl_incomplete.setStyleSheet("color: #ff4444; font-weight: bold; font-size: 11px;")
+        self.lbl_incomplete.setStyleSheet("color: #D2544B; font-weight: bold; font-size: 11px;")
         self.lbl_incomplete.setVisible(False)
         main_layout.addWidget(self.lbl_incomplete)
 
@@ -87,9 +87,9 @@ class FrequencyListWidget(QWidget):
         self.btn_add = QPushButton("+ Add Frequency")
         self.btn_add.setMinimumHeight(32)
         self.btn_add.setStyleSheet(
-            "QPushButton { background-color: #22c55e; color: white; border-radius: 6px; "
-            "font-weight: bold; font-size: 13px; padding: 4px 14px; border: 1px solid #16a34a; }"
-            "QPushButton:hover { background-color: #16a34a; }"
+            "QPushButton { background-color: #A8E6C1; color: #14532D; border-radius: 6px; "
+            "font-weight: bold; font-size: 13px; padding: 4px 14px; border: 1px solid #7FD9A0; }"
+            "QPushButton:hover { background-color: #7FD9A0; }"
         )
         self.btn_add.clicked.connect(self.add_row)
 
@@ -135,9 +135,9 @@ class FrequencyListWidget(QWidget):
             btn_del = QPushButton("X")
             btn_del.setFixedSize(32, 32)
             btn_del.setStyleSheet(
-                "QPushButton { background-color: #ef4444; color: white; border-radius: 16px; "
-                "font-weight: bold; font-size: 11px; border: 1px solid #dc2626;}"
-                "QPushButton:hover { background-color: #dc2626; }"
+                "QPushButton { background-color: #FDAFAB; color: #7A1F1B; border-radius: 16px; "
+                "font-weight: bold; font-size: 11px; border: 1px solid #F58E89;}"
+                "QPushButton:hover { background-color: #F58E89; }"
             )
             btn_del.clicked.connect(lambda: self.remove_row(row_container))
             row_layout.addWidget(btn_del)
@@ -392,7 +392,7 @@ class InputPanel(QWidget):
 
         # Label แสดงจำนวนรอบวัดทั้งหมด = Discard + Readings (คล้ายกับ "จำนวนจุดที่ได้" ของ SWEEP)
         self.lbl_total_rounds_single = QLabel("-")
-        self.lbl_total_rounds_single.setStyleSheet("color: #38bdf8; font-weight: bold;")
+        self.lbl_total_rounds_single.setStyleSheet("color: #5B7FB5; font-weight: bold;")
 
         grid_single_samples.addWidget(QLabel("Samples Count:"), 0, 0)
         grid_single_samples.addWidget(self.input_n_single, 0, 1)
@@ -456,7 +456,7 @@ class InputPanel(QWidget):
         self.input_step_freq.setFixedWidth(FREQ_FIELD_WIDTH)
 
         self.lbl_calculated_points = QLabel("-")
-        self.lbl_calculated_points.setStyleSheet("color: #38bdf8; font-weight: bold;")
+        self.lbl_calculated_points.setStyleSheet("color: #5B7FB5; font-weight: bold;")
 
         grid_sweep.addWidget(QLabel("Start Frequency:"), 0, 0)
         grid_sweep.addWidget(self.input_start_freq, 0, 1)
@@ -503,7 +503,7 @@ class InputPanel(QWidget):
         )
 
         self.lbl_total_rounds_sweep = QLabel("-")
-        self.lbl_total_rounds_sweep.setStyleSheet("color: #38bdf8; font-weight: bold;")
+        self.lbl_total_rounds_sweep.setStyleSheet("color: #5B7FB5; font-weight: bold;")
 
         grid_sweep_samples.addWidget(QLabel("Samples per Sweep:"), 0, 0)
         grid_sweep_samples.addWidget(self.input_samples_sweep, 0, 1)
@@ -559,7 +559,7 @@ class InputPanel(QWidget):
 
         # Label แสดงจำนวนรอบวัดทั้งหมดต่อ 1 ความถี่ = Discard + Samples
         self.lbl_total_rounds_list = QLabel("-")
-        self.lbl_total_rounds_list.setStyleSheet("color: #38bdf8; font-weight: bold;")
+        self.lbl_total_rounds_list.setStyleSheet("color: #5B7FB5; font-weight: bold;")
 
         grid_list_nums.addWidget(QLabel("Samples per Sweep:"), 0, 0)
         grid_list_nums.addWidget(self.input_samples, 0, 1)

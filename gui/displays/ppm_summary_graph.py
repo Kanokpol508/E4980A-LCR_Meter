@@ -196,8 +196,8 @@ class _EngAxisItem(pg.AxisItem):
 
 class PpmSummaryGraph(QWidget):
     # สีเดียวกับ freq_summary_graph.py เพื่อไม่ให้ผู้ใช้สับสนระหว่าง Tab
-    COLOR_PRIMARY = '#0066CC'    # น้ำเงิน
-    COLOR_SECONDARY = '#CC0066'  # แดงอมชมพู
+    COLOR_PRIMARY = '#789CCE'    # น้ำเงิน
+    COLOR_SECONDARY = '#E27A9B'  # แดงอมชมพู
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -271,16 +271,20 @@ class PpmSummaryGraph(QWidget):
         # ผ่าน set_progress()/set_current_reading() ทุกครั้งที่มีจุดข้อมูลใหม่เข้ามา
         # ==========================================
         status_bar = QHBoxLayout()
-        status_bar.addWidget(QLabel("Progress:"))
+        lbl_progress_title = QLabel("Progress:")
+        lbl_progress_title.setStyleSheet("color: #FFFFFF;")
+        status_bar.addWidget(lbl_progress_title)
         self.lbl_progress = QLabel("Idle")
-        self.lbl_progress.setStyleSheet("font-weight: bold;")
+        self.lbl_progress.setStyleSheet("font-weight: bold; color: #FFFFFF;")
         status_bar.addWidget(self.lbl_progress)
 
         status_bar.addSpacing(20)
 
-        status_bar.addWidget(QLabel("Current Reading:"))
+        lbl_current_reading_title = QLabel("Current Reading:")
+        lbl_current_reading_title.setStyleSheet("color: #FFFFFF;")
+        status_bar.addWidget(lbl_current_reading_title)
         self.lbl_current_reading = QLabel("--")
-        self.lbl_current_reading.setStyleSheet("font-weight: bold;")
+        self.lbl_current_reading.setStyleSheet("font-weight: bold; color: #FFFFFF;")
         status_bar.addWidget(self.lbl_current_reading)
 
         status_bar.addStretch(1)
@@ -290,7 +294,9 @@ class PpmSummaryGraph(QWidget):
         # แถบ Graph Title + ปุ่ม Save เป็น JPEG
         # ==========================================
         title_bar = QHBoxLayout()
-        title_bar.addWidget(QLabel("Graph Title:"))
+        lbl_graph_title = QLabel("Graph Title:")
+        lbl_graph_title.setStyleSheet("color: #FFFFFF;")
+        title_bar.addWidget(lbl_graph_title)
         self.input_graph_title = QLineEdit()
         self.input_graph_title.setPlaceholderText("กรอกชื่อกราฟที่ต้องการ")
         title_bar.addWidget(self.input_graph_title, stretch=1)

@@ -93,29 +93,37 @@ _SESSION_INFO_FIELDS = [
     ("ppm_sec_ref",      "PPM Ref (Secondary)"),
 ]
 
-# --- Style — ปรับตามตัวอย่างไฟล์ Excel ของเครื่อง AH2700A ที่ผู้ใช้ส่งมา ---
-# แนวทาง: หัวตาราง (row เดียว) เป็นสีกรมท่าเข้ม (navy) ล้วนทั้งแถวเสมอ ไม่แยกสีตามกลุ่ม
-# ส่วนสีที่ใช้แยกกลุ่มคอลัมน์จะไปอยู่ที่ "พื้นหลังของเซลล์ข้อมูล" แทน (พาสเทลอ่อนๆ) ให้ทุกแถว
-# มีสีเดียวกันตามคอลัมน์ (ไม่สลับแถบแถวคู่/คี่แบบเดิม) อ่านง่ายเป็นแนวตั้งเหมือนต้นแบบ
-_NAVY = "203764"
-_SUBHEADER_BLUE = "2F75B5"
+# --- Style — ปรับให้เข้าธีมพาสเทลเดียวกับตัวโปรแกรม (assets/styles.qss) ---
+# สีอ้างอิงตรงจากโปรแกรมจริง:
+#   - หัวตาราง: ฟ้าเข้ม #789CCE (สีเดียวกับหัว QGroupBox#lcdGroup / ตัวหนังสือขาว)
+#   - กล่อง Label: ม่วงพาสเทล #D9C4EC (สีเดียวกับหัวข้อ QGroupBox ทุกกล่องในโปรแกรม)
+#   - สีตัวหนังสือหลัก: #2C3A5C, สีตัวหนังสือ label/หัวข้อรอง: #5B7FB5 (โทนเดียวกับ label
+#     "Total Readings" ในหน้า Frequency Settings)
+#   - สีกลุ่มคอลัมน์ Statistics/Raw Data: ใช้สีเดียวกับตาราง Statistics Table ในโปรแกรมทุกกลุ่มเป๊ะๆ
+#     (อ้างอิงจาก gui/displays/statistics_table.py: _GROUP_COLORS / _GROUP_HEADER_COLORS)
+#   - เส้นขอบตาราง: ฟ้าอ่อน #AACCE2 (สีเดียวกับขอบช่องกรอกข้อมูลทุกช่องในโปรแกรม)
+_HEADER_BG = "789CCE"
+_TEXT_NAVY = "2C3A5C"
+_TEXT_BLUE_LABEL = "5B7FB5"
+_LABEL_BG = "D9C4EC"
 _GROUP_BODY_COLOR = {
-    0: "B4C6E7",  # คอลัมน์ระบุตัวตน เช่น Save Name / No. — ฟ้าอมเทา (เหมือนคอลัมน์ Date/Time ในต้นแบบ)
-    1: "FCE4D6",  # Frequency, Samples (N) — ส้มอ่อน (เหมือนคอลัมน์ Frequency/Voltage ในต้นแบบ)
-    2: "E9F0FE",  # Primary group — ฟ้าอ่อนมาก (เหมือนคอลัมน์ Readings ในต้นแบบ)
-    3: "FCE4EC",  # Secondary group — ชมพูอ่อน (แยกจาก Primary ให้ชัดแบบสีกราฟในแอป)
+    0: "C3D5E5",  # คอลัมน์ระบุตัวตน เช่น Save Name / No. — สีเดียวกับหัวคอลัมน์กลุ่ม Frequency ในแอป
+    1: "F0F3F6",  # Frequency, Samples (N) — เทาอ่อนเป็นกลาง (ตรงกับ _GROUP_COLORS[1] ในแอป)
+    2: "D9F1F1",  # Primary group — ฟ้าพาสเทล (ตรงกับ _GROUP_COLORS[2] ในแอป)
+    3: "FADEE1",  # Secondary group — ชมพูพาสเทล (ตรงกับ _GROUP_COLORS[3] ในแอป)
 }
 
-_HEADER_FILL = PatternFill(start_color=_NAVY, end_color=_NAVY, fill_type="solid")
+_HEADER_FILL = PatternFill(start_color=_HEADER_BG, end_color=_HEADER_BG, fill_type="solid")
 _HEADER_FONT = Font(color="FFFFFF", bold=True, size=12)
-_LABEL_FILL = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
-_LABEL_FONT = Font(bold=True)
-_TITLE_FONT = Font(bold=True, size=13, color=_NAVY)
-_SUBTITLE_FONT = Font(bold=True, size=11, color=_NAVY)
+_LABEL_FILL = PatternFill(start_color=_LABEL_BG, end_color=_LABEL_BG, fill_type="solid")
+_LABEL_FONT = Font(bold=True, color=_TEXT_NAVY)
+_TITLE_FONT = Font(bold=True, size=13, color=_TEXT_NAVY)
+_SUBTITLE_FONT = Font(bold=True, size=11, color=_TEXT_BLUE_LABEL)
 _CENTER = Alignment(horizontal="center", vertical="center")
 _LEFT = Alignment(horizontal="left", vertical="center")
-_THIN_SIDE = Side(style="thin", color="9AA7B8")
+_THIN_SIDE = Side(style="thin", color="AACCE2")
 _THIN_BORDER = Border(left=_THIN_SIDE, right=_THIN_SIDE, top=_THIN_SIDE, bottom=_THIN_SIDE)
+_DATA_FONT = Font(color=_TEXT_NAVY)  # สีตัวหนังสือข้อมูลทั่วไป — เดียวกับสีตัวหนังสือหลักของแอป
 
 
 def _safe_float(text):
@@ -287,6 +295,7 @@ def _add_data_record_sheet(wb: Workbook, record_details: dict, save_names: list)
         value_cell = ws.cell(row=r, column=3, value=value)
         value_cell.border = _THIN_BORDER
         value_cell.alignment = _LEFT
+        value_cell.font = _DATA_FONT
         r += 1
 
     # Exported Files — แถวแรกมี label "Exported Files", แถวถัดไปเป็นชื่อไฟล์ล้วนๆ (ไม่มี label ซ้ำ)
@@ -297,6 +306,7 @@ def _add_data_record_sheet(wb: Workbook, record_details: dict, save_names: list)
         name_cell = ws.cell(row=r + i, column=3, value=name)
         name_cell.border = _THIN_BORDER
         name_cell.alignment = _LEFT
+        name_cell.font = _DATA_FONT
     r += max(len(save_names), 1)
 
     ws.cell(row=r, column=2, value="Total Saved Files").font = _LABEL_FONT
@@ -305,6 +315,7 @@ def _add_data_record_sheet(wb: Workbook, record_details: dict, save_names: list)
     total_cell = ws.cell(row=r, column=3, value=len(save_names))
     total_cell.border = _THIN_BORDER
     total_cell.alignment = _LEFT
+    total_cell.font = _DATA_FONT
 
 
 def _add_statistics_sheet(wb: Workbook, loaded_saves: list):
@@ -332,6 +343,7 @@ def _add_statistics_sheet(wb: Workbook, loaded_saves: list):
                 cell = ws.cell(row=row_idx, column=col_idx, value=value)
                 cell.alignment = _CENTER
                 cell.border = _THIN_BORDER
+                cell.font = _DATA_FONT
                 body_color = _GROUP_BODY_COLOR.get(group)
                 if body_color:
                     cell.fill = PatternFill(start_color=body_color, end_color=body_color, fill_type="solid")
@@ -364,6 +376,7 @@ def _write_raw_data_tab(ws, item: dict):
     date_cell = ws.cell(row=r, column=2, value=meta.get("measurement_time") or "-")
     date_cell.border = _THIN_BORDER
     date_cell.alignment = _LEFT
+    date_cell.font = _DATA_FONT
     r += 1
 
     for key, label in _SESSION_INFO_FIELDS:
@@ -374,6 +387,7 @@ def _write_raw_data_tab(ws, item: dict):
         value_cell = ws.cell(row=r, column=2, value=value if value not in (None, "") else "-")
         value_cell.border = _THIN_BORDER
         value_cell.alignment = _LEFT
+        value_cell.font = _DATA_FONT
         r += 1
 
     r += 1  # แถวว่างคั่น
@@ -395,13 +409,15 @@ def _write_raw_data_tab(ws, item: dict):
             cell = ws.cell(row=r, column=col_idx, value=value)
             cell.alignment = _CENTER
             cell.border = _THIN_BORDER
+            cell.font = _DATA_FONT
             body_color = _GROUP_BODY_COLOR.get(group)
             if body_color:
                 cell.fill = PatternFill(start_color=body_color, end_color=body_color, fill_type="solid")
+            # สีสถานะ SUCCESS/FAIL — ใช้โทนเขียว/แดงเดียวกับสีปุ่ม START/STOP ในแอป
             if col_idx == 6 and str(value).upper() != "SUCCESS":
-                cell.font = Font(bold=True, color="EF4444")
+                cell.font = Font(bold=True, color="D2544B")
             elif col_idx == 6:
-                cell.font = Font(color="10B981")
+                cell.font = Font(bold=True, color="14532D")
         r += 1
 
     for col_idx in range(1, 7):

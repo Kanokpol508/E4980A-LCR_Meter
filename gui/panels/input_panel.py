@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QGridLayout,
                              QSizePolicy, QLineEdit, QCheckBox, QPushButton)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QDoubleValidator
-from utils.helpers import NoScrollComboBox
+from utils.helpers import NoScrollComboBox, NoScrollSpinBox, NoScrollDoubleSpinBox
 
 # ความกว้างมาตรฐานของช่องกรอกค่าตัวเลขสั้นๆ (ความถี่ / แรงดัน)
 # (ลดลงจากเดิมเพื่อคืนพื้นที่ฝั่งซ้ายให้แคบลง เอาไปเพิ่มพื้นที่ Output ฝั่งขวา)
@@ -16,7 +16,7 @@ VOLT_FIELD_WIDTH = 120
 COUNT_FIELD_WIDTH = 111
 
 
-class CleanDoubleSpinBox(QDoubleSpinBox):
+class CleanDoubleSpinBox(NoScrollDoubleSpinBox):
     def textFromValue(self, val):
         # โชว์ตัวเลขเต็ม ไม่มีย่อ (k, M) และตัดทศนิยม .00 ด้านหลังทิ้ง
         text = f"{val:.{self.decimals()}f}"
@@ -175,7 +175,6 @@ class FrequencyListWidget(QWidget):
                     field.blockSignals(False)
             except ValueError:
                 pass  # ข้อความระหว่างพิมพ์ที่ยังแปลงเป็นตัวเลขไม่ได้ (เช่น "-", ".") ปล่อยผ่านไปก่อน
-
         self.freq_changed.emit()
 
     def remove_row(self, row_container):
@@ -369,7 +368,7 @@ class InputPanel(QWidget):
         grid_single_samples.setHorizontalSpacing(6)
 
         # จำนวนครั้งที่วัดซ้ำ (N) ใน SINGLE mode
-        self.input_n_single = QSpinBox()
+        self.input_n_single = NoScrollSpinBox()
         self.input_n_single.setRange(1, 9999)
         self.input_n_single.setValue(10)
         self.input_n_single.setFixedWidth(COUNT_FIELD_WIDTH)
@@ -380,7 +379,7 @@ class InputPanel(QWidget):
         )
 
         # Discard First Reading ใน SINGLE mode (ทิ้งค่าแรกหลังตั้งค่าเครื่อง)
-        self.input_discard_single = QSpinBox()
+        self.input_discard_single = NoScrollSpinBox()
         self.input_discard_single.setRange(0, 5)
         self.input_discard_single.setValue(1)
         self.input_discard_single.setFixedWidth(COUNT_FIELD_WIDTH)
@@ -486,12 +485,12 @@ class InputPanel(QWidget):
         # ต้องดันพื้นที่ว่างทั้งหมดไปไว้คอลัมน์ขวาสุดเหมือน grid_sweep ด้านบนแทน
         grid_sweep_samples.setColumnStretch(3, 1)
 
-        self.input_samples_sweep = QSpinBox()
+        self.input_samples_sweep = NoScrollSpinBox()
         self.input_samples_sweep.setRange(1, 999)
         self.input_samples_sweep.setValue(10)
         self.input_samples_sweep.setFixedWidth(COUNT_FIELD_WIDTH)
 
-        self.input_discard_first_sweep = QSpinBox()
+        self.input_discard_first_sweep = NoScrollSpinBox()
         self.input_discard_first_sweep.setRange(0, 5)
         self.input_discard_first_sweep.setValue(1)
         self.input_discard_first_sweep.setFixedWidth(COUNT_FIELD_WIDTH)
@@ -538,11 +537,11 @@ class InputPanel(QWidget):
         # เหมือนกลุ่ม grid_sweep / grid_single เพื่อให้ช่องกรอกชิดหน่วยพอดี
         grid_list_nums.setColumnStretch(3, 1)
 
-        self.input_samples = QSpinBox()
+        self.input_samples = NoScrollSpinBox()
         self.input_samples.setRange(1, 999)
         self.input_samples.setValue(10)
 
-        self.input_discard_first = QSpinBox()
+        self.input_discard_first = NoScrollSpinBox()
         self.input_discard_first.setRange(0, 5)
         self.input_discard_first.setValue(1)
         self.input_discard_first.setToolTip(
@@ -642,7 +641,7 @@ class InputPanel(QWidget):
         self.combo_time.addItems(["SHORT", "MEDIUM", "LONG"])
         self.combo_time.setCurrentText("LONG")  # ค่าเริ่มต้น = LONG (ความแม่นยำสูงสุด)
 
-        self.input_avg = QSpinBox()
+        self.input_avg = NoScrollSpinBox()
         self.input_avg.setRange(1, 256)
         self.input_avg.setValue(1)
 

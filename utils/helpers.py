@@ -2,7 +2,7 @@
 
 import math
 
-from PyQt6.QtWidgets import QComboBox
+from PyQt6.QtWidgets import QComboBox, QSpinBox, QDoubleSpinBox
 
 
 def truncate_sci(value: float, decimals: int = 2) -> str:
@@ -178,6 +178,28 @@ class NoScrollComboBox(QComboBox):
     เดียวกันนี้ต่อขึ้นไปให้ widget แม่ (parent) จัดการเองโดยอัตโนมัติ ผลคือถ้า dropdown
     อยู่ใน QScrollArea การ scroll หน้าจอผ่าน dropdown ยังทำงานได้ปกติ เปลี่ยนแค่ค่าใน
     dropdown จะไม่เปลี่ยนตามอีกต่อไป (ต้องคลิกเลือกเองเท่านั้น)
+    """
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoScrollSpinBox(QSpinBox):
+    """QSpinBox ธรรมดาทุกอย่าง ยกเว้นปิดพฤติกรรม "เลื่อนลูกกลิ้งเมาส์ (scroll wheel)
+    แล้วเปลี่ยนค่าตัวเลข" ทิ้ง — ใช้แทน QSpinBox ทุกจุดในโปรแกรมนี้
+
+    เหตุผลและวิธีแก้เหมือนกับ NoScrollComboBox ด้านบน: override wheelEvent()
+    แล้วเรียก event.ignore() แทนที่จะเพิ่ม/ลดค่า ผู้ใช้ต้องพิมพ์ค่าเองหรือกดปุ่ม
+    +/- เท่านั้นจึงจะเปลี่ยนค่าได้
+    """
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoScrollDoubleSpinBox(QDoubleSpinBox):
+    """QDoubleSpinBox ธรรมดาทุกอย่าง ยกเว้นปิดพฤติกรรมเลื่อนลูกกลิ้งเมาส์แล้วเปลี่ยนค่า
+    (เหตุผลและวิธีแก้เหมือนกับ NoScrollComboBox / NoScrollSpinBox ด้านบน)
     """
 
     def wheelEvent(self, event):

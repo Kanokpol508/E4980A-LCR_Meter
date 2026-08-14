@@ -200,19 +200,19 @@ class GraphDisplay(QWidget):
         # ==========================================
         status_bar = QHBoxLayout()
         lbl_progress_title = QLabel("Progress:")
-        lbl_progress_title.setStyleSheet("color: #FFFFFF;")
+        lbl_progress_title.setStyleSheet("color: #2C3A5C;")
         status_bar.addWidget(lbl_progress_title)
         self.lbl_progress = QLabel("Idle")
-        self.lbl_progress.setStyleSheet("font-weight: bold; color: #FFFFFF;")
+        self.lbl_progress.setStyleSheet("font-weight: bold; color: #2C3A5C;")
         status_bar.addWidget(self.lbl_progress)
 
         status_bar.addSpacing(20)
 
         lbl_current_reading_title = QLabel("Current Reading:")
-        lbl_current_reading_title.setStyleSheet("color: #FFFFFF;")
+        lbl_current_reading_title.setStyleSheet("color: #2C3A5C;")
         status_bar.addWidget(lbl_current_reading_title)
         self.lbl_current_reading = QLabel("--")
-        self.lbl_current_reading.setStyleSheet("font-weight: bold; color: #FFFFFF;")
+        self.lbl_current_reading.setStyleSheet("font-weight: bold; color: #2C3A5C;")
         status_bar.addWidget(self.lbl_current_reading)
 
         status_bar.addStretch(1)
@@ -223,7 +223,7 @@ class GraphDisplay(QWidget):
         # ==========================================
         title_bar = QHBoxLayout()
         lbl_graph_title = QLabel("Graph Title:")
-        lbl_graph_title.setStyleSheet("color: #FFFFFF;")
+        lbl_graph_title.setStyleSheet("color: #2C3A5C;")
         title_bar.addWidget(lbl_graph_title)
         self.input_graph_title = QLineEdit()
         self.input_graph_title.setPlaceholderText("กรอกชื่อกราฟที่ต้องการ")

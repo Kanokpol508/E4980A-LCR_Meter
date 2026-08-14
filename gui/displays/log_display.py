@@ -81,7 +81,7 @@ class LogDisplay(QWidget):
 
         lbl = QLabel("แสดงตั้งแต่ Level:")
         lbl.setFixedWidth(130)
-        lbl.setStyleSheet("color: #FFFFFF;")
+        lbl.setStyleSheet("color: #2C3A5C;")
         toolbar.addWidget(lbl)
 
         self.combo_level_filter = NoScrollComboBox()

@@ -11,6 +11,7 @@ QWidget {
     font-size: 12px;
     color: #33415C;
     font-weight: bold;
+    background-color: #FBFAF8;
 }
 
 QMainWindow, QDialog, QWidget#centralwidget {
@@ -34,6 +35,22 @@ QWidget#leftPanel QScrollArea > QWidget > QWidget {
 
 QLabel, QHBoxLayout, QVBoxLayout, QGridLayout {
     background-color: transparent;
+}
+
+/* แก้แผ่นสีเทาที่ซ้อนอยู่หลังช่องกรอกใน Frequency Settings / PPM Deviation
+   (QWidget ลูกที่อยู่ใน QGroupBox ไม่ได้กำหนดสีพื้นหลังไว้ จึงโดนสี
+   QWidget { background-color: #FBFAF8; } ทั่วไปบังคับใช้ กลายเป็นแผ่นสีเทา
+   ซ้อนทับอยู่ในกล่องสีขาวของ QGroupBox) */
+QGroupBox QWidget {
+    background-color: transparent;
+}
+
+/* คืนสีขาวให้ช่อง Dropdown/Input ที่อยู่ใน QGroupBox
+   เนื่องจากกฎ QGroupBox > QWidget ด้านบน specificity สูงกว่ากฎสีขาวเดิม
+   ของ QComboBox/QLineEdit/QSpinBox/QDoubleSpinBox เลยไปทับให้โปร่งใสด้วย */
+QGroupBox QComboBox, QGroupBox QLineEdit, QGroupBox QSpinBox,
+QGroupBox QDoubleSpinBox, QGroupBox QTextEdit, QGroupBox QPlainTextEdit {
+    background-color: #FFFFFF;
 }
 
 /* ==========================================

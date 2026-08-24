@@ -42,10 +42,11 @@ class MeasurementWorker(QThread):
             lcr.set_frequency(freq)
             lcr.set_aperture(time_mode, avg)
 
-            # ปรับ VISA timeout ให้เหมาะกับ time_mode + averaging ที่ใช้จริง
-            # ต้องเรียกหลัง set_aperture() เสมอ เพราะ timeout ขึ้นกับ 2 ค่านี้
+            # ปรับ VISA timeout ให้เหมาะกับ time_mode + averaging + imp_range ที่ใช้จริง
+            # ต้องเรียกหลัง set_aperture() เสมอ เพราะ timeout ขึ้นกับค่าเหล่านี้
             # ป้องกัน VisaIOError: Timeout เมื่อใช้ LONG aperture + avg จำนวนมาก
-            lcr.set_measurement_timeout(time_mode, avg)
+            # หรือเมื่อใช้ AUTO range ที่ auto-ranging ใช้เวลานานกว่า base aperture time มาก
+            lcr.set_measurement_timeout(time_mode, avg, imp_range)
 
             # ต้องตั้งค่านี้ก่อนวัดเสมอ เพราะมีผลกับทุกการวัดทันที (ไม่เกี่ยวกับ OPEN/SHORT Correction)
             cable_text = self.settings.get('cable', '0 m')

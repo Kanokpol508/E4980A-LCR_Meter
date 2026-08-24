@@ -100,16 +100,22 @@ class E4980A:
     # overhead ของ VISA I/O + jitter + processing บน host + margin ความปลอดภัย
     _OVERHEAD_MS = 2000   # 2 วินาที สำหรับ VISA roundtrip + UI overhead
     _MARGIN_MULT = 1.5    # คูณ safety factor 1.5× กันกรณีเครื่องช้ากว่า spec ทั่วไป
+    # [แก้ไข] เผื่อเวลาเพิ่มเมื่อ Range = AUTO เพราะเครื่องต้องลองหลาย range กว่าจะนิ่ง
+    # ใช้เวลานานกว่าที่ base_ms/reading ประเมินไว้มาก (สาเหตุของ VI_ERROR_TMO ที่พบ
+    # ตอน AVG=1 + LONG + AUTO range ซึ่งคำนวณ timeout ได้แค่ ~2.1 วินาที)
+    _AUTO_RANGE_EXTRA_MS = 3000   # 3 วินาที เผื่อ auto-ranging
 
-    def set_measurement_timeout(self, time_mode: str, averaging: int = 1):
+    def set_measurement_timeout(self, time_mode: str, averaging: int = 1, imp_range='AUTO'):
         """
         ปรับ VISA timeout แบบไดนามิกให้เหมาะกับ time_mode และ averaging ที่ใช้จริง
         ป้องกัน VisaIOError: Timeout เมื่อใช้ LONG aperture ร่วมกับ averaging จำนวนมาก
+        หรือเมื่อใช้ AUTO range ที่ต้องใช้เวลาลองหลาย range กว่าจะนิ่ง
 
-        สูตร:  timeout = (_BASE_TIME_MS[mode] × avg × _MARGIN_MULT) + _OVERHEAD_MS
+        สูตร:  timeout = (_BASE_TIME_MS[mode] × avg × _MARGIN_MULT) + _OVERHEAD_MS (+ _AUTO_RANGE_EXTRA_MS ถ้า AUTO)
         ตัวอย่าง:
-            LONG + avg=256 → (80 × 256 × 1.5) + 2000 ≈ 32,720 ms (~33 วินาที)
-            SHORT + avg=1  → (7  × 1   × 1.5) + 2000 ≈  2,011 ms (~2 วินาที)
+            LONG + avg=256 + HOLD range → (80 × 256 × 1.5) + 2000 ≈ 32,720 ms (~33 วินาที)
+            LONG + avg=1   + AUTO range → (80 × 1   × 1.5) + 2000 + 3000 ≈  5,120 ms (~5 วินาที)
+            SHORT + avg=1  + HOLD range → (7  × 1   × 1.5) + 2000 ≈  2,011 ms (~2 วินาที)
 
         เรียกหลัง connect() และหลัง set_aperture() เสมอ
         ค่า timeout ไม่ต่ำกว่า 5,000 ms (ค่าเริ่มต้น) เพื่อรองรับ overhead พื้นฐาน
@@ -121,12 +127,16 @@ class E4980A:
         mode_key    = str(time_mode).upper()
         base_ms     = self._BASE_TIME_MS.get(mode_key, 20)   # fallback เป็น MEDIUM ถ้า key ไม่พบ
 
-        calculated  = int(base_ms * avg_clamped * self._MARGIN_MULT) + self._OVERHEAD_MS
+        overhead    = self._OVERHEAD_MS
+        if str(imp_range).upper() == 'AUTO':
+            overhead += self._AUTO_RANGE_EXTRA_MS
+
+        calculated  = int(base_ms * avg_clamped * self._MARGIN_MULT) + overhead
         new_timeout = max(5000, calculated)
 
         self.inst.timeout = new_timeout
         print(f"⏱ Timeout ปรับเป็น {new_timeout} ms "
-              f"(mode={mode_key}, avg={avg_clamped}, base={base_ms}ms/reading)")
+              f"(mode={mode_key}, avg={avg_clamped}, base={base_ms}ms/reading, range={imp_range})")
 
     # ==========================================
     # ระบบชดเชยค่าสายวัด (Correction) - OPEN / SHORT
@@ -144,6 +154,7 @@ class E4980A:
 
         # ป้องกัน NameError ใน finally
         original_timeout = 5000
+        original_alc = None
 
         try:
             # 1. การทำ Correction ใช้เวลานาน ต้องเพิ่ม Timeout
@@ -154,6 +165,17 @@ class E4980A:
             if cable_text is not None:
                 self.set_cable_length(cable_text)
                 self.wait_until_ready()
+
+            # 1.2 [ใหม่] บังคับปิด ALC ชั่วคราวก่อนทำ Correction เสมอ ไม่ว่า checkbox
+            # ในหน้าจอ/สถานะเครื่องปัจจุบันจะเป็นอย่างไรก็ตาม
+            # เหตุผล: ALC ใช้ feedback loop ปรับระดับสัญญาณให้ตรงกับค่าที่ตกคร่อม DUT จริง
+            # แต่ตอน OPEN (วงจรเปิด) หรือ SHORT (วงจรลัด) ไม่มี DUT จริงให้ feedback ลู่เข้าได้
+            # ทำให้ ALC iterate ครบ 9 รอบแล้ว inactive พร้อม error/warning "ALC unable to regulate"
+            # ซึ่งไปโผล่เป็น error +43 "Measurement failed" ตามที่คู่มือเครื่องระบุไว้
+            # อ่านค่าจริงจากเครื่อง (ไม่ใช่จาก checkbox) เพื่อ restore กลับได้ถูกต้องเสมอ
+            original_alc = self.inst.query(":AMPLitude:ALC?").strip()
+            self.inst.write(":AMPLitude:ALC OFF")
+            self.wait_until_ready()
 
             # 2. เปิดโหมด Correction ให้เป็น ON ก่อน แล้วสั่ง Execute
             if corr_type.upper() == "OPEN":
@@ -168,6 +190,14 @@ class E4980A:
             # 3. ใช้ wait_until_ready รอสถานะ OPC แทนการใส่ ;*OPC? ต่อท้าย
             self.wait_until_ready()
 
+            # 3.1 [แก้ไข] เช็ค error queue ทันทีหลัง EXEC
+            # ป้องกัน error ค้าง (เช่น +43 Measurement failed จากขั้ว UNKNOWN ต่อไม่เหมาะสม)
+            # หลุดไปโผล่ผิดที่ผิดเวลาตอนกด START วัดครั้งถัดไป (safety-net check ใน measurement_thread.py
+            # จะอ่าน error ตัวแรกสุดในคิวแบบ FIFO ซึ่งอาจไม่ใช่ error ของการตั้งค่าที่เพิ่งทำจริง ๆ)
+            err_res = self.inst.query(":SYSTem:ERRor?").strip()
+            if '"No error"' not in err_res:
+                return False, f"{corr_type.upper()} Correction ล้มเหลว — ตรวจสอบขั้ว UNKNOWN:\n{err_res}"
+
             return True, f"ทำ {corr_type.upper()} Correction สำเร็จเรียบร้อย!"
 
         except pyvisa.errors.VisaIOError as e:
@@ -181,6 +211,13 @@ class E4980A:
                     self.inst.timeout = original_timeout
                 except:
                     pass
+                # 4.1 [ใหม่] คืนค่า ALC กลับตามที่เครื่องเคยเป็นก่อนเริ่ม Correction เสมอ
+                # (ผู้ใช้ต้องกลับไปเจอสถานะเดิมทุกประการตอนไปวัดจริงต่อ)
+                if original_alc is not None:
+                    try:
+                        self.inst.write(f":AMPLitude:ALC {original_alc}")
+                    except:
+                        pass
 
     # ==========================================
     # ระบบตั้งค่า (Configuration Methods)

@@ -594,6 +594,10 @@ class InputPanel(QWidget):
             "แนะนำเปิดเมื่อวัด Inductor ด้วยโหมด A\n"
             "เพื่อให้กระแสทดสอบคงที่ตลอดการวัดทุกความถี่"
         )
+        # เปลี่ยนข้อความ + สีเป็นเขียวพร้อมอิโมจิ ✅ เมื่อติ๊กเปิดใช้งาน เพื่อให้เห็นชัดเจนว่า
+        # ALC กำลังทำงานอยู่ (ไม่ใช่แค่ดูจากติ๊กถูกเฉยๆ)
+        self.chk_alc.toggled.connect(self._on_alc_toggled)
+        self._on_alc_toggled(self.chk_alc.isChecked())
 
         v_signal.addWidget(self.chk_alc)
         v_signal.addStretch()
@@ -655,3 +659,22 @@ class InputPanel(QWidget):
         layout.addWidget(self.group_hw)
 
         layout.addStretch()
+
+    def _on_alc_toggled(self, checked: bool):
+        """เปลี่ยนข้อความ + สี checkbox 'Enable ALC' เมื่อผู้ใช้ติ๊กเปิด/ปิด
+        - เปิด (checked=True): ข้อความสีเขียว + อิโมจิ ✅ ต่อท้าย เพื่อให้เห็นชัดว่า ALC กำลังทำงานอยู่
+        - ปิด (checked=False): กลับเป็นข้อความปกติ ไม่มีสี/อิโมจิ
+        กำหนด QCheckBox:disabled ไว้ในสไตล์นี้ด้วยเสมอ (สีเทาเดียวกับ assets/styles.qss)
+        เพราะ stylesheet ที่ตั้งตรงที่ตัว widget (setStyleSheet) จะมีสิทธิ์เหนือกว่า
+        stylesheet ระดับแอปพลิเคชันเสมอ — ถ้าไม่ใส่เงื่อนไข :disabled ไว้เอง ตัวอักษรจะยัง
+        เขียวสดค้างอยู่แม้ช่องนี้จะถูกล็อก (setEnabled(False)) ระหว่างกำลังวัด/Correction/
+        SINGLE mode session ก็ตาม ทำให้ผู้ใช้เข้าใจผิดว่ายังกดแก้ไขได้อยู่"""
+        if checked:
+            self.chk_alc.setText("Enable ALC (Automatic Level Control) ✅")
+            self.chk_alc.setStyleSheet(
+                "QCheckBox { color: #2E8B57; font-weight: bold; } "
+                "QCheckBox:disabled { color: #A3ADC2; font-weight: normal; }"
+            )
+        else:
+            self.chk_alc.setText("Enable ALC (Automatic Level Control)")
+            self.chk_alc.setStyleSheet("")

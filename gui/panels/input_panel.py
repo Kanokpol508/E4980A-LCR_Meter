@@ -15,6 +15,11 @@ VOLT_FIELD_WIDTH = 120
 # ไม่จำเป็นต้องกว้างเท่าช่องความถี่ (สูงสุด 7 หลัก) จึงแยกค่าคงที่ให้แคบกว่า
 COUNT_FIELD_WIDTH = 111
 
+# จำนวนค่าแรกที่โปรแกรม "ทิ้ง" อัตโนมัติเสมอ ก่อนเริ่มเก็บค่าไปคำนวณสถิติจริง
+# (เดิมเป็นช่องให้ผู้ใช้กรอกเอง 0-5 ครั้ง ตอนนี้ล็อกเป็นค่าคงที่ ผู้ใช้ไม่ต้องกรอก/ตั้งค่าเอง
+#  แต่ยังคงทำงานอยู่เบื้องหลังเหมือนเดิมทุกโหมด SINGLE/SWEEP/LIST)
+DISCARD_FIRST_COUNT = 3
+
 
 class CleanDoubleSpinBox(NoScrollDoubleSpinBox):
     def textFromValue(self, val):
@@ -378,16 +383,10 @@ class InputPanel(QWidget):
             "แนะนำ: ≥ 10 ครั้ง สำหรับงาน Metrology"
         )
 
-        # Discard First Reading ใน SINGLE mode (ทิ้งค่าแรกหลังตั้งค่าเครื่อง)
-        self.input_discard_single = NoScrollSpinBox()
-        self.input_discard_single.setRange(0, 5)
-        self.input_discard_single.setValue(1)
-        self.input_discard_single.setFixedWidth(COUNT_FIELD_WIDTH)
-        self.input_discard_single.setToolTip(
-            "จำนวนครั้งแรกที่วัดแล้วทิ้ง ไม่นำไปคำนวณสถิติ\n"
-            "เครื่องต้องใช้เวลาปรับตัวหลังตั้งค่า ค่าแรกๆ อาจยังไม่นิ่ง\n"
-            "ทำงานเฉพาะครั้งแรกของ session (กด Start ครั้งที่ 2 เป็นต้นไปไม่ Discard)"
-        )
+        # [แก้ไข] เดิมเป็นช่อง "Discard First" ให้ผู้ใช้กรอกเอง (SINGLE mode) — เอาช่องกรอก
+        # ออกแล้ว โปรแกรมทิ้งค่าแรก DISCARD_FIRST_COUNT (=3) ครั้งให้อัตโนมัติเสมอเบื้องหลัง
+        # (ทำงานเฉพาะครั้งแรกของ session เหมือนเดิม) ผู้ใช้ไม่ต้องตั้งค่าเอง แต่ยังเห็นผลรวม
+        # ผ่าน Label "Total Readings" ด้านล่างว่ามีการ Discard อยู่จริง
 
         # Label แสดงจำนวนรอบวัดทั้งหมด = Discard + Readings (คล้ายกับ "จำนวนจุดที่ได้" ของ SWEEP)
         self.lbl_total_rounds_single = QLabel("-")
@@ -397,16 +396,12 @@ class InputPanel(QWidget):
         grid_single_samples.addWidget(self.input_n_single, 0, 1)
         grid_single_samples.addWidget(QLabel("Times"), 0, 2)
 
-        grid_single_samples.addWidget(QLabel("Discard First:"), 1, 0)
-        grid_single_samples.addWidget(self.input_discard_single, 1, 1)
-        grid_single_samples.addWidget(QLabel("Times"), 1, 2)
-
-        grid_single_samples.addWidget(QLabel("Total Readings:"), 2, 0)
+        grid_single_samples.addWidget(QLabel("Total Readings:"), 1, 0)
         # colSpan=3 (คร่อมคอลัมน์ 1-3): เพราะข้อความในนี้ยาว (เช่น
-        # "11 Times (Discard 1 + Measure 10)") ถ้าใส่แค่คอลัมน์ 1 เฉยๆ จะไปบังคับ
-        # ให้คอลัมน์ 1 กว้างตามข้อความยาวนี้ไปด้วย ทำให้ช่อง Samples/Discard ที่แคบกว่า
-        # ถูกจัดชิดซ้ายแล้วเหลือช่องว่างค้างก่อนถึงหน่วย "Times" (สาเหตุของปัญหาที่เห็น)
-        grid_single_samples.addWidget(self.lbl_total_rounds_single, 2, 1, 1, 3)
+        # "11 Times (Discard 3 + Measure 10)") ถ้าใส่แค่คอลัมน์ 1 เฉยๆ จะไปบังคับ
+        # ให้คอลัมน์ 1 กว้างตามข้อความยาวนี้ไปด้วย ทำให้ช่อง Samples ที่แคบกว่า
+        # ถูกจัดชิดซ้ายแล้วเหลือช่องว่างค้างก่อนถึงหน่วย "Times" (สาเหตุของปัญหาที่เคยเห็น)
+        grid_single_samples.addWidget(self.lbl_total_rounds_single, 1, 1, 1, 3)
 
         grid_single_samples.setColumnStretch(3, 1)
 
@@ -490,16 +485,9 @@ class InputPanel(QWidget):
         self.input_samples_sweep.setValue(10)
         self.input_samples_sweep.setFixedWidth(COUNT_FIELD_WIDTH)
 
-        self.input_discard_first_sweep = NoScrollSpinBox()
-        self.input_discard_first_sweep.setRange(0, 5)
-        self.input_discard_first_sweep.setValue(1)
-        self.input_discard_first_sweep.setFixedWidth(COUNT_FIELD_WIDTH)
-        self.input_discard_first_sweep.setToolTip(
-            "จำนวนตัวอย่างแรกสุดของแต่ละความถี่ที่จะไม่นำไปคำนวณสถิติ\n"
-            "(ค่าที่วัดได้ทันทีหลังเปลี่ยนความถี่มักยังไม่นิ่ง)\n"
-            "โปรแกรมจะวัดเพิ่มจากจำนวน Samples per Sweep โดยอัตโนมัติ\n"
-            "เช่น Samples=5 + Discard=3 -> วัดจริง 8 ครั้ง เหลือใช้คำนวณสถิติครบ 5 ค่า"
-        )
+        # [แก้ไข] เดิมเป็นช่อง "Discard First Reading" ให้ผู้ใช้กรอกเอง — เอาช่องกรอกออก
+        # โปรแกรมทิ้งค่าแรก DISCARD_FIRST_COUNT (=3) ค่าแรกของทุกความถี่ให้อัตโนมัติเสมอ
+        # เบื้องหลัง ผู้ใช้ไม่ต้องตั้งค่าเอง แต่ยังเห็นผลรวมผ่าน Label "Total Readings" ด้านล่าง
 
         self.lbl_total_rounds_sweep = QLabel("-")
         self.lbl_total_rounds_sweep.setStyleSheet("color: #5B7FB5; font-weight: bold;")
@@ -508,12 +496,8 @@ class InputPanel(QWidget):
         grid_sweep_samples.addWidget(self.input_samples_sweep, 0, 1)
         grid_sweep_samples.addWidget(QLabel("Times"), 0, 2)
 
-        grid_sweep_samples.addWidget(QLabel("Discard First Reading:"), 1, 0)
-        grid_sweep_samples.addWidget(self.input_discard_first_sweep, 1, 1)
-        grid_sweep_samples.addWidget(QLabel("Times"), 1, 2)
-
-        grid_sweep_samples.addWidget(QLabel("Total Readings / Frequency:"), 2, 0)
-        grid_sweep_samples.addWidget(self.lbl_total_rounds_sweep, 2, 1, 1, 3)
+        grid_sweep_samples.addWidget(QLabel("Total Readings / Frequency:"), 1, 0)
+        grid_sweep_samples.addWidget(self.lbl_total_rounds_sweep, 1, 1, 1, 3)
 
         v_sweep.addLayout(grid_sweep_samples)
 
@@ -541,20 +525,13 @@ class InputPanel(QWidget):
         self.input_samples.setRange(1, 999)
         self.input_samples.setValue(10)
 
-        self.input_discard_first = NoScrollSpinBox()
-        self.input_discard_first.setRange(0, 5)
-        self.input_discard_first.setValue(1)
-        self.input_discard_first.setToolTip(
-            "จำนวนตัวอย่างแรกสุดของแต่ละความถี่ที่จะไม่นำไปคำนวณสถิติ\n"
-            "(ค่าที่วัดได้ทันทีหลังเปลี่ยนความถี่มักยังไม่นิ่ง)\n"
-            "โปรแกรมจะวัดเพิ่มจากจำนวน Samples per Sweep โดยอัตโนมัติ\n"
-            "เช่น Samples=5 + Discard=3 -> วัดจริง 8 ครั้ง เหลือใช้คำนวณสถิติครบ 5 ค่า"
-        )
+        # [แก้ไข] เดิมเป็นช่อง "Discard First Reading" ให้ผู้ใช้กรอกเอง — เอาช่องกรอกออก
+        # โปรแกรมทิ้งค่าแรก DISCARD_FIRST_COUNT (=3) ค่าแรกของทุกความถี่ให้อัตโนมัติเสมอ
+        # เบื้องหลัง ผู้ใช้ไม่ต้องตั้งค่าเอง แต่ยังเห็นผลรวมผ่าน Label "Total Readings" ด้านล่าง
 
-        # บังคับให้ทั้งสองช่องกว้างเท่ากันเป๊ะ (แคบกว่าช่องความถี่ปกติเล็กน้อย
+        # บังคับให้ช่องกว้างเท่ากับช่องอื่นๆ ในกลุ่มเดียวกัน (แคบกว่าช่องความถี่ปกติเล็กน้อย
         # เพราะค่าที่กรอกเป็นแค่จำนวนครั้ง ไม่ใช่ตัวเลขความถี่ที่อาจยาวหลักล้าน)
         self.input_samples.setFixedWidth(COUNT_FIELD_WIDTH)
-        self.input_discard_first.setFixedWidth(COUNT_FIELD_WIDTH)
 
         # Label แสดงจำนวนรอบวัดทั้งหมดต่อ 1 ความถี่ = Discard + Samples
         self.lbl_total_rounds_list = QLabel("-")
@@ -564,12 +541,8 @@ class InputPanel(QWidget):
         grid_list_nums.addWidget(self.input_samples, 0, 1)
         grid_list_nums.addWidget(QLabel("Times"), 0, 2)
 
-        grid_list_nums.addWidget(QLabel("Discard First Reading:"), 1, 0)
-        grid_list_nums.addWidget(self.input_discard_first, 1, 1)
-        grid_list_nums.addWidget(QLabel("Times"), 1, 2)
-
-        grid_list_nums.addWidget(QLabel("Total Readings / Frequency:"), 2, 0)
-        grid_list_nums.addWidget(self.lbl_total_rounds_list, 2, 1, 1, 3)
+        grid_list_nums.addWidget(QLabel("Total Readings / Frequency:"), 1, 0)
+        grid_list_nums.addWidget(self.lbl_total_rounds_list, 1, 1, 1, 3)
 
         # เชื่อมสัญญาณเพื่ออัปเดต label ทุกครั้งที่ค่าเปลี่ยน
         # (signal connect และการคำนวณจริงอยู่ใน app_controller.py เพื่อรวมไว้กับ

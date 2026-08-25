@@ -12,6 +12,7 @@ from hardware.lcr_meter import E4980A
 from data.data_processor import calculate_frequency_stats
 from utils.helpers import truncate_sci
 from core import save_manager
+from gui.panels.input_panel import DISCARD_FIRST_COUNT
 
 class AppController(QObject):
     def __init__(self, view):
@@ -150,17 +151,15 @@ class AppController(QObject):
         v.input_panel.input_stop_freq.valueChanged.connect(self.update_calculated_points)
         v.input_panel.input_step_freq.valueChanged.connect(self.update_calculated_points)
 
-        # SINGLE: อัปเดต label รวมรอบวัดทั้งหมดเมื่อ Readings หรือ Discard เปลี่ยน
+        # SINGLE: อัปเดต label รวมรอบวัดทั้งหมดเมื่อ Readings เปลี่ยน
+        # (Discard First ล็อกเป็นค่าคงที่ DISCARD_FIRST_COUNT แล้ว ไม่มีช่องกรอกให้ผู้ใช้อีก)
         v.input_panel.input_n_single.valueChanged.connect(self.update_single_total)
-        v.input_panel.input_discard_single.valueChanged.connect(self.update_single_total)
 
-        # LIST: อัปเดต label รวมรอบวัดทั้งหมด/ความถี่ เมื่อ Samples หรือ Discard เปลี่ยน
+        # LIST: อัปเดต label รวมรอบวัดทั้งหมด/ความถี่ เมื่อ Samples เปลี่ยน
         v.input_panel.input_samples.valueChanged.connect(self.update_list_total)
-        v.input_panel.input_discard_first.valueChanged.connect(self.update_list_total)
 
-        # SWEEP: อัปเดต label รวมรอบวัดทั้งหมด/ความถี่ เมื่อ Samples หรือ Discard เปลี่ยน
+        # SWEEP: อัปเดต label รวมรอบวัดทั้งหมด/ความถี่ เมื่อ Samples เปลี่ยน
         v.input_panel.input_samples_sweep.valueChanged.connect(self.update_sweep_total)
-        v.input_panel.input_discard_first_sweep.valueChanged.connect(self.update_sweep_total)
 
         # ตรวจสอบ Frequency List ทุกครั้งที่มีการแก้ไข (เฉพาะมีผลตอนอยู่โหมด List)
         v.input_panel.input_freq_list.freq_changed.connect(self.validate_freq_list)
@@ -205,31 +204,31 @@ class AppController(QObject):
 
     def update_single_total(self):
         """คำนวณและแสดงรวมรอบวัดทั้งหมดของโหมด SINGLE
-        รวมรอบ = Discard First + Readings Count
+        รวมรอบ = Discard First (ค่าคงที่ DISCARD_FIRST_COUNT) + Readings Count
         (จำนวนครั้งที่เครื่องจะวัดจริงทั้งหมดต่อ 1 ครั้งที่กด Start)"""
         v = self.view
         n = v.input_panel.input_n_single.value()
-        d = v.input_panel.input_discard_single.value()
+        d = DISCARD_FIRST_COUNT
         total = n + d
         v.input_panel.lbl_total_rounds_single.setText(f"{total} Times (Discard {d} + Measure {n})")
 
     def update_list_total(self):
         """คำนวณและแสดงรวมรอบวัดทั้งหมดต่อความถี่ของโหมด LIST
-        รวมรอบ/ความถี่ = Discard First + Samples per Sweep
+        รวมรอบ/ความถี่ = Discard First (ค่าคงที่ DISCARD_FIRST_COUNT) + Samples per Sweep
         (จำนวนครั้งที่เครื่องวัดต่อ 1 ความถี่ ก่อนขยับไปความถี่ถัดไป)"""
         v = self.view
         s = v.input_panel.input_samples.value()
-        d = v.input_panel.input_discard_first.value()
+        d = DISCARD_FIRST_COUNT
         total = s + d
         v.input_panel.lbl_total_rounds_list.setText(f"{total} Times/Frequency \n (Discard {d} + Measure {s})")
 
     def update_sweep_total(self):
         """คำนวณและแสดงรวมรอบวัดทั้งหมดต่อความถี่ของโหมด SWEEP
-        รวมรอบ/ความถี่ = Discard First + Samples per Sweep
+        รวมรอบ/ความถี่ = Discard First (ค่าคงที่ DISCARD_FIRST_COUNT) + Samples per Sweep
         (เหมือน LIST — ใช้ widget แยกกันเพราะ SWEEP กับ LIST แสดงพร้อมกันไม่ได้อยู่แล้ว)"""
         v = self.view
         s = v.input_panel.input_samples_sweep.value()
-        d = v.input_panel.input_discard_first_sweep.value()
+        d = DISCARD_FIRST_COUNT
         total = s + d
         v.input_panel.lbl_total_rounds_sweep.setText(f"{total} Times/Frequency \n (Discard {d} + Measure {s})")
 
@@ -707,14 +706,14 @@ class AppController(QObject):
         if len(self.graph_x_data) == 0:
             self.setup_graph_labels()
 
-        # SWEEP และ LIST มีช่องกรอก Samples/Discard แยกกันคนละ widget
-        # (ใช้ค่าตาม widget ของโหมดที่กำลังทำงานอยู่จริง)
+        # SWEEP และ LIST มีช่องกรอก Samples แยกกันคนละ widget (ใช้ค่าตาม widget ของโหมด
+        # ที่กำลังทำงานอยู่จริง) ส่วน Discard First ล็อกเป็นค่าคงที่ DISCARD_FIRST_COUNT
+        # เสมอทุกโหมด ไม่มีช่องกรอกให้ผู้ใช้ตั้งเองแล้ว
         if run_mode == "SWEEP":
             samples_val = v.input_panel.input_samples_sweep.value()
-            discard_val = v.input_panel.input_discard_first_sweep.value()
         else:
             samples_val = v.input_panel.input_samples.value()
-            discard_val = v.input_panel.input_discard_first.value()
+        discard_val = DISCARD_FIRST_COUNT
 
         settings = {
             'run_mode': run_mode,  # 'SINGLE' / 'SWEEP' / 'LIST'
@@ -729,7 +728,7 @@ class AppController(QObject):
             # _run_single_measurement() ใช้ทั้ง 3 ค่านี้ — ถ้าไม่ส่งมา
             # จะ fallback เป็น n=1, discard=0 ทำให้การตั้งค่าใน UI ไม่มีผลเลย
             'n_single':               v.input_panel.input_n_single.value(),
-            'discard_single':         v.input_panel.input_discard_single.value(),
+            'discard_single':         DISCARD_FIRST_COUNT,
             'is_first_single_session': is_first_single_session,
             'scpi_mode': v.input_panel.combo_scpi_mode.currentData(),
             'volt': v.input_panel.input_volt.value(),
@@ -1149,19 +1148,15 @@ class AppController(QObject):
             v.input_panel.input_stop_freq.setEnabled(run_mode == "SWEEP")
             v.input_panel.input_step_freq.setEnabled(run_mode == "SWEEP")
             v.input_panel.input_samples_sweep.setEnabled(run_mode == "SWEEP")
-            v.input_panel.input_discard_first_sweep.setEnabled(run_mode == "SWEEP")
             v.input_panel.input_freq_list.setEnabled(run_mode == "LIST")
             v.input_panel.input_samples.setEnabled(run_mode == "LIST")
-            v.input_panel.input_discard_first.setEnabled(run_mode == "LIST")
         else:
             v.input_panel.input_start_freq.setEnabled(False)
             v.input_panel.input_stop_freq.setEnabled(False)
             v.input_panel.input_step_freq.setEnabled(False)
             v.input_panel.input_samples_sweep.setEnabled(False)
-            v.input_panel.input_discard_first_sweep.setEnabled(False)
             v.input_panel.input_freq_list.setEnabled(False)
             v.input_panel.input_samples.setEnabled(False)
-            v.input_panel.input_discard_first.setEnabled(False)
 
         # [restored] เช็คใหม่ทุกครั้งที่ session lock เปลี่ยน (เผื่อ mode เปลี่ยนระหว่างล็อก/ปลดล็อก)
         self.validate_freq_list()
@@ -1323,10 +1318,8 @@ class AppController(QObject):
         v.input_panel.input_stop_freq.setEnabled(is_sweep)
         v.input_panel.input_step_freq.setEnabled(is_sweep)
         v.input_panel.input_samples_sweep.setEnabled(is_sweep)
-        v.input_panel.input_discard_first_sweep.setEnabled(is_sweep)
         v.input_panel.input_freq_list.setEnabled(is_list)
         v.input_panel.input_samples.setEnabled(is_list)
-        v.input_panel.input_discard_first.setEnabled(is_list)
 
         # Tab "กราฟสรุปตามความถี่" และ "กราฟ PPM" มีความหมายเฉพาะ SWEEP/LIST
         # (SINGLE มีความถี่เดียว ไม่มีเส้นแนวโน้มให้ดู) — ซ่อน Tab ไปเลยกันผู้ใช้สับสน
@@ -1446,15 +1439,15 @@ class AppController(QObject):
                 "run_mode": run_mode,
                 "freq": v.input_panel.input_freq.value(),
                 "n_single": v.input_panel.input_n_single.value(),
-                "discard_single": v.input_panel.input_discard_single.value(),
+                "discard_single": DISCARD_FIRST_COUNT,
                 "start_freq": v.input_panel.input_start_freq.value(),
                 "stop_freq": v.input_panel.input_stop_freq.value(),
                 "step_freq": v.input_panel.input_step_freq.value(),
                 "samples_sweep": v.input_panel.input_samples_sweep.value(),
-                "discard_first_sweep": v.input_panel.input_discard_first_sweep.value(),
+                "discard_first_sweep": DISCARD_FIRST_COUNT,
                 "freq_list": v.input_panel.input_freq_list.get_frequencies(),
                 "samples_list": v.input_panel.input_samples.value(),
-                "discard_first_list": v.input_panel.input_discard_first.value(),
+                "discard_first_list": DISCARD_FIRST_COUNT,
                 "volt": v.input_panel.input_volt.value(),
                 "level_mode": v.input_panel.combo_level_mode.currentData(),
                 "alc_enabled": v.input_panel.chk_alc.isChecked(),
@@ -1581,19 +1574,14 @@ class AppController(QObject):
 
         v.input_panel.input_freq.setValue(inputs.get("freq", v.input_panel.input_freq.value()))
         v.input_panel.input_n_single.setValue(inputs.get("n_single", v.input_panel.input_n_single.value()))
-        v.input_panel.input_discard_single.setValue(inputs.get("discard_single", v.input_panel.input_discard_single.value()))
+        # Discard First ล็อกเป็นค่าคงที่ DISCARD_FIRST_COUNT เสมอ ไม่ต้องอ่านค่ากลับจากไฟล์ Save
+        # เก่าอีกต่อไป (ไฟล์เก่าอาจมีค่าที่ผู้ใช้เคยตั้งเองไว้ 0-5 ซึ่งไม่ตรงกับพฤติกรรมปัจจุบัน)
         v.input_panel.input_start_freq.setValue(inputs.get("start_freq", v.input_panel.input_start_freq.value()))
         v.input_panel.input_stop_freq.setValue(inputs.get("stop_freq", v.input_panel.input_stop_freq.value()))
         v.input_panel.input_step_freq.setValue(inputs.get("step_freq", v.input_panel.input_step_freq.value()))
         v.input_panel.input_samples_sweep.setValue(inputs.get("samples_sweep", v.input_panel.input_samples_sweep.value()))
-        v.input_panel.input_discard_first_sweep.setValue(
-            inputs.get("discard_first_sweep", v.input_panel.input_discard_first_sweep.value())
-        )
         v.input_panel.input_freq_list.set_frequencies(inputs.get("freq_list", []))
         v.input_panel.input_samples.setValue(inputs.get("samples_list", v.input_panel.input_samples.value()))
-        v.input_panel.input_discard_first.setValue(
-            inputs.get("discard_first_list", v.input_panel.input_discard_first.value())
-        )
         v.input_panel.input_volt.setValue(inputs.get("volt", v.input_panel.input_volt.value()))
         self._set_combo_by_data(v.input_panel.combo_level_mode, inputs.get("level_mode"))
         v.input_panel.chk_alc.setChecked(inputs.get("alc_enabled", False))

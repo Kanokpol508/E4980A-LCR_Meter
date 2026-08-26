@@ -45,6 +45,7 @@ from data.data_processor import (
 # group: 1 = Frequency/Samples, 2 = Primary, 3 = Secondary (สีตรงกับ statistics_table.py)
 # ==========================================
 _COLS_SINGLE = [
+    ("nominal",        "Nominal Value",         1),
     ("freq",           "Frequency (Hz)",        1),
     ("n",              "Samples (N)",           1),
     ("pri_mean",       "Primary Mean",          2),
@@ -63,6 +64,7 @@ _COLS_SINGLE = [
     ("sec_type_a_ppm", "Secondary Type A (PPM)", 3),
 ]
 _COLS_LIST = [
+    ("nominal",        "Nominal Value",         1),
     ("freq",           "Frequency (Hz)",        1),
     ("n_samples",      "Samples (N)",           1),
     ("pri_mean",       "Primary Mean",          2),
@@ -83,10 +85,7 @@ _COLS_LIST = [
 
 # ต้องตรงกับ gui/displays/raw_data_table.py (RawDataTable.SESSION_INFO_FIELDS)
 _SESSION_INFO_FIELDS = [
-    ("mode",             "SCPI Mode"),
-    ("signal",           "Signal Level"),
     ("meas_time",        "Meas Time (Aperture)"),
-    ("avg",              "Averaging"),
     ("cable",            "Cable Length"),
     ("imp_range",        "Range"),
     ("ppm_pri_ref",      "PPM Ref (Primary)"),
@@ -189,6 +188,8 @@ def _build_stats_rows(save_data: dict):
     pri_ref = _safe_float(inputs.get("ppm_pri_ref")) if ppm_enabled else None
     sec_ref = _safe_float(inputs.get("ppm_sec_ref")) if ppm_enabled else None
 
+    nominal_text = str(inputs.get("nominal_value") or "").strip() or "-"
+
     if mode == "SINGLE":
         saved_freq = inputs.get("freq", 0)
         raw_single_runs = results.get("single_runs", [])
@@ -210,7 +211,13 @@ def _build_stats_rows(save_data: dict):
 
         stats_list = calculate_single_stats_per_run(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
         columns = _COLS_SINGLE
-        rows = [[format_single_row_for_table(s)[key] for key, _, _ in columns] for s in stats_list]
+
+        def _row_of(s):
+            fmt = format_single_row_for_table(s)
+            fmt['nominal'] = nominal_text
+            return [fmt[key] for key, _, _ in columns]
+
+        rows = [_row_of(s) for s in stats_list]
     else:
         graph_x = results.get("graph_x_data", [])
         graph_raw_pri = results.get("graph_raw_pri_y", [])
@@ -227,7 +234,13 @@ def _build_stats_rows(save_data: dict):
 
         stats = calculate_frequency_stats(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
         columns = _COLS_LIST
-        rows = [[format_stats_row_for_table(s)[key] for key, _, _ in columns] for s in stats]
+
+        def _row_of(s):
+            fmt = format_stats_row_for_table(s)
+            fmt['nominal'] = nominal_text
+            return [fmt[key] for key, _, _ in columns]
+
+        rows = [_row_of(s) for s in stats]
 
     return mode, columns, rows
 
@@ -393,18 +406,22 @@ def _write_raw_data_tab(ws, item: dict):
     r += 1  # แถวว่างคั่น
     scpi_mode = inputs.get("scpi_mode")
     pri_label, sec_label = _scpi_axis_labels(scpi_mode)
-    headers = ["No.", "Frequency (Hz)", "Samples (N)", f"Primary [{pri_label}]", f"Secondary [{sec_label}]", "Status"]
+    headers = ["No.", "Nominal Value", "SCPI Mode", "Frequency (Hz)", "AVG", "Signal Level",
+               "Samples (N)", f"Primary [{pri_label}]", f"Secondary [{sec_label}]", "Status"]
     _write_header_row(ws, r, headers)
     ws.freeze_panes = ws.cell(row=r + 1, column=1).coordinate
     r += 1
 
     for row_data in results.get("raw_table_rows", []):
         values = [
-            row_data.get("no", ""), row_data.get("freq", ""), row_data.get("sample_text", ""),
+            row_data.get("no", ""), row_data.get("nominal", "-"), row_data.get("scpi_mode", "-"),
+            row_data.get("freq", ""), row_data.get("avg", "-"), row_data.get("signal_level", "-"),
+            row_data.get("sample_text", ""),
             row_data.get("primary", ""), row_data.get("secondary", ""), row_data.get("status", ""),
         ]
-        # กลุ่มสีคอลัมน์: No.=identify(0), Freq/Samples=1, Primary=2, Secondary=3, Status=ไม่ระบายพื้น
-        col_groups = [0, 1, 1, 2, 3, None]
+        # กลุ่มสีคอลัมน์: No./Nominal/SCPI Mode=identify(0), Freq/AVG/Signal/Samples=1,
+        # Primary=2, Secondary=3, Status=ไม่ระบายพื้น
+        col_groups = [0, 0, 0, 1, 1, 1, 1, 2, 3, None]
         for col_idx, (value, group) in enumerate(zip(values, col_groups), start=1):
             cell = ws.cell(row=r, column=col_idx, value=value)
             cell.alignment = _CENTER
@@ -414,13 +431,13 @@ def _write_raw_data_tab(ws, item: dict):
             if body_color:
                 cell.fill = PatternFill(start_color=body_color, end_color=body_color, fill_type="solid")
             # สีสถานะ SUCCESS/FAIL — ใช้โทนเขียว/แดงเดียวกับสีปุ่ม START/STOP ในแอป
-            if col_idx == 6 and str(value).upper() != "SUCCESS":
+            if col_idx == 10 and str(value).upper() != "SUCCESS":
                 cell.font = Font(bold=True, color="D2544B")
-            elif col_idx == 6:
+            elif col_idx == 10:
                 cell.font = Font(bold=True, color="14532D")
         r += 1
 
-    for col_idx in range(1, 7):
+    for col_idx in range(1, 11):
         col_letter = get_column_letter(col_idx)
         ws.column_dimensions[col_letter].width = 20
     ws.column_dimensions["A"].width = max(ws.column_dimensions["A"].width, 28)

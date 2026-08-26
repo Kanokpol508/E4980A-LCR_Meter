@@ -55,6 +55,9 @@ class AppController(QObject):
         # แยกจาก no_val (ตัวนับสะสมทั้ง session ใช้กับคอลัมน์ No.) เพื่อไม่ให้เลข Samples
         # เพี้ยนเป็น 6/5, 7/5 ตอนกดวัดซ้ำรอบสอง
         self._single_run_sample_no = 0
+        # [NEW] settings ของรอบวัดล่าสุดที่กด Start — ใช้ประกอบ SCPI Mode/AVG/Signal Level
+        # ต่อแถวใน Raw Data Table (ดูเหตุผลที่ start_measurement())
+        self._active_run_settings = {}
 
         # [NEW] เวลาที่วัดเสร็จล่าสุด (ใช้เป็นเวลา Save จริงๆ ไม่ใช่เวลาที่กดปุ่ม Save)
         self.last_measurement_time = None
@@ -741,6 +744,11 @@ class AppController(QObject):
         }
 
         self.worker = MeasurementWorker(self.lcr, settings)
+        # [NEW] เก็บ settings ของรอบนี้ไว้ใช้ตอน append_row ลง Raw Data Table
+        # (SCPI Mode/AVG/Signal Level ปลดล็อกให้แก้ระหว่างมีข้อมูลค้างได้แล้ว จึงต้องอ้างอิง
+        # ค่าที่ "ใช้จริง" ตอนกด Start ของรอบนี้ ไม่ใช่อ่าน UI สดตอน handle_data_ready
+        # เพราะผู้ใช้อาจเปลี่ยนค่าทิ้งไว้ก่อนรอบถัดไปแล้ว)
+        self._active_run_settings = settings
         self.worker.data_ready.connect(self.handle_data_ready)
         self.worker.error_occurred.connect(self.handle_worker_error)
         self.worker.progress_updated.connect(self.handle_progress_update)
@@ -844,10 +852,23 @@ class AppController(QObject):
         # [NEW] Nominal Value: ข้อความอิสระที่ผู้ใช้กรอกใน Measurement Type — ถ้าไม่ได้
         # กรอกไว้ ให้แสดงเป็น "-" ในตาราง
         nominal_text = v.input_panel.edit_nominal_value.text().strip() or "-"
+        # [NEW] SCPI Mode / AVG / Signal Level ย้ายมาบันทึกต่อแถวแทน Session Info Bar
+        # (ช่องเหล่านี้ปลดล็อกให้แก้ระหว่างมีข้อมูลค้างได้แล้ว) — ใช้ค่าจาก settings ของ
+        # รอบที่กด Start จริง ไม่ใช่อ่าน UI สด เพื่อให้แต่ละแถวตรงกับค่าที่ใช้วัดจริง
+        rs = self._active_run_settings
+        scpi_text = rs.get('scpi_mode') or v.input_panel.combo_scpi_mode.currentText() or "-"
+        avg_text = str(rs.get('avg', v.input_panel.input_avg.value()))
+        level_mode = rs.get('level_mode', v.input_panel.combo_level_mode.currentData())
+        level_unit_row = "A" if level_mode == "Current" else "V"
+        volt_val = rs.get('volt', v.input_panel.input_volt.value())
+        signal_text = f"{volt_val:g} {level_unit_row}"
         v.raw_table.append_row({
             'no': no_val,
             'nominal': nominal_text,
+            'scpi_mode': scpi_text,
             'freq': freq_val,
+            'avg': avg_text,
+            'signal_level': signal_text,
             'sample_text': sample_text,
             'primary': raw_pri,
             'secondary': raw_sec,
@@ -1113,8 +1134,12 @@ class AppController(QObject):
         is_single = (run_mode == "SINGLE")
         should_lock = has_data and is_single
 
-        v.input_panel.combo_prop_group.setEnabled(not should_lock)
-        v.input_panel.combo_scpi_mode.setEnabled(not should_lock)
+        # [แก้ไข] ปลดล็อก Parameter Group / SCPI Mode ให้แก้ไขได้แม้มีข้อมูลค้างอยู่ในโหมด
+        # SINGLE (ตามที่ผู้ใช้ร้องขอ) — เดิมล็อกไว้เพราะกลัวข้อมูลรอบเก่ากับ SCPI Mode
+        # ที่โชว์ไม่ตรงกัน แต่ตอนนี้ Raw Data Table เก็บ SCPI Mode ต่อแถวแล้ว (ไม่ได้พึ่ง
+        # Session Info Bar อย่างเดียวอีกต่อไป) จึงปลอดภัยที่จะปลดล็อกทั้งสองช่องนี้
+        v.input_panel.combo_prop_group.setEnabled(True)
+        v.input_panel.combo_scpi_mode.setEnabled(True)
         v.input_panel.combo_run_mode.setEnabled(not should_lock)
 
         v.adv_panel.chk_dev_ppm_enable.setEnabled(not should_lock)
@@ -1137,12 +1162,17 @@ class AppController(QObject):
         # ของรอบนั้นไว้กับข้อมูลดิบเลย (มาจาก settings snapshot ตอนกด Start ผ่าน worker ไม่ใช่
         # อ่านค่า UI ปัจจุบันสดๆ ตอนคำนวณสถิติ) รอบเก่าจึงไม่มีทางถูกเปลี่ยนป้ายความถี่ผิดอีก
         # แม้จะเปลี่ยน input_freq ก่อนกด Start รอบถัดไปก็ตาม — ดู update_statistics_table()
+        # [แก้ไข] ปลดล็อก Signal Level (input_volt/combo_level_mode) และ AVG (input_avg)
+        # ให้แก้ไขได้ระหว่างมีข้อมูลค้างอยู่ในโหมด SINGLE ตามที่ผู้ใช้ร้องขอ — เหตุผลเดียวกับ
+        # Parameter Group/SCPI Mode ด้านบน: ค่าที่ใช้จริงต่อแถวถูก stamp ไว้ใน Raw Data Table
+        # แล้ว ไม่ต้องพึ่ง Session Info Bar อย่างเดียวอีกต่อไป
+        v.input_panel.input_volt.setEnabled(True)
+        v.input_panel.combo_level_mode.setEnabled(True)
+        v.input_panel.input_avg.setEnabled(True)
+
         for widget in (
-            v.input_panel.input_volt,        # Signal Level (ตัวเลข)
-            v.input_panel.combo_level_mode,  # Signal Level (V/A)
             v.input_panel.chk_alc,           # ALC
             v.input_panel.combo_time,        # Meas Time (Aperture: SHORT/MEDIUM/LONG)
-            v.input_panel.input_avg,         # Averaging
             v.input_panel.combo_cable,       # Cable Length
             v.input_panel.combo_range,       # Range
         ):

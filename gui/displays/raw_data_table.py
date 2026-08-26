@@ -25,11 +25,11 @@ class RawDataTable(QWidget):
       (Mode/สัญญาณ/สายวัด/ย่าน/PPM Ref ฯลฯ) แยกจากตารางเพราะไม่เปลี่ยนต่อแถว
     """
     # [NEW] คำอธิบาย (label) ของแต่ละ key ใน session info — ใช้ทั้งตอนสร้าง UI และ update
+    # [แก้ไข] ย้าย SCPI Mode / Signal Level / Averaging ออกจาก Session Info Bar ไปบันทึก
+    # เป็นคอลัมน์ต่อแถวในตารางแทน (ผู้ใช้ปลดล็อกให้แก้ค่าเหล่านี้ระหว่าง session ได้แล้ว
+    # จึงไม่ใช่ค่าคงที่ตลอด session อีกต่อไป — ต้องอ้างอิงต่อแถวถึงจะถูกต้อง)
     SESSION_INFO_FIELDS = [
-        ("mode",             "SCPI Mode"),
-        ("signal",           "Signal Level"),
         ("meas_time",        "Meas Time (Aperture)"),
-        ("avg",              "Averaging"),
         ("cable",            "Cable Length"),
         ("imp_range",        "Range"),
         ("ppm_pri_ref",      "PPM Ref (Primary)"),
@@ -87,11 +87,13 @@ class RawDataTable(QWidget):
     def set_mode(self, mode: str):
         """ปรับหัวคอลัมน์ตามโหมดการวัด (SINGLE, SWEEP, LIST)"""
         self._current_mode = mode
-        self.table.setColumnCount(7)
+        self.table.setColumnCount(10)
 
         # คอลัมน์พื้นฐาน (ทุกโหมดใช้ "Samples (N)" เหมือนกันแล้ว)
-        # [NEW] คอลัมน์ Nominal Value อยู่ถัดจาก No. และก่อน Frequency (Hz)
-        headers = ["No.", "Nominal Value", "Frequency (Hz)", "Samples (N)", "Primary", "Secondary", "Status"]
+        # [NEW] Nominal Value อยู่ถัดจาก No., SCPI Mode อยู่ถัดจาก Nominal Value
+        # [NEW] AVG อยู่ถัดจาก Frequency (Hz), Signal Level อยู่ถัดจาก AVG
+        headers = ["No.", "Nominal Value", "SCPI Mode", "Frequency (Hz)", "AVG", "Signal Level",
+                   "Samples (N)", "Primary", "Secondary", "Status"]
 
         self.table.setHorizontalHeaderLabels(headers)
         self.clear_table()
@@ -125,9 +127,9 @@ class RawDataTable(QWidget):
         elif scpi_mode == "GB": sec = "B"
 
         # ตั้งชื่อ Header คอลัมน์ Primary และ Secondary ใหม่
-        # (เลื่อนจากคอลัมน์ 3/4 เดิม เป็น 4/5 หลังจากแทรกคอลัมน์ Nominal Value)
-        item_pri = self.table.horizontalHeaderItem(4)
-        item_sec = self.table.horizontalHeaderItem(5)
+        # (คอลัมน์ 7/8 หลังจากแทรก Nominal Value/SCPI Mode/AVG/Signal Level)
+        item_pri = self.table.horizontalHeaderItem(7)
+        item_sec = self.table.horizontalHeaderItem(8)
         if item_pri: item_pri.setText(f"Primary [{pri}]")
         if item_sec: item_sec.setText(f"Secondary [{sec}]")
 
@@ -153,19 +155,34 @@ class RawDataTable(QWidget):
         item_nominal.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setItem(row_idx, 1, item_nominal)
 
-        # 2: Frequency
+        # 2: SCPI Mode (ค่าที่ใช้จริงตอนวัดแถวนี้ — ย้ายมาจาก Session Info Bar เดิม)
+        item_scpi = QTableWidgetItem(str(data.get('scpi_mode', '-')))
+        item_scpi.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row_idx, 2, item_scpi)
+
+        # 3: Frequency
         freq = data.get('freq')
         freq_str = f"{freq:.2f}" if isinstance(freq, (int, float)) else str(freq)
         item_freq = QTableWidgetItem(freq_str)
         item_freq.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.table.setItem(row_idx, 2, item_freq)
+        self.table.setItem(row_idx, 3, item_freq)
 
-        # 3: Samples (N)
+        # 4: AVG (Averaging — ย้ายมาจาก Session Info Bar เดิม)
+        item_avg = QTableWidgetItem(str(data.get('avg', '-')))
+        item_avg.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row_idx, 4, item_avg)
+
+        # 5: Signal Level (ย้ายมาจาก Session Info Bar เดิม)
+        item_signal = QTableWidgetItem(str(data.get('signal_level', '-')))
+        item_signal.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row_idx, 5, item_signal)
+
+        # 6: Samples (N)
         item_sample = QTableWidgetItem(str(data.get('sample_text', '-')))
         item_sample.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.table.setItem(row_idx, 3, item_sample)
+        self.table.setItem(row_idx, 6, item_sample)
 
-        # 4: Primary
+        # 7: Primary
         # [แก้ไข] เดิม f"{pri:.5e}" ปัดเศษ (round) และตัดความละเอียดเหลือแค่ 5 ตำแหน่ง
         # เปลี่ยนมาใช้ truncate_sci() ที่ "ตัดทิ้ง" ไม่ปัดเศษ (ตรงกับหลักการเดียวกับ
         # Data Labels ในกราฟ) และเพิ่มเป็น 9 ตำแหน่งเพื่อเก็บนัยสำคัญให้มากที่สุด
@@ -174,16 +191,16 @@ class RawDataTable(QWidget):
         pri_str = truncate_sci(pri, RAW_VALUE_DECIMALS) if isinstance(pri, (int, float)) else str(pri)
         item_pri = QTableWidgetItem(pri_str)
         item_pri.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.table.setItem(row_idx, 4, item_pri)
+        self.table.setItem(row_idx, 7, item_pri)
 
-        # 5: Secondary
+        # 8: Secondary
         sec = data.get('secondary')
         sec_str = truncate_sci(sec, RAW_VALUE_DECIMALS) if isinstance(sec, (int, float)) else str(sec)
         item_sec = QTableWidgetItem(sec_str)
         item_sec.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.table.setItem(row_idx, 5, item_sec)
+        self.table.setItem(row_idx, 8, item_sec)
 
-        # 6: Status
+        # 9: Status
         status = str(data.get('status', 'SUCCESS'))
         item_status = QTableWidgetItem(status)
         item_status.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -195,7 +212,7 @@ class RawDataTable(QWidget):
         else:
             item_status.setForeground(QBrush(QColor("#10b981"))) # สีเขียว Tailwind
             
-        self.table.setItem(row_idx, 6, item_status)
+        self.table.setItem(row_idx, 9, item_status)
         
         # เลื่อนหน้าจอลงมาแถวล่าสุด
         self.table.scrollToBottom()
@@ -232,10 +249,13 @@ class RawDataTable(QWidget):
             rows.append({
                 'no': cell(0),
                 'nominal': cell(1),
-                'freq': cell(2),
-                'sample_text': cell(3),
-                'primary': cell(4),
-                'secondary': cell(5),
-                'status': cell(6),
+                'scpi_mode': cell(2),
+                'freq': cell(3),
+                'avg': cell(4),
+                'signal_level': cell(5),
+                'sample_text': cell(6),
+                'primary': cell(7),
+                'secondary': cell(8),
+                'status': cell(9),
             })
         return rows

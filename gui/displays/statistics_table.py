@@ -43,7 +43,7 @@ def _column_group(key: str) -> int:
         return 2
     if key.startswith("sec_"):
         return 3
-    return 1  # freq, n, n_samples
+    return 1  # nominal, freq, n, n_samples
 
 
 class _GroupColorDelegate(QStyledItemDelegate):
@@ -92,6 +92,7 @@ class _ColoredHeaderView(QHeaderView):
 # Column definitions แยกตามโหมด
 # ==========================================
 _COLS_SINGLE = [
+    ("nominal",        "Nominal Value"),
     ("freq",           "Frequency (Hz)"),
     ("n",              "Samples (N)"),
     ("pri_mean",       "Primary Mean"),
@@ -112,6 +113,7 @@ _COLS_SINGLE = [
 
 # SWEEP ใช้ column set เดียวกับ LIST ทุกประการ (วัดซ้ำได้หลายครั้ง/ความถี่เหมือนกันแล้ว)
 _COLS_LIST = [
+    ("nominal",        "Nominal Value"),
     ("freq",           "Frequency (Hz)"),
     ("n_samples",      "Samples (N)"),
     ("pri_mean",       "Primary Mean"),
@@ -228,7 +230,7 @@ class StatisticsTable(QWidget):
         if mode != self._current_mode:
             self._apply_columns(mode)
 
-    def update_table(self, raw_records: list, pri_ref=None, sec_ref=None, mode: str = None):
+    def update_table(self, raw_records: list, pri_ref=None, sec_ref=None, mode: str = None, nominal_value: str = None):
         """
         อัปเดตตารางใหม่ทั้งหมดจากข้อมูลดิบ
         - SINGLE mode: raw_records คือ "กลุ่มต่อรอบ" [[{...},...], [{...},...], ...]
@@ -236,16 +238,22 @@ class StatisticsTable(QWidget):
         - SWEEP/LIST mode: raw_records คือ flat list [{'freq':.., 'primary':.., 'secondary':..}, ...]
         สูตรทั้งหมดอยู่ใน data_processor.py — ที่นี่แค่แสดงผล
         (SWEEP ใช้สูตรและการแสดงผลเดียวกับ LIST ทุกประการ)
+        - [NEW] nominal_value: ข้อความ Nominal Value ที่ผู้ใช้กรอก (ค่าคงที่ตลอด session)
+          หากไม่ได้กรอกจะแสดง "-" ในทุกแถว
         """
         if mode and mode != self._current_mode:
             self._apply_columns(mode)
 
-        if self._current_mode == "SINGLE":
-            self._render_single(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
-        else:  # SWEEP หรือ LIST
-            self._render_list(raw_records, pri_ref, sec_ref)
+        nominal_text = str(nominal_value).strip() if nominal_value not in (None, "") else "-"
+        if not nominal_text:
+            nominal_text = "-"
 
-    def _render_single(self, run_groups: list, pri_ref=None, sec_ref=None):
+        if self._current_mode == "SINGLE":
+            self._render_single(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, nominal_text=nominal_text)
+        else:  # SWEEP หรือ LIST
+            self._render_list(raw_records, pri_ref, sec_ref, nominal_text=nominal_text)
+
+    def _render_single(self, run_groups: list, pri_ref=None, sec_ref=None, nominal_text: str = "-"):
         """[แก้ไข] เดิมรวมทุกรอบเป็นแถวเดียว (calculate_single_stats บนข้อมูลทั้งหมด)
         ตอนนี้แยกคำนวณทีละรอบ (1 รอบ = 1 แถว) ด้วย calculate_single_stats_per_run()
         และแก้บั๊กเดิมที่ไม่เคยส่ง pri_ref/sec_ref เข้าไปเลย ทำให้คอลัมน์ PPM Dev ของ
@@ -254,13 +262,15 @@ class StatisticsTable(QWidget):
         self.table.setRowCount(len(stats_list))
         for i, stat in enumerate(stats_list):
             fmt = format_single_row_for_table(stat)
+            fmt['nominal'] = nominal_text
             self._set_row(i, [fmt[key] for key, _ in _COLS_SINGLE])
 
-    def _render_list(self, raw_records: list, pri_ref=None, sec_ref=None):
+    def _render_list(self, raw_records: list, pri_ref=None, sec_ref=None, nominal_text: str = "-"):
         stats = calculate_frequency_stats(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
         self.table.setRowCount(len(stats))
         for i, stat_row in enumerate(stats):
             fmt = format_stats_row_for_table(stat_row)
+            fmt['nominal'] = nominal_text
             self._set_row(i, [fmt[key] for key, _ in _COLS_LIST])
 
     def clear_table(self):

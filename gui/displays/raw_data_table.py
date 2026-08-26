@@ -87,11 +87,12 @@ class RawDataTable(QWidget):
     def set_mode(self, mode: str):
         """ปรับหัวคอลัมน์ตามโหมดการวัด (SINGLE, SWEEP, LIST)"""
         self._current_mode = mode
-        self.table.setColumnCount(6)
-        
+        self.table.setColumnCount(7)
+
         # คอลัมน์พื้นฐาน (ทุกโหมดใช้ "Samples (N)" เหมือนกันแล้ว)
-        headers = ["No.", "Frequency (Hz)", "Samples (N)", "Primary", "Secondary", "Status"]
-            
+        # [NEW] คอลัมน์ Nominal Value อยู่ถัดจาก No. และก่อน Frequency (Hz)
+        headers = ["No.", "Nominal Value", "Frequency (Hz)", "Samples (N)", "Primary", "Secondary", "Status"]
+
         self.table.setHorizontalHeaderLabels(headers)
         self.clear_table()
 
@@ -123,9 +124,10 @@ class RawDataTable(QWidget):
         elif scpi_mode.endswith("X"): sec = "X"
         elif scpi_mode == "GB": sec = "B"
 
-        # ตั้งชื่อ Header คอลัมน์ 3 และ 4 ใหม่
-        item_pri = self.table.horizontalHeaderItem(3)
-        item_sec = self.table.horizontalHeaderItem(4)
+        # ตั้งชื่อ Header คอลัมน์ Primary และ Secondary ใหม่
+        # (เลื่อนจากคอลัมน์ 3/4 เดิม เป็น 4/5 หลังจากแทรกคอลัมน์ Nominal Value)
+        item_pri = self.table.horizontalHeaderItem(4)
+        item_sec = self.table.horizontalHeaderItem(5)
         if item_pri: item_pri.setText(f"Primary [{pri}]")
         if item_sec: item_sec.setText(f"Secondary [{sec}]")
 
@@ -142,19 +144,28 @@ class RawDataTable(QWidget):
         item_no.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setItem(row_idx, 0, item_no)
 
-        # 1: Frequency
+        # 1: Nominal Value (ข้อความอิสระที่ผู้ใช้กรอก — ถ้าไม่ได้กรอกให้แสดง "-")
+        nominal = data.get('nominal')
+        nominal_str = str(nominal).strip() if nominal not in (None, "") else "-"
+        if not nominal_str:
+            nominal_str = "-"
+        item_nominal = QTableWidgetItem(nominal_str)
+        item_nominal.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table.setItem(row_idx, 1, item_nominal)
+
+        # 2: Frequency
         freq = data.get('freq')
         freq_str = f"{freq:.2f}" if isinstance(freq, (int, float)) else str(freq)
         item_freq = QTableWidgetItem(freq_str)
         item_freq.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.table.setItem(row_idx, 1, item_freq)
+        self.table.setItem(row_idx, 2, item_freq)
 
-        # 2: Samples (N)
+        # 3: Samples (N)
         item_sample = QTableWidgetItem(str(data.get('sample_text', '-')))
         item_sample.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.table.setItem(row_idx, 2, item_sample)
+        self.table.setItem(row_idx, 3, item_sample)
 
-        # 3: Primary
+        # 4: Primary
         # [แก้ไข] เดิม f"{pri:.5e}" ปัดเศษ (round) และตัดความละเอียดเหลือแค่ 5 ตำแหน่ง
         # เปลี่ยนมาใช้ truncate_sci() ที่ "ตัดทิ้ง" ไม่ปัดเศษ (ตรงกับหลักการเดียวกับ
         # Data Labels ในกราฟ) และเพิ่มเป็น 9 ตำแหน่งเพื่อเก็บนัยสำคัญให้มากที่สุด
@@ -163,16 +174,16 @@ class RawDataTable(QWidget):
         pri_str = truncate_sci(pri, RAW_VALUE_DECIMALS) if isinstance(pri, (int, float)) else str(pri)
         item_pri = QTableWidgetItem(pri_str)
         item_pri.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.table.setItem(row_idx, 3, item_pri)
+        self.table.setItem(row_idx, 4, item_pri)
 
-        # 4: Secondary
+        # 5: Secondary
         sec = data.get('secondary')
         sec_str = truncate_sci(sec, RAW_VALUE_DECIMALS) if isinstance(sec, (int, float)) else str(sec)
         item_sec = QTableWidgetItem(sec_str)
         item_sec.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.table.setItem(row_idx, 4, item_sec)
+        self.table.setItem(row_idx, 5, item_sec)
 
-        # 5: Status
+        # 6: Status
         status = str(data.get('status', 'SUCCESS'))
         item_status = QTableWidgetItem(status)
         item_status.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -184,7 +195,7 @@ class RawDataTable(QWidget):
         else:
             item_status.setForeground(QBrush(QColor("#10b981"))) # สีเขียว Tailwind
             
-        self.table.setItem(row_idx, 5, item_status)
+        self.table.setItem(row_idx, 6, item_status)
         
         # เลื่อนหน้าจอลงมาแถวล่าสุด
         self.table.scrollToBottom()
@@ -220,10 +231,11 @@ class RawDataTable(QWidget):
                 return item.text() if item else ""
             rows.append({
                 'no': cell(0),
-                'freq': cell(1),
-                'sample_text': cell(2),
-                'primary': cell(3),
-                'secondary': cell(4),
-                'status': cell(5),
+                'nominal': cell(1),
+                'freq': cell(2),
+                'sample_text': cell(3),
+                'primary': cell(4),
+                'secondary': cell(5),
+                'status': cell(6),
             })
         return rows

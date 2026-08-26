@@ -306,16 +306,22 @@ class InputPanel(QWidget):
 
         self.combo_prop_group = NoScrollComboBox()
         self.combo_scpi_mode = NoScrollComboBox()
+        self.edit_nominal_value = QLineEdit()
+        self.edit_nominal_value.setPlaceholderText("กรอกNominal Value (ถ้ามี)")
 
         lbl_prop_group = QLabel("Parameter Group:")
         lbl_scpi_mode = QLabel("SCPI Mode:")
+        lbl_nominal_value = QLabel("Nominal Value:")
         lbl_prop_group.setMaximumWidth(120)
         lbl_scpi_mode.setMaximumWidth(120)
+        lbl_nominal_value.setMaximumWidth(120)
 
         grid_prop.addWidget(lbl_prop_group, 0, 0)
         grid_prop.addWidget(self.combo_prop_group, 0, 1)
         grid_prop.addWidget(lbl_scpi_mode, 1, 0)
         grid_prop.addWidget(self.combo_scpi_mode, 1, 1)
+        grid_prop.addWidget(lbl_nominal_value, 2, 0)
+        grid_prop.addWidget(self.edit_nominal_value, 2, 1)
 
         self.group_prop.setLayout(grid_prop)
 

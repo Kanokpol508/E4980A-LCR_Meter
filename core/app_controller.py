@@ -841,8 +841,12 @@ class AppController(QObject):
             freq_val = current_freq
 
         # ส่งให้ Raw Data Table แสดงผล
+        # [NEW] Nominal Value: ข้อความอิสระที่ผู้ใช้กรอกใน Measurement Type — ถ้าไม่ได้
+        # กรอกไว้ ให้แสดงเป็น "-" ในตาราง
+        nominal_text = v.input_panel.edit_nominal_value.text().strip() or "-"
         v.raw_table.append_row({
             'no': no_val,
+            'nominal': nominal_text,
             'freq': freq_val,
             'sample_text': sample_text,
             'primary': raw_pri,
@@ -958,7 +962,8 @@ class AppController(QObject):
         pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if ppm_enabled else None
         sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if ppm_enabled else None
 
-        v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode)
+        nominal_text = v.input_panel.edit_nominal_value.text().strip() or "-"
+        v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode, nominal_value=nominal_text)
 
         # กราฟ "vs Frequency" มีความหมายเฉพาะ LIST/SWEEP เท่านั้น
         # (SINGLE มีความถี่เดียว ไม่มีเส้นแนวโน้มให้ลาก)
@@ -1436,6 +1441,7 @@ class AppController(QObject):
                 "visa_resource": v.conn_panel.combo_visa.currentText(),
                 "prop_group": v.input_panel.combo_prop_group.currentText(),
                 "scpi_mode": v.input_panel.combo_scpi_mode.currentData(),
+                "nominal_value": v.input_panel.edit_nominal_value.text(),
                 "run_mode": run_mode,
                 "freq": v.input_panel.input_freq.value(),
                 "n_single": v.input_panel.input_n_single.value(),
@@ -1595,6 +1601,8 @@ class AppController(QObject):
         v.adv_panel.chk_dev_ppm_enable.setChecked(inputs.get("ppm_enabled", False))
         v.adv_panel.input_dev_pri.setText(inputs.get("ppm_pri_ref") or "")
         v.adv_panel.input_dev_sec.setText(inputs.get("ppm_sec_ref") or "")
+
+        v.input_panel.edit_nominal_value.setText(inputs.get("nominal_value") or "")
 
         visa_saved = inputs.get("visa_resource")
         if visa_saved:

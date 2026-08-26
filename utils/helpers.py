@@ -2,7 +2,7 @@
 
 import math
 
-from PyQt6.QtWidgets import QComboBox, QSpinBox, QDoubleSpinBox
+from PyQt6.QtWidgets import QComboBox, QSpinBox, QDoubleSpinBox, QAbstractSpinBox
 
 
 def truncate_sci(value: float, decimals: int = 2) -> str:
@@ -185,13 +185,23 @@ class NoScrollComboBox(QComboBox):
 
 
 class NoScrollSpinBox(QSpinBox):
-    """QSpinBox ธรรมดาทุกอย่าง ยกเว้นปิดพฤติกรรม "เลื่อนลูกกลิ้งเมาส์ (scroll wheel)
-    แล้วเปลี่ยนค่าตัวเลข" ทิ้ง — ใช้แทน QSpinBox ทุกจุดในโปรแกรมนี้
+    """QSpinBox ธรรมดาทุกอย่าง ยกเว้น:
+    1. ปิดพฤติกรรม "เลื่อนลูกกลิ้งเมาส์ (scroll wheel) แล้วเปลี่ยนค่าตัวเลข" ทิ้ง
+    2. ซ่อนปุ่ม +/- (ลูกศรขึ้น-ลง) ทิ้ง — บังคับให้ผู้ใช้พิมพ์ค่าเองเท่านั้น
+    ใช้แทน QSpinBox ทุกจุดในโปรแกรมนี้
 
-    เหตุผลและวิธีแก้เหมือนกับ NoScrollComboBox ด้านบน: override wheelEvent()
-    แล้วเรียก event.ignore() แทนที่จะเพิ่ม/ลดค่า ผู้ใช้ต้องพิมพ์ค่าเองหรือกดปุ่ม
-    +/- เท่านั้นจึงจะเปลี่ยนค่าได้
+    เหตุผลข้อ 1 และวิธีแก้เหมือนกับ NoScrollComboBox ด้านบน: override wheelEvent()
+    แล้วเรียก event.ignore() แทนที่จะเพิ่ม/ลดค่า
+
+    เหตุผลข้อ 2: ปุ่ม +/- กดทีละ 1 หน่วย ไม่เหมาะกับการตั้งค่าที่ต้องพิมพ์ตัวเลข
+    เฉพาะเจาะจง (เช่น จำนวนครั้งวัด) — ตัดออกเพื่อให้ผู้ใช้พิมพ์ค่าที่ต้องการได้ตรงๆ
+    ทันที ไม่ต้องกดปุ่มไล่ทีละ 1 (setButtonSymbols(NoButtons) ไม่ตัดความสามารถ
+    พิมพ์ค่าเอง/ใช้ปุ่มลูกศรบนคีย์บอร์ดออก ยังใช้งานได้ปกติ)
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
 
     def wheelEvent(self, event):
         event.ignore()
@@ -199,8 +209,12 @@ class NoScrollSpinBox(QSpinBox):
 
 class NoScrollDoubleSpinBox(QDoubleSpinBox):
     """QDoubleSpinBox ธรรมดาทุกอย่าง ยกเว้นปิดพฤติกรรมเลื่อนลูกกลิ้งเมาส์แล้วเปลี่ยนค่า
-    (เหตุผลและวิธีแก้เหมือนกับ NoScrollComboBox / NoScrollSpinBox ด้านบน)
+    และซ่อนปุ่ม +/- ทิ้ง (เหตุผลและวิธีแก้เหมือนกับ NoScrollSpinBox ด้านบน)
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
 
     def wheelEvent(self, event):
         event.ignore()

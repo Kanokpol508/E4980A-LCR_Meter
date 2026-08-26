@@ -146,10 +146,14 @@ QComboBox QAbstractItemView {
 }
 
 /* ==========================================
-   SpinBox: สัญลักษณ์ "+" และ "-"
+   SpinBox: ซ่อนปุ่ม "+" และ "-" ทิ้ง (ให้พิมพ์ค่าเองเท่านั้น)
+   [แก้ไข] เดิม qproperty-buttonSymbols: 1 (UpDownArrows) บังคับให้ปุ่มโชว์
+   เสมอผ่าน QSS ระดับ global — ทับค่าที่ตั้งไว้ใน setButtonSymbols() ฝั่ง
+   Python (utils/helpers.py: NoScrollSpinBox/NoScrollDoubleSpinBox) เพราะ QSS
+   ถูก apply ทีหลังตอน widget แสดงผลจริง เปลี่ยนเป็น 2 (NoButtons) ให้ตรงกัน
 ========================================== */
 QSpinBox, QDoubleSpinBox {
-    qproperty-buttonSymbols: 1;
+    qproperty-buttonSymbols: 2;
     padding-right: 10px;
 }
 

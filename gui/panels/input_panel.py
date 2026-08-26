@@ -307,7 +307,7 @@ class InputPanel(QWidget):
         self.combo_prop_group = NoScrollComboBox()
         self.combo_scpi_mode = NoScrollComboBox()
         self.edit_nominal_value = QLineEdit()
-        self.edit_nominal_value.setPlaceholderText("กรอกNominal Value (ถ้ามี)")
+        self.edit_nominal_value.setPlaceholderText("e.g. 100 pF")
 
         lbl_prop_group = QLabel("Parameter Group:")
         lbl_scpi_mode = QLabel("SCPI Mode:")
@@ -576,7 +576,7 @@ class InputPanel(QWidget):
         self.input_volt.setDecimals(4)
         self.input_volt.setSingleStep(0.1)
         self.input_volt.setValue(1.0)
-        self.input_volt.setFixedWidth(VOLT_FIELD_WIDTH + 10)
+        self.input_volt.setFixedWidth(VOLT_FIELD_WIDTH - 20)
 
         # Dropdown หน่วย: V (Voltage) หรือ A (Current)
         self.combo_level_mode = NoScrollComboBox()
@@ -584,17 +584,10 @@ class InputPanel(QWidget):
         self.combo_level_mode.addItem("A", userData="Current")
         self.combo_level_mode.setFixedWidth(105)
 
-        # Label อยู่แถวบน, SpinBox + Dropdown อยู่แถวล่าง
-        v_signal.addWidget(QLabel("Signal Level:"))
-
-        h_level = QHBoxLayout()
-        h_level.addWidget(self.input_volt)
-        h_level.addWidget(self.combo_level_mode)
-        h_level.addStretch()
-        v_signal.addLayout(h_level)
-
-        # ALC (Automatic Level Control)
-        self.chk_alc = QCheckBox("Enable ALC (Automatic Level Control)")
+        # ALC (Automatic Level Control) — [แก้ไข] ย้ายมาอยู่แถวเดียวกับ SpinBox + Dropdown
+        # (ข้าง Dropdown หน่วย) แทนที่จะแยกอยู่คนละแถวด้านล่าง และตัดชื่อเต็ม
+        # "(Automatic Level Control)" ออก เหลือแค่ "Enable ALC" (คำอธิบายเต็มยังอยู่ใน tooltip)
+        self.chk_alc = QCheckBox("Enable ALC")
         self.chk_alc.setToolTip(
             "ALC ทำให้ระดับสัญญาณ ณ จุดที่ชิ้นงาน เท่ากับค่าที่ตั้งไว้จริงๆ\n"
             "แนะนำเปิดเมื่อวัด Inductor ด้วยโหมด A\n"
@@ -605,7 +598,16 @@ class InputPanel(QWidget):
         self.chk_alc.toggled.connect(self._on_alc_toggled)
         self._on_alc_toggled(self.chk_alc.isChecked())
 
-        v_signal.addWidget(self.chk_alc)
+        # Label อยู่แถวบน, SpinBox + Dropdown + Enable ALC อยู่แถวล่างเดียวกัน
+        v_signal.addWidget(QLabel("Signal Level:"))
+
+        h_level = QHBoxLayout()
+        h_level.addWidget(self.input_volt)
+        h_level.addWidget(self.combo_level_mode)
+        h_level.addWidget(self.chk_alc)
+        h_level.addStretch()
+        v_signal.addLayout(h_level)
+
         v_signal.addStretch()
         self.group_signal.setLayout(v_signal)
 
@@ -676,11 +678,11 @@ class InputPanel(QWidget):
         เขียวสดค้างอยู่แม้ช่องนี้จะถูกล็อก (setEnabled(False)) ระหว่างกำลังวัด/Correction/
         SINGLE mode session ก็ตาม ทำให้ผู้ใช้เข้าใจผิดว่ายังกดแก้ไขได้อยู่"""
         if checked:
-            self.chk_alc.setText("Enable ALC (Automatic Level Control) ✅")
+            self.chk_alc.setText("Enable ALC ✅")
             self.chk_alc.setStyleSheet(
                 "QCheckBox { color: #2E8B57; font-weight: bold; } "
                 "QCheckBox:disabled { color: #A3ADC2; font-weight: normal; }"
             )
         else:
-            self.chk_alc.setText("Enable ALC (Automatic Level Control)")
+            self.chk_alc.setText("Enable ALC")
             self.chk_alc.setStyleSheet("")

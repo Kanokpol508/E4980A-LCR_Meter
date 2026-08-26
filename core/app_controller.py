@@ -1169,9 +1169,11 @@ class AppController(QObject):
         v.input_panel.input_volt.setEnabled(True)
         v.input_panel.combo_level_mode.setEnabled(True)
         v.input_panel.input_avg.setEnabled(True)
+        # [แก้ไข] ปลดล็อก Enable ALC ให้แก้ไขได้ระหว่างมีข้อมูลค้างในโหมด SINGLE ด้วย
+        # (ตามที่ผู้ใช้ร้องขอ) — เหตุผลเดียวกับ Signal Level/AVG ด้านบน
+        v.input_panel.chk_alc.setEnabled(True)
 
         for widget in (
-            v.input_panel.chk_alc,           # ALC
             v.input_panel.combo_time,        # Meas Time (Aperture: SHORT/MEDIUM/LONG)
             v.input_panel.combo_cable,       # Cable Length
             v.input_panel.combo_range,       # Range

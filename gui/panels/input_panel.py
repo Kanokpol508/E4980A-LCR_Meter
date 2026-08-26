@@ -307,7 +307,7 @@ class InputPanel(QWidget):
         self.combo_prop_group = NoScrollComboBox()
         self.combo_scpi_mode = NoScrollComboBox()
         self.edit_nominal_value = QLineEdit()
-        self.edit_nominal_value.setPlaceholderText("e.g. 100 pF")
+        self.edit_nominal_value.setPlaceholderText("กรอก Nominal Value (ถ้ามี)")
 
         lbl_prop_group = QLabel("Parameter Group:")
         lbl_scpi_mode = QLabel("SCPI Mode:")

@@ -363,7 +363,7 @@ class InputPanel(QWidget):
         self.input_freq.setRange(20.0, 2000000.0)
         self.input_freq.setDecimals(2)
         self.input_freq.setSingleStep(100)
-        self.input_freq.setValue(100000.0)
+        self.input_freq.setValue(1000.0)
         self.input_freq.setFixedWidth(FREQ_FIELD_WIDTH)
 
         grid_single_freq.addWidget(QLabel("Frequency:"), 0, 0)
@@ -628,10 +628,11 @@ class InputPanel(QWidget):
 
         self.input_avg = NoScrollSpinBox()
         self.input_avg.setRange(1, 256)
-        self.input_avg.setValue(1)
+        self.input_avg.setValue(10)
 
         self.combo_cable = NoScrollComboBox()
         self.combo_cable.addItems(["0 m", "1 m", "2 m", "4 m"])
+        self.combo_cable.setCurrentText("1 m")
 
         self.combo_range = NoScrollComboBox()
         self.combo_range.addItem("AUTO", userData="AUTO")

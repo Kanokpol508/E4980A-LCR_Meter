@@ -337,7 +337,9 @@ class ExportExcelDialog(QDialog):
         self.stack.addWidget(page)
 
     def _refresh_export_summary(self):
-        if len(self.selected_saves) == 1:
+        # self.selected_saves คงลำดับตาม self._rows_data (list_saves คืนค่าใหม่สุด -> เก่าสุดเสมอ)
+        # ดังนั้น selected_saves[0] คือ Save ที่ล่าสุดที่สุดในบรรดา Save ที่ติ๊กเลือกมา
+        if self.selected_saves:
             self.input_filename.setText(self.selected_saves[0]["save_name"])
 
     def _on_page2_back(self):

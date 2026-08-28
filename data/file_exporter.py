@@ -177,9 +177,23 @@ def _raw_records_from_table_rows(raw_table_rows: list) -> list:
     return records
 
 
-def _build_stats_rows(save_data: dict):
+def _any_ppm_enabled(loaded_saves: list) -> bool:
+    """True ถ้ามี Save ไฟล์ใดไฟล์หนึ่งที่เลือกมา Export เปิดใช้ PPM Deviation"""
+    return any(item["data"].get("inputs", {}).get("ppm_enabled") for item in loaded_saves)
+
+
+def _any_nominal_filled(loaded_saves: list) -> bool:
+    """True ถ้ามี Save ไฟล์ใดไฟล์หนึ่งที่เลือกมา Export กรอก Nominal Value ไว้"""
+    return any(
+        str(item["data"].get("inputs", {}).get("nominal_value") or "").strip()
+        for item in loaded_saves
+    )
+
+
+def _build_stats_rows(save_data: dict, exclude_cols: set = None):
     """คำนวณ Statistics Table จาก save_data (dict ที่โหลดจาก save_manager.load_save)
-    คืน (mode, columns, rows) — rows เป็น list ของ list ค่าที่ format แล้ว (string)"""
+    คืน (mode, columns, rows) — rows เป็น list ของ list ค่าที่ format แล้ว (string)
+    exclude_cols: set ของ key คอลัมน์ที่ต้องตัดออก (เช่น {'nominal'}, {'pri_ppm','sec_ppm'})"""
     inputs = save_data.get("inputs", {})
     results = save_data.get("results", {})
     mode = inputs.get("run_mode", "SINGLE")
@@ -211,6 +225,8 @@ def _build_stats_rows(save_data: dict):
 
         stats_list = calculate_single_stats_per_run(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
         columns = _COLS_SINGLE
+        if exclude_cols:
+            columns = [c for c in columns if c[0] not in exclude_cols]
 
         def _row_of(s):
             fmt = format_single_row_for_table(s)
@@ -234,6 +250,8 @@ def _build_stats_rows(save_data: dict):
 
         stats = calculate_frequency_stats(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
         columns = _COLS_LIST
+        if exclude_cols:
+            columns = [c for c in columns if c[0] not in exclude_cols]
 
         def _row_of(s):
             fmt = format_stats_row_for_table(s)
@@ -335,7 +353,15 @@ def _add_statistics_sheet(wb: Workbook, loaded_saves: list):
     ws = wb.create_sheet("Statistics Table")
     ws.sheet_view.showGridLines = True
 
-    _, columns, _ = _build_stats_rows(loaded_saves[0]["data"])
+    # ตัดคอลัมน์ PPM Dev ออกถ้าไม่มี Save ไฟล์ไหนเปิดใช้ PPM Deviation เลยซักไฟล์
+    # ตัดคอลัมน์ Nominal Value ออกถ้าไม่มี Save ไฟล์ไหนกรอก Nominal Value ไว้เลยซักไฟล์
+    exclude_cols = set()
+    if not _any_ppm_enabled(loaded_saves):
+        exclude_cols |= {"pri_ppm", "sec_ppm"}
+    if not _any_nominal_filled(loaded_saves):
+        exclude_cols.add("nominal")
+
+    _, columns, _ = _build_stats_rows(loaded_saves[0]["data"], exclude_cols)
     headers = ["Save Name"] + [label for _, label, _ in columns]
     groups = [0] + [g for _, _, g in columns]
     _write_grouped_header(ws, 1, headers, groups)
@@ -343,7 +369,7 @@ def _add_statistics_sheet(wb: Workbook, loaded_saves: list):
 
     row_idx = 2
     for item in loaded_saves:
-        _, _, rows = _build_stats_rows(item["data"])
+        _, _, rows = _build_stats_rows(item["data"], exclude_cols)
         for row in rows:
             name_cell = ws.cell(row=row_idx, column=1, value=item["save_name"])
             name_cell.alignment = _LEFT
@@ -368,8 +394,10 @@ def _add_statistics_sheet(wb: Workbook, loaded_saves: list):
     _autosize(ws, start_row=1)
 
 
-def _write_raw_data_tab(ws, item: dict):
-    """เขียนเนื้อหา 1 แทบ Raw Data: ชื่อ Save -> Session Info (รวมวันเวลาที่วัด) -> ตารางข้อมูลดิบ"""
+def _write_raw_data_tab(ws, item: dict, exclude_ppm: bool = False, exclude_nominal: bool = False):
+    """เขียนเนื้อหา 1 แทบ Raw Data: ชื่อ Save -> Session Info (รวมวันเวลาที่วัด) -> ตารางข้อมูลดิบ
+    exclude_ppm    : ตัด "PPM Ref (Primary/Secondary)" ออกจาก Session Info
+    exclude_nominal: ตัดคอลัมน์ "Nominal Value" ออกจากตารางข้อมูลดิบ"""
     ws.sheet_view.showGridLines = True
     data = item["data"]
     inputs = data.get("inputs", {})
@@ -393,6 +421,8 @@ def _write_raw_data_tab(ws, item: dict):
     r += 1
 
     for key, label in _SESSION_INFO_FIELDS:
+        if exclude_ppm and key in ("ppm_pri_ref", "ppm_sec_ref"):
+            continue
         value = session_info.get(key)
         ws.cell(row=r, column=1, value=f"{label}:").font = _LABEL_FONT
         ws.cell(row=r, column=1).fill = _LABEL_FILL
@@ -406,23 +436,34 @@ def _write_raw_data_tab(ws, item: dict):
     r += 1  # แถวว่างคั่น
     scpi_mode = inputs.get("scpi_mode")
     pri_label, sec_label = _scpi_axis_labels(scpi_mode)
-    headers = ["No.", "Nominal Value", "SCPI Mode", "Frequency (Hz)", "AVG", "Signal Level",
-               "Samples (N)", f"Primary [{pri_label}]", f"Secondary [{sec_label}]", "Status"]
+
+    # นิยามคอลัมน์ทั้งหมด: (header, getter, กลุ่มสี) — ตัด "Nominal Value" ออกได้ถ้า exclude_nominal
+    # กลุ่มสีคอลัมน์: No./Nominal/SCPI Mode=identify(0), Freq/AVG/Signal/Samples=1,
+    # Primary=2, Secondary=3, Status=ไม่ระบายพื้น
+    col_defs = [
+        ("No.", lambda rd: rd.get("no", ""), 0),
+        ("Nominal Value", lambda rd: rd.get("nominal", "-"), 0),
+        ("SCPI Mode", lambda rd: rd.get("scpi_mode", "-"), 0),
+        ("Frequency (Hz)", lambda rd: rd.get("freq", ""), 1),
+        ("AVG", lambda rd: rd.get("avg", "-"), 1),
+        ("Signal Level", lambda rd: rd.get("signal_level", "-"), 1),
+        ("Samples (N)", lambda rd: rd.get("sample_text", ""), 1),
+        (f"Primary [{pri_label}]", lambda rd: rd.get("primary", ""), 2),
+        (f"Secondary [{sec_label}]", lambda rd: rd.get("secondary", ""), 3),
+        ("Status", lambda rd: rd.get("status", ""), None),
+    ]
+    if exclude_nominal:
+        col_defs = [c for c in col_defs if c[0] != "Nominal Value"]
+    status_col_idx = len(col_defs)  # Status อยู่คอลัมน์สุดท้ายเสมอ
+
+    headers = [h for h, _, _ in col_defs]
     _write_header_row(ws, r, headers)
     ws.freeze_panes = ws.cell(row=r + 1, column=1).coordinate
     r += 1
 
     for row_data in results.get("raw_table_rows", []):
-        values = [
-            row_data.get("no", ""), row_data.get("nominal", "-"), row_data.get("scpi_mode", "-"),
-            row_data.get("freq", ""), row_data.get("avg", "-"), row_data.get("signal_level", "-"),
-            row_data.get("sample_text", ""),
-            row_data.get("primary", ""), row_data.get("secondary", ""), row_data.get("status", ""),
-        ]
-        # กลุ่มสีคอลัมน์: No./Nominal/SCPI Mode=identify(0), Freq/AVG/Signal/Samples=1,
-        # Primary=2, Secondary=3, Status=ไม่ระบายพื้น
-        col_groups = [0, 0, 0, 1, 1, 1, 1, 2, 3, None]
-        for col_idx, (value, group) in enumerate(zip(values, col_groups), start=1):
+        for col_idx, (_, getter, group) in enumerate(col_defs, start=1):
+            value = getter(row_data)
             cell = ws.cell(row=r, column=col_idx, value=value)
             cell.alignment = _CENTER
             cell.border = _THIN_BORDER
@@ -431,13 +472,13 @@ def _write_raw_data_tab(ws, item: dict):
             if body_color:
                 cell.fill = PatternFill(start_color=body_color, end_color=body_color, fill_type="solid")
             # สีสถานะ SUCCESS/FAIL — ใช้โทนเขียว/แดงเดียวกับสีปุ่ม START/STOP ในแอป
-            if col_idx == 10 and str(value).upper() != "SUCCESS":
+            if col_idx == status_col_idx and str(value).upper() != "SUCCESS":
                 cell.font = Font(bold=True, color="D2544B")
-            elif col_idx == 10:
+            elif col_idx == status_col_idx:
                 cell.font = Font(bold=True, color="14532D")
         r += 1
 
-    for col_idx in range(1, 11):
+    for col_idx in range(1, len(col_defs) + 1):
         col_letter = get_column_letter(col_idx)
         ws.column_dimensions[col_letter].width = 20
     ws.column_dimensions["A"].width = max(ws.column_dimensions["A"].width, 28)
@@ -446,13 +487,18 @@ def _write_raw_data_tab(ws, item: dict):
 def _add_raw_data_sheets(wb: Workbook, loaded_saves: list):
     mode = loaded_saves[0]["data"].get("inputs", {}).get("run_mode", "SINGLE")
 
+    # ตัด PPM Ref ออกถ้าไม่มี Save ไฟล์ไหนเปิดใช้ PPM Deviation เลยซักไฟล์
+    # ตัด Nominal Value ออกถ้าไม่มี Save ไฟล์ไหนกรอก Nominal Value ไว้เลยซักไฟล์
+    exclude_ppm = not _any_ppm_enabled(loaded_saves)
+    exclude_nominal = not _any_nominal_filled(loaded_saves)
+
     if mode == "SINGLE" and len(loaded_saves) > 1:
         for idx, item in enumerate(loaded_saves, start=1):
             ws = wb.create_sheet(f"Raw Data {idx}")
-            _write_raw_data_tab(ws, item)
+            _write_raw_data_tab(ws, item, exclude_ppm=exclude_ppm, exclude_nominal=exclude_nominal)
     else:
         ws = wb.create_sheet("Raw Data")
-        _write_raw_data_tab(ws, loaded_saves[0])
+        _write_raw_data_tab(ws, loaded_saves[0], exclude_ppm=exclude_ppm, exclude_nominal=exclude_nominal)
 
 
 # ==========================================

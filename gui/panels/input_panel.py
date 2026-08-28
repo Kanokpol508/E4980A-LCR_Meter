@@ -10,7 +10,7 @@ from utils.helpers import NoScrollComboBox, NoScrollSpinBox, NoScrollDoubleSpinB
 # ความกว้างมาตรฐานของช่องกรอกค่าตัวเลขสั้นๆ (ความถี่ / แรงดัน)
 # (ลดลงจากเดิมเพื่อคืนพื้นที่ฝั่งซ้ายให้แคบลง เอาไปเพิ่มพื้นที่ Output ฝั่งขวา)
 FREQ_FIELD_WIDTH = 135
-VOLT_FIELD_WIDTH = 120
+VOLT_FIELD_WIDTH = 80
 # ความกว้างช่องกรอกตัวเลข "จำนวนครั้ง" (Samples / Discard) ซึ่งเป็นเลขหลักเดียว-4 หลัก
 # ไม่จำเป็นต้องกว้างเท่าช่องความถี่ (สูงสุด 7 หลัก) จึงแยกค่าคงที่ให้แคบกว่า
 COUNT_FIELD_WIDTH = 111
@@ -576,13 +576,13 @@ class InputPanel(QWidget):
         self.input_volt.setDecimals(4)
         self.input_volt.setSingleStep(0.1)
         self.input_volt.setValue(1.0)
-        self.input_volt.setFixedWidth(VOLT_FIELD_WIDTH - 20)
+        self.input_volt.setFixedWidth(VOLT_FIELD_WIDTH)
 
         # Dropdown หน่วย: V (Voltage) หรือ A (Current)
         self.combo_level_mode = NoScrollComboBox()
-        self.combo_level_mode.addItem("V", userData="Voltage")
-        self.combo_level_mode.addItem("A", userData="Current")
-        self.combo_level_mode.setFixedWidth(105)
+        self.combo_level_mode.addItem("Voltage(V)", userData="Voltage")
+        self.combo_level_mode.addItem("Current(A)", userData="Current")
+        self.combo_level_mode.setFixedWidth(135)
 
         # ALC (Automatic Level Control) — [แก้ไข] ย้ายมาอยู่แถวเดียวกับ SpinBox + Dropdown
         # (ข้าง Dropdown หน่วย) แทนที่จะแยกอยู่คนละแถวด้านล่าง และตัดชื่อเต็ม

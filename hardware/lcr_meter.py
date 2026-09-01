@@ -248,6 +248,23 @@ class E4980A:
         else:
             self.inst.write(f":VOLTage:LEVel {level}")
 
+    def get_signal_level(self, mode: str = 'Voltage') -> float:
+        """
+        [NEW] อ่านค่าระดับสัญญาณทดสอบ "จริง" ที่เครื่องยืนยันว่ากำลังตั้งอยู่ ณ ขณะนี้
+        (Query กลับจากเครื่องจริงๆ ผ่าน SCPI ไม่ใช่ค่าที่ผู้ใช้กรอกไว้ในช่อง UI เฉยๆ)
+        - mode = 'Current' -> query :CURRent:LEVel? (หน่วย A) ใช้กับ Inductor
+        - mode = 'Voltage' -> query :VOLTage:LEVel? (หน่วย V) ใช้กับ Capacitor
+        เหตุผลที่ต้อง query กลับ: เครื่องอาจปัดเศษ/จำกัดค่าที่ตั้งเอง (เช่นชนขอบสเปค)
+        ทำให้ค่าที่ตั้งจริงคลาดเคลื่อนจากค่าที่ผู้ใช้กรอกได้เล็กน้อย
+        """
+        if not self.is_connected:
+            raise ConnectionError("⚠️ ยังไม่ได้เชื่อมต่อเครื่องมือวัด")
+        if mode == 'Current':
+            resp = self.inst.query(":CURRent:LEVel?")
+        else:
+            resp = self.inst.query(":VOLTage:LEVel?")
+        return float(resp.strip())
+
     def set_alc(self, enabled: bool):
         """
         ตั้งค่า ALC (Automatic Level Control)

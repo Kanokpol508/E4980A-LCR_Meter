@@ -57,6 +57,17 @@ class MeasurementWorker(QThread):
             # รอให้ค่าที่เซ็ตเข้าไปทั้งหมดประมวลผลเสร็จสิ้น
             lcr.wait_until_ready()
 
+            # [NEW] อ่านค่า Signal Level "จริง" ที่เครื่องยืนยันว่ากำลังตั้งอยู่ (query กลับ
+            # จากเครื่องจริงๆ) แทนที่จะใช้แค่ค่าที่ผู้ใช้กรอกใน UI เฉยๆ — เก็บลงใน
+            # self.settings ซึ่งเป็น dict object เดียวกับ _active_run_settings ใน
+            # app_controller.py (ส่งมาโดยอ้างอิง ไม่ใช่ copy) ทำให้ raw_table อ่านค่านี้ได้ทันที
+            try:
+                self.settings['actual_volt'] = lcr.get_signal_level(level_mode)
+            except Exception:
+                # query ไม่สำเร็จ (เช่น เครื่องรุ่นนี้ไม่รองรับคำสั่งนี้) — ไม่ทำให้การวัดล้มเหลว
+                # ไปด้วย ปล่อยให้ app_controller.py fallback ไปใช้ค่าที่ตั้งไว้แทน
+                self.settings['actual_volt'] = None
+
             # SAFETY-NET: ตรวจสอบว่าเครื่องปฏิเสธการตั้งค่าด้านบนหรือไม่
             err_res = lcr.inst.query(":SYSTem:ERRor?").strip()
             if '"No error"' not in err_res:

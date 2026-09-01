@@ -860,8 +860,16 @@ class AppController(QObject):
         avg_text = str(rs.get('avg', v.input_panel.input_avg.value()))
         level_mode = rs.get('level_mode', v.input_panel.combo_level_mode.currentData())
         level_unit_row = "A" if level_mode == "Current" else "V"
+        # [แก้ไข] ใช้ค่า "จริง" ที่เครื่องยืนยันกลับมา (query โดย measurement_thread.py ผ่าน
+        # lcr.get_signal_level()) แทนค่าที่ผู้ใช้กรอกใน UI เฉยๆ — ถ้า query ไม่สำเร็จ
+        # (actual_volt เป็น None) ให้ fallback ไปใช้ค่าที่ตั้งไว้แทน พร้อมต่อท้ายด้วย "*"
+        # เพื่อให้ผู้ใช้รู้ว่าเป็นค่าที่ "ตั้งไว้" ไม่ใช่ค่าที่เครื่องยืนยันจริง
+        actual_volt = rs.get('actual_volt')
         volt_val = rs.get('volt', v.input_panel.input_volt.value())
-        signal_text = f"{volt_val:g} {level_unit_row}"
+        if actual_volt is not None:
+            signal_text = f"{actual_volt:g} {level_unit_row}"
+        else:
+            signal_text = f"{volt_val:g} {level_unit_row}*"
         v.raw_table.append_row({
             'no': no_val,
             'nominal': nominal_text,

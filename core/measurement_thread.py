@@ -167,18 +167,15 @@ class MeasurementWorker(QThread):
         if step_f <= 0:
             step_f = 1.0
 
-        n_points_calculated = int((stop_f - start_f) / step_f) + 1
-        n_points = max(2, min(201, n_points_calculated))
-
-        # [NEW] แจ้งเตือนถ้าจำนวนจุดที่คำนวณได้เกิน 201 จุด — ป้องกันผู้ใช้เข้าใจผิด
-        # ว่าวัดครบตามช่วงความถี่ที่ตั้งไว้ ทั้งที่จริงแล้วช่วงความถี่ถูกตัดให้แคบลง
-        # (เพราะ n_points ถูก clamp ไว้ที่ 201 จุดสูงสุดด้านบน)
-        if n_points_calculated > 201:
-            self.error_occurred.emit(
-                f"⚠️ Step Size ที่ตั้งไว้ให้ {n_points_calculated} จุด แต่ระบบรองรับสูงสุด 201 จุด "
-                f"ต่อการ Sweep — ช่วงความถี่ที่วัดจริงจะแคบกว่าที่ตั้งไว้ "
-                f"(แนะนำเพิ่มค่า Step Size หรือลดช่วง Start–Stop Frequency)"
-            )
+        # [แก้ไข] ใช้ round() แทน int() เพื่อกัน floating-point error
+        # เช่น (2000000 - 100) / 100 อาจได้ 19998.999999999998 แทนที่จะเป็น 19999.0 พอดี
+        # ทำให้ int() ตัดเศษทิ้งผิดจุด จุดสุดท้ายที่วัดจริงคลาดจากที่ตั้งไว้ (เช่นได้ 1999900 แทน 2000000)
+        n_points_calculated = round((stop_f - start_f) / step_f) + 1
+        # [แก้ไข] เอาเพดาน 201 จุดออก — ค่านี้เดิมอ้างอิงผิดมาจากสเปค Hardware LIST Sweep
+        # ของเครื่อง (:LIST:FREQ) ซึ่งจำกัดจริงแค่โหมด LIST บนตัวเครื่องเท่านั้น
+        # แต่โหมด SWEEP นี้สั่งความถี่ทีละจุดผ่าน set_frequency() (SCPI :FREQ) ไม่ได้ใช้
+        # ฟีเจอร์ LIST ของเครื่อง จึงไม่มีข้อจำกัด 201 จุดนี้ในทางเทคนิค
+        n_points = max(2, n_points_calculated)
 
         frequencies = [start_f + i * step_f for i in range(n_points)]
         frequencies = [min(f, stop_f) for f in frequencies]

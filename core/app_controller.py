@@ -201,8 +201,15 @@ class AppController(QObject):
             v.input_panel.lbl_calculated_points.setText("-")
             return
 
-        n_points = int((stop - start) / step) + 1
-        n_points = max(2, min(201, n_points))
+        # [แก้ไข] ใช้ round() แทน int() เพื่อกัน floating-point error
+        # เช่น (2000000 - 100) / 100 อาจได้ 19998.999999999998 แทนที่จะเป็น 19999.0 พอดี
+        # ทำให้ int() ตัดเศษทิ้งผิดจุด จุดสุดท้ายที่วัดจริงคลาดจากที่ตั้งไว้ (เช่นได้ 1999900 แทน 2000000)
+        n_points = round((stop - start) / step) + 1
+        # [แก้ไข] เอาเพดาน 201 จุดออก — ค่านี้เดิมอ้างอิงผิดมาจากสเปค Hardware LIST Sweep
+        # ของเครื่อง (:LIST:FREQ) ซึ่งจำกัดจริงแค่โหมด LIST บนตัวเครื่องเท่านั้น
+        # แต่โหมด SWEEP ในโปรแกรมนี้สั่งความถี่ทีละจุดผ่าน set_frequency() (SCPI :FREQ)
+        # ไม่ได้ใช้ฟีเจอร์ LIST ของเครื่อง จึงไม่มีข้อจำกัด 201 จุดนี้
+        n_points = max(2, n_points)
         v.input_panel.lbl_calculated_points.setText(f"{n_points} Points")
 
     def update_single_total(self):

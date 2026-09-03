@@ -258,6 +258,119 @@ def calculate_frequency_stats(raw_records: list, pri_ref=None, sec_ref=None) -> 
     return results
 
 
+# ==========================================================
+# [NEW] Incremental accumulator สำหรับ LIST/SWEEP mode
+# ==========================================================
+#
+# ปัญหาเดิม: calculate_frequency_stats() ต้องได้รับ raw_records ครบทุกจุดแล้ว "กวาดคำนวณ
+# ใหม่ทั้งหมด" ทุกครั้งที่ถูกเรียก — ถ้าเรียกทุกครั้งที่มีจุดข้อมูลใหม่ 1 จุดเข้ามา (ตามที่
+# core/app_controller.py เคยทำ) ต้นทุนต่อจุดจะโตขึ้นเรื่อยๆ ตามจำนวนจุดสะสม (O(n) ต่อจุด
+# รวมทั้งสวีปเป็น O(n²)) ทำให้สวีปยาวๆ (หลายพัน/หมื่นจุด, วัดต่อเนื่องหลายชั่วโมง) โปรแกรมค้าง
+#
+# FrequencyStatsAccumulator แก้ปัญหานี้ด้วยการ "สะสม" mean/variance/min/max แบบ incremental
+# ต่อความถี่ (Welford's online algorithm) — รับจุดข้อมูลใหม่ 1 จุดด้วยต้นทุนคงที่ O(1) แทนที่
+# จะต้องมีค่าดิบทั้งหมดในมือแล้วคำนวณใหม่ ผลลัพธ์ที่ได้จาก get_stats() ตรงกับผลลัพธ์จาก
+# calculate_frequency_stats(raw_records) ทุกประการ (สูตรคณิตศาสตร์เดียวกัน คนละวิธีคำนวณ)
+# ไม่ใช่ค่าประมาณ — ใช้แทนกันได้อย่างปลอดภัย
+class FrequencyStatsAccumulator:
+    """สะสมสถิติ Mean/SD/Min/Max ต่อความถี่แบบ incremental (ดู docstring หัวข้อด้านบน)
+    ใช้แทน calculate_frequency_stats() เมื่อต้องอัปเดตบ่อยๆ ระหว่างวัด (LIST/SWEEP mode)"""
+
+    def __init__(self):
+        self._groups: dict = {}   # freq_key(float, ปัดเศษ 6 ตำแหน่ง) -> dict สถานะสะสม
+
+    def clear(self):
+        """ล้างค่าสะสมทั้งหมด (เรียกตอนเริ่ม session ใหม่ / Clear Graph)"""
+        self._groups.clear()
+
+    def add(self, freq, primary, secondary):
+        """เพิ่มจุดข้อมูลใหม่ 1 จุด — ต้นทุนคงที่ O(1) ไม่ขึ้นกับจำนวนจุดที่สะสมไว้ก่อนหน้า"""
+        if freq is None:
+            return
+        key = round(float(freq), 6)   # ปัดเศษกัน float drift แบบเดียวกับ calculate_frequency_stats()
+        g = self._groups.get(key)
+        if g is None:
+            g = {
+                'pri_n': 0, 'pri_mean': 0.0, 'pri_m2': 0.0, 'pri_min': None, 'pri_max': None,
+                'sec_n': 0, 'sec_mean': 0.0, 'sec_m2': 0.0, 'sec_min': None, 'sec_max': None,
+                'n_samples': 0,
+            }
+            self._groups[key] = g
+
+        g['n_samples'] += 1
+
+        if primary is not None:
+            g['pri_n'] += 1
+            delta = primary - g['pri_mean']
+            g['pri_mean'] += delta / g['pri_n']
+            g['pri_m2'] += delta * (primary - g['pri_mean'])   # Welford's algorithm
+            g['pri_min'] = primary if g['pri_min'] is None else min(g['pri_min'], primary)
+            g['pri_max'] = primary if g['pri_max'] is None else max(g['pri_max'], primary)
+
+        if secondary is not None:
+            g['sec_n'] += 1
+            delta = secondary - g['sec_mean']
+            g['sec_mean'] += delta / g['sec_n']
+            g['sec_m2'] += delta * (secondary - g['sec_mean'])
+            g['sec_min'] = secondary if g['sec_min'] is None else min(g['sec_min'], secondary)
+            g['sec_max'] = secondary if g['sec_max'] is None else max(g['sec_max'], secondary)
+
+    @staticmethod
+    def _block_from_accum(n: int, mean: float, m2: float, vmin, vmax, ref) -> dict:
+        """แปลงสถานะสะสม (n, mean, M2) ของ 1 พารามิเตอร์ ให้เป็น block เดียวกับ
+        _calc_stats_block() — สูตรเดียวกันทุกประการ (sample SD, ddof=1) แค่คำนวณจาก
+        ตัวสะสมแทนการวนค่าดิบทั้งหมด"""
+        if n == 0:
+            return {k: None for k in ('mean', 'sd', 'min', 'max', 'rsd_pct', 'ppm', 'type_a_ppm')}
+        sd = math.sqrt(m2 / (n - 1)) if n > 1 else 0.0
+        return {
+            'mean':       mean,
+            'sd':         sd,
+            'min':        vmin,
+            'max':        vmax,
+            'rsd_pct':    (sd / abs(mean) * 100) if (n > 1 and mean != 0) else None,
+            'ppm':        _calc_ppm(mean, ref),
+            'type_a_ppm': ((sd / math.sqrt(n)) / abs(mean) * 1_000_000) if (n >= 2 and mean != 0) else None,
+        }
+
+    def get_stats(self, pri_ref=None, sec_ref=None) -> list:
+        """คืนผลลัพธ์รูปแบบเดียวกับ calculate_frequency_stats() ทุกประการ
+        (list ของ dict เรียงตาม freq จากน้อยไปมาก)"""
+        results = []
+        for freq_key in sorted(self._groups.keys()):
+            g = self._groups[freq_key]
+            pri = self._block_from_accum(g['pri_n'], g['pri_mean'], g['pri_m2'], g['pri_min'], g['pri_max'], pri_ref)
+            sec = self._block_from_accum(g['sec_n'], g['sec_mean'], g['sec_m2'], g['sec_min'], g['sec_max'], sec_ref)
+            results.append({
+                'freq':      freq_key,
+                'n_samples': g['n_samples'],
+
+                'pri_mean':       pri['mean'],
+                'pri_sd':         pri['sd'],
+                'pri_min':        pri['min'],
+                'pri_max':        pri['max'],
+                'pri_rsd_pct':    pri['rsd_pct'],
+                'pri_ppm':        pri['ppm'],
+                'pri_type_a_ppm': pri['type_a_ppm'],
+
+                'sec_mean':       sec['mean'],
+                'sec_sd':         sec['sd'],
+                'sec_min':        sec['min'],
+                'sec_max':        sec['max'],
+                'sec_rsd_pct':    sec['rsd_pct'],
+                'sec_ppm':        sec['ppm'],
+                'sec_type_a_ppm': sec['type_a_ppm'],
+            })
+        return results
+
+    def rebuild_from_records(self, raw_records: list):
+        """ล้างค่าสะสมเดิมแล้วโหลดค่าดิบทั้งหมดเข้าสะสมใหม่ตั้งแต่ต้น — ใช้ตอนโหลด Session
+        เก่าจากไฟล์ (view_save_dialog) ที่มีค่าดิบครบอยู่แล้วแต่ยังไม่เคยผ่านตัวสะสมนี้"""
+        self.clear()
+        for rec in raw_records:
+            self.add(rec.get('freq'), rec.get('primary'), rec.get('secondary'))
+
+
 def format_stats_row_for_table(stat_row: dict) -> dict:
     """แปลงผลจาก calculate_frequency_stats() เป็น string"""
     return {

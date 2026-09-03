@@ -230,12 +230,20 @@ class StatisticsTable(QWidget):
         if mode != self._current_mode:
             self._apply_columns(mode)
 
-    def update_table(self, raw_records: list, pri_ref=None, sec_ref=None, mode: str = None, nominal_value: str = None):
+    def update_table(self, raw_records: list = None, pri_ref=None, sec_ref=None, mode: str = None,
+                      nominal_value: str = None, stats_list: list = None):
         """
-        อัปเดตตารางใหม่ทั้งหมดจากข้อมูลดิบ
+        อัปเดตตารางใหม่ทั้งหมด
         - SINGLE mode: raw_records คือ "กลุ่มต่อรอบ" [[{...},...], [{...},...], ...]
           (1 ครั้งกด Start = 1 รอบ = 1 แถวในตาราง)
-        - SWEEP/LIST mode: raw_records คือ flat list [{'freq':.., 'primary':.., 'secondary':..}, ...]
+        - SWEEP/LIST mode: ส่งได้ 2 แบบ
+            1) raw_records เป็น flat list [{'freq':.., 'primary':.., 'secondary':..}, ...]
+               (ตารางจะเรียก calculate_frequency_stats() คำนวณเองจากค่าดิบ)
+            2) [NEW] stats_list เป็นผลลัพธ์ที่คำนวณไว้แล้ว (เช่นจาก
+               data_processor.FrequencyStatsAccumulator().get_stats() ซึ่งคำนวณสะสมแบบ
+               incremental) — ใช้กรณีนี้เมื่อเรียกอัปเดตบ่อยๆ ระหว่างวัด (สวีปยาว/จุดข้อมูล
+               เยอะ) เพื่อไม่ต้องคำนวณสถิติซ้ำจากค่าดิบทั้งหมดทุกครั้งที่ตารางอัปเดต
+               ถ้าส่งมาทั้งคู่ จะใช้ stats_list เป็นหลัก (ไม่คำนวณซ้ำ)
         สูตรทั้งหมดอยู่ใน data_processor.py — ที่นี่แค่แสดงผล
         (SWEEP ใช้สูตรและการแสดงผลเดียวกับ LIST ทุกประการ)
         - [NEW] nominal_value: ข้อความ Nominal Value ที่ผู้ใช้กรอก (ค่าคงที่ตลอด session)
@@ -250,6 +258,8 @@ class StatisticsTable(QWidget):
 
         if self._current_mode == "SINGLE":
             self._render_single(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, nominal_text=nominal_text)
+        elif stats_list is not None:
+            self._render_list_from_stats(stats_list, nominal_text=nominal_text)
         else:  # SWEEP หรือ LIST
             self._render_list(raw_records, pri_ref, sec_ref, nominal_text=nominal_text)
 
@@ -259,19 +269,34 @@ class StatisticsTable(QWidget):
         และแก้บั๊กเดิมที่ไม่เคยส่ง pri_ref/sec_ref เข้าไปเลย ทำให้คอลัมน์ PPM Dev ของ
         โหมด SINGLE ไม่เคยคำนวณค่าให้แม้จะกรอก Reference ไว้แล้วก็ตาม"""
         stats_list = calculate_single_stats_per_run(run_groups, pri_ref=pri_ref, sec_ref=sec_ref)
-        self.table.setRowCount(len(stats_list))
-        for i, stat in enumerate(stats_list):
-            fmt = format_single_row_for_table(stat)
-            fmt['nominal'] = nominal_text
-            self._set_row(i, [fmt[key] for key, _ in _COLS_SINGLE])
+        self.table.setUpdatesEnabled(False)
+        try:
+            self.table.setRowCount(len(stats_list))
+            for i, stat in enumerate(stats_list):
+                fmt = format_single_row_for_table(stat)
+                fmt['nominal'] = nominal_text
+                self._set_row(i, [fmt[key] for key, _ in _COLS_SINGLE])
+        finally:
+            self.table.setUpdatesEnabled(True)
 
     def _render_list(self, raw_records: list, pri_ref=None, sec_ref=None, nominal_text: str = "-"):
         stats = calculate_frequency_stats(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
-        self.table.setRowCount(len(stats))
-        for i, stat_row in enumerate(stats):
-            fmt = format_stats_row_for_table(stat_row)
-            fmt['nominal'] = nominal_text
-            self._set_row(i, [fmt[key] for key, _ in _COLS_LIST])
+        self._render_list_from_stats(stats, nominal_text=nominal_text)
+
+    def _render_list_from_stats(self, stats: list, nominal_text: str = "-"):
+        """[NEW] วาดตารางจากผลลัพธ์สถิติที่คำนวณไว้แล้ว (list of dict รูปแบบเดียวกับ
+        calculate_frequency_stats()) — ไม่คำนวณซ้ำ ใช้เมื่อผู้เรียกส่ง stats_list มาให้ตรงๆ
+        (เช่นจาก FrequencyStatsAccumulator) — setUpdatesEnabled(False) คร่อมการวาดทั้งก้อน
+        ลดจำนวนครั้งที่ Qt repaint ระหว่างตั้งค่าเซลล์ทีละอัน (มีผลชัดเจนตอนตารางมีหลายพันแถว)"""
+        self.table.setUpdatesEnabled(False)
+        try:
+            self.table.setRowCount(len(stats))
+            for i, stat_row in enumerate(stats):
+                fmt = format_stats_row_for_table(stat_row)
+                fmt['nominal'] = nominal_text
+                self._set_row(i, [fmt[key] for key, _ in _COLS_LIST])
+        finally:
+            self.table.setUpdatesEnabled(True)
 
     def clear_table(self):
         self.table.setRowCount(0)

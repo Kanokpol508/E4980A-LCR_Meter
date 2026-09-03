@@ -4,12 +4,12 @@ import re
 import time
 
 from PyQt6.QtWidgets import QMessageBox, QProgressDialog
-from PyQt6.QtCore import Qt, QObject
+from PyQt6.QtCore import Qt, QObject, QTimer
 
 from core.measurement_thread import MeasurementWorker
 from core.correction_thread import CorrectionWorker
 from hardware.lcr_meter import E4980A
-from data.data_processor import calculate_frequency_stats
+from data.data_processor import calculate_frequency_stats, FrequencyStatsAccumulator
 from utils.helpers import truncate_sci
 from core import save_manager
 from gui.panels.input_panel import DISCARD_FIRST_COUNT
@@ -55,6 +55,23 @@ class AppController(QObject):
         # แยกจาก no_val (ตัวนับสะสมทั้ง session ใช้กับคอลัมน์ No.) เพื่อไม่ให้เลข Samples
         # เพี้ยนเป็น 6/5, 7/5 ตอนกดวัดซ้ำรอบสอง
         self._single_run_sample_no = 0
+
+        # [NEW] สะสมสถิติต่อความถี่แบบ incremental (LIST/SWEEP) — แทนการคำนวณจากค่าดิบ
+        # ทั้งหมดใหม่ทุกครั้ง (ดู FrequencyStatsAccumulator ใน data/data_processor.py)
+        # ป้องกันโปรแกรมค้างตอนสวีปยาวๆ ที่มีจุดข้อมูลสะสมจำนวนมาก
+        self._freq_stats_acc = FrequencyStatsAccumulator()
+
+        # [NEW] แทนที่จะรีเฟรชกราฟ Live Trend + Statistics Table + กราฟสรุปตามความถี่ทุกครั้ง
+        # ที่มีจุดข้อมูลใหม่ 1 จุด (ทำให้ UI thread งานสะสมล้นตอนวัดนานๆ/จุดเยอะๆ) เปลี่ยนเป็น
+        # "ตั้งค่าสถานะรออัปเดต" (_stats_ui_dirty) แล้วให้ timer นี้เป็นตัวรีเฟรชจริงเป็นช่วงๆ
+        # (ทุก 1 วิ) แทน — ยังเห็นแนวโน้มระหว่างวัดได้ตามปกติ (หน่วงจากจุดจริงไม่เกิน ~1 วิ)
+        # โดยไม่ทำให้โปรแกรมค้างแม้เปิดวัดทิ้งไว้นานหลายชั่วโมง ข้อมูลดิบ/สถิติที่คำนวณยังคง
+        # ถูกต้องครบถ้วน 100% เสมอ (ดู handle_data_ready / _flush_stats_ui_if_dirty)
+        self._stats_ui_dirty = False
+        self._stats_refresh_timer = QTimer(self)
+        self._stats_refresh_timer.setInterval(1000)
+        self._stats_refresh_timer.timeout.connect(self._flush_stats_ui_if_dirty)
+        self._stats_refresh_timer.start()
         # [NEW] settings ของรอบวัดล่าสุดที่กด Start — ใช้ประกอบ SCPI Mode/AVG/Signal Level
         # ต่อแถวใน Raw Data Table (ดูเหตุผลที่ start_measurement())
         self._active_run_settings = {}
@@ -701,6 +718,7 @@ class AppController(QObject):
             self.graph_sec_y = []
             self.graph_raw_pri_y = []
             self.graph_raw_sec_y = []
+            self._freq_stats_acc.clear()  # [NEW] ล้างสถิติสะสมต่อความถี่เมื่อเริ่ม session ใหม่
             v.graph_display.clear_plots()
             v.freq_summary_graph.clear()
             v.ppm_summary_graph.clear()
@@ -899,16 +917,19 @@ class AppController(QObject):
         self.graph_pri_y.append(raw_pri)
         self.graph_sec_y.append(raw_sec)
 
-        # ถ้าเป็น LIST หรือ SWEEP mode ให้ส่งแกน X เป็นลำดับ 1, 2, 3... ไปวาดกราฟ
-        # (กันกราฟซิกแซกเมื่อ samples > 1 ต่อความถี่ — สอดคล้องกับ label แกน X
-        # ที่ตั้งไว้ใน setup_graph_labels ว่าเป็น "Measurement Count (Points)")
+        # [NEW] อัปเดตสถิติสะสมต่อความถี่แบบ incremental (O(1)/จุด) — ใช้แทนการคำนวณจาก
+        # ค่าดิบทั้งหมดใหม่ทุกครั้งใน update_statistics_table() (ดู FrequencyStatsAccumulator)
         if is_list or is_sweep:
-            plot_x = list(range(1, len(self.graph_x_data) + 1))
-        else:
-            plot_x = self.graph_x_data
+            self._freq_stats_acc.add(current_freq, raw_pri, raw_sec)
 
-        v.graph_display.update_plots(plot_x, self.graph_pri_y, self.graph_sec_y)
-        self.update_statistics_table()
+        # [แก้ไข] เดิมเรียก v.graph_display.update_plots() + self.update_statistics_table()
+        # (รีบิลด์กราฟ/ตารางสถิติใหม่ทั้งหมด) ทุกครั้งที่มีจุดข้อมูลใหม่ 1 จุด — พอสวีปมีจุดข้อมูล
+        # สะสมมาก (สวีปยาว/วัดต่อเนื่องหลายชั่วโมง) ต้นทุนต่อจุดโตขึ้นเรื่อยๆ จนโปรแกรมค้าง
+        # ไม่ตอบสนอง ตอนนี้แค่ตั้งสถานะ "รออัปเดต" แล้วให้ self._stats_refresh_timer (ทำงานทุก
+        # ~1 วิ) เป็นตัวรีเฟรชจริงแทน (ดู _flush_stats_ui_if_dirty/_refresh_trend_ui) — ยังเห็น
+        # แนวโน้มระหว่างวัดได้ตามปกติ ไม่ต้องรอวัดจบ (หน่วงจากจุดจริงไม่เกิน ~1 วิ) โดยไม่ทำให้
+        # โปรแกรมค้างแม้เปิดทิ้งไว้นาน — ข้อมูลดิบและสถิติที่คำนวณยังคงถูกต้องครบ 100% เสมอ
+        self._stats_ui_dirty = True
 
         # --- [NEW] อัปเดต Progress / Current Reading ใต้กราฟสรุปตามความถี่ & กราฟ PPM ---
         # มีความหมายเฉพาะโหมด LIST/SWEEP (ที่วัดหลายความถี่ วนซ้ำหลายรอบต่อความถี่)
@@ -966,11 +987,53 @@ class AppController(QObject):
         else:
             return f"{freq:g} Hz"
 
-    def update_statistics_table(self):
-        """สร้าง raw_records จากข้อมูลที่เก็บไว้ แล้วส่งให้ StatisticsTable คำนวณ/แสดงผลใหม่
-        รองรับทุกโหมด: SINGLE (แยกสถิติทีละรอบ/1 Start = 1 แถว) / SWEEP (per-freq raw) / LIST (per-freq stats)"""
+    def _flush_stats_ui_if_dirty(self):
+        """[NEW] เรียกโดย self._stats_refresh_timer ทุก ~1 วิ — รีเฟรชกราฟ Live Trend +
+        Statistics Table + กราฟสรุปตามความถี่/PPM จริง เฉพาะตอนมีข้อมูลใหม่เข้ามาจริงเท่านั้น
+        (ข้าม tick เปล่าๆ ตอนไม่มีข้อมูลใหม่ ไม่เสียงานฟรี)"""
+        if not self._stats_ui_dirty:
+            return
+        self._stats_ui_dirty = False
+        self._refresh_trend_ui()
+
+    def _refresh_trend_ui(self):
+        """[NEW] รีเฟรชกราฟ Live Trend + Statistics Table + กราฟสรุปตามความถี่/PPM ด้วยข้อมูล
+        ล่าสุดที่มีอยู่ตอนนี้ทั้งหมด — แยกออกมาจาก handle_data_ready() เพื่อให้เรียกได้ทั้งจาก
+        timer (ระหว่างวัด, throttled) และเรียกตรงๆ ทันทีตอนวัดจบ/ผู้ใช้กด Stop (ให้เห็นผลล่าสุด
+        ทันทีไม่ต้องรอ timer รอบถัดไป)"""
         v = self.view
         run_mode = self.get_current_run_mode()
+
+        # ถ้าเป็น LIST หรือ SWEEP mode ให้ส่งแกน X เป็นลำดับ 1, 2, 3... ไปวาดกราฟ
+        # (กันกราฟซิกแซกเมื่อ samples > 1 ต่อความถี่ — สอดคล้องกับ label แกน X
+        # ที่ตั้งไว้ใน setup_graph_labels ว่าเป็น "Measurement Count (Points)")
+        if run_mode in ("LIST", "SWEEP"):
+            plot_x = list(range(1, len(self.graph_x_data) + 1))
+        else:
+            plot_x = self.graph_x_data
+        v.graph_display.update_plots(plot_x, self.graph_pri_y, self.graph_sec_y)
+
+        self.update_statistics_table()
+
+    def update_statistics_table(self):
+        """คำนวณ/แสดงผล Statistics Table ใหม่ รองรับทุกโหมด: SINGLE (แยกสถิติทีละรอบ/1 Start
+        = 1 แถว, คำนวณจากค่าดิบตรงๆ เพราะจำนวนรอบไม่เยอะ) / SWEEP-LIST (per-freq stats)
+
+        [แก้ไข] เดิมโหมด SWEEP/LIST จะสร้าง raw_records จากค่าดิบทั้งหมดแล้วเรียก
+        calculate_frequency_stats() คำนวณใหม่จากศูนย์ทุกครั้งที่ฟังก์ชันนี้ถูกเรียก (และเรียกซ้ำ
+        2 รอบในตัวเองด้วย — ครั้งแรกใน StatisticsTable ครั้งที่สองสำหรับ freq_summary_graph)
+        ทำให้ต้นทุนโตขึ้นเรื่อยๆ ตามจำนวนจุดข้อมูลสะสม ตอนนี้เปลี่ยนไปใช้ผลลัพธ์จาก
+        self._freq_stats_acc (คำนวณสะสมแบบ incremental มาแล้วตั้งแต่ handle_data_ready)
+        คำนวณเพียงครั้งเดียว แล้วใช้ผลลัพธ์เดียวกันทั้งตารางและกราฟสรุปตามความถี่
+        — ผลลัพธ์ตัวเลขเหมือนเดิมทุกประการ (ดู FrequencyStatsAccumulator.get_stats)"""
+        v = self.view
+        run_mode = self.get_current_run_mode()
+
+        # ส่ง Ref เฉพาะตอน checkbox PPM เปิด — ใช้ได้ทั้ง SINGLE, SWEEP และ LIST
+        ppm_enabled = v.adv_panel.chk_dev_ppm_enable.isChecked()
+        pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if ppm_enabled else None
+        sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if ppm_enabled else None
+        nominal_text = v.input_panel.edit_nominal_value.text().strip() or "-"
 
         if run_mode == "SINGLE":
             # [แก้ไข] เดิมดึง fixed_freq = v.input_panel.input_freq.value() ค่าเดียวมาแปะให้
@@ -987,24 +1050,21 @@ class AppController(QObject):
                 [{'freq': f, 'primary': p, 'secondary': s} for p, s, f in run]
                 for run in self.single_runs
             ]
-        else:
-            raw_records = [
-                {'freq': f, 'primary': p, 'secondary': s}
-                for f, p, s in zip(self.graph_x_data, self.graph_raw_pri_y, self.graph_raw_sec_y)
-            ]
+            v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref,
+                                        mode=run_mode, nominal_value=nominal_text)
+            # กราฟ "vs Frequency" มีความหมายเฉพาะ LIST/SWEEP เท่านั้น (SINGLE มีความถี่เดียว
+            # ไม่มีเส้นแนวโน้มให้ลาก)
+            v.freq_summary_graph.clear()
+            v.ppm_summary_graph.clear()
+            return
 
-        # ส่ง Ref เฉพาะตอน checkbox PPM เปิด — ใช้ได้ทั้ง SINGLE, SWEEP และ LIST
-        ppm_enabled = v.adv_panel.chk_dev_ppm_enable.isChecked()
-        pri_ref = self._safe_float(v.adv_panel.input_dev_pri.text()) if ppm_enabled else None
-        sec_ref = self._safe_float(v.adv_panel.input_dev_sec.text()) if ppm_enabled else None
+        # SWEEP / LIST — ใช้สถิติสะสมแบบ incremental (คำนวณครั้งเดียว ใช้ร่วมกันทั้งตาราง
+        # และกราฟสรุปตามความถี่/PPM ด้านล่าง)
+        freq_stats = self._freq_stats_acc.get_stats(pri_ref=pri_ref, sec_ref=sec_ref)
+        v.stats_table.update_table(pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode,
+                                    nominal_value=nominal_text, stats_list=freq_stats)
 
-        nominal_text = v.input_panel.edit_nominal_value.text().strip() or "-"
-        v.stats_table.update_table(raw_records, pri_ref=pri_ref, sec_ref=sec_ref, mode=run_mode, nominal_value=nominal_text)
-
-        # กราฟ "vs Frequency" มีความหมายเฉพาะ LIST/SWEEP เท่านั้น
-        # (SINGLE มีความถี่เดียว ไม่มีเส้นแนวโน้มให้ลาก)
-        if run_mode in ("LIST", "SWEEP") and raw_records:
-            freq_stats = calculate_frequency_stats(raw_records, pri_ref=pri_ref, sec_ref=sec_ref)
+        if freq_stats:
             v.freq_summary_graph.update_data(
                 freqs=[s['freq'] for s in freq_stats],
                 pri_mean=[s['pri_mean'] for s in freq_stats],
@@ -1086,6 +1146,11 @@ class AppController(QObject):
         self.set_ui_locked(False)
         self.worker = None
 
+        # [NEW] บังคับรีเฟรชกราฟ/ตารางสถิติทันทีตอนวัดจบ (ไม่ต้องรอ _stats_refresh_timer
+        # รอบถัดไปซึ่งอาจช้าไปถึง ~1 วิ) เพื่อให้เห็นจุดข้อมูลสุดท้ายครบถ้วนทันที
+        self._stats_ui_dirty = False
+        self._refresh_trend_ui()
+
         # [NEW] อัปเดต Progress ใต้กราฟสรุป/PPM ให้รู้ว่าวัดเสร็จแล้ว (เฉพาะถ้ามีการวัดจริง)
         run_mode = self.get_current_run_mode()
         if run_mode in ("LIST", "SWEEP"):
@@ -1114,6 +1179,8 @@ class AppController(QObject):
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
         self.single_runs = []  # [NEW] เคลียร์กลุ่มข้อมูลดิบแยกตามรอบด้วย
+        self._freq_stats_acc.clear()  # [NEW] เคลียร์สถิติสะสมต่อความถี่ด้วย
+        self._stats_ui_dirty = False  # [NEW] กันรีเฟรชด้วยข้อมูลเก่าที่เพิ่งถูกล้างไปแล้ว
         self.view.graph_display.clear_plots()
         self.view.freq_summary_graph.clear()
         self.view.ppm_summary_graph.clear()
@@ -1677,6 +1744,15 @@ class AppController(QObject):
             [tuple(s) if len(s) == 3 else (s[0], s[1], saved_freq) for s in run]
             for run in raw_single_runs
         ]
+
+        # [NEW] โหลดค่าดิบที่คืนมาเข้าตัวสะสมสถิติต่อความถี่ใหม่ทั้งหมด (accumulator ใหม่/ว่าง
+        # ตอนเปิดโปรแกรม หรือยังไม่เคยผ่านข้อมูลชุดนี้มาก่อน) ให้ update_statistics_table()
+        # ด้านล่างคำนวณสถิติ LIST/SWEEP ได้ถูกต้องตรงกับข้อมูลที่เพิ่งโหลดมา
+        self._freq_stats_acc.rebuild_from_records([
+            {'freq': f, 'primary': p, 'secondary': s}
+            for f, p, s in zip(self.graph_x_data, self.graph_raw_pri_y, self.graph_raw_sec_y)
+        ])
+        self._stats_ui_dirty = False
 
         self.setup_graph_labels()
         is_list_or_sweep = run_mode in ("LIST", "SWEEP")

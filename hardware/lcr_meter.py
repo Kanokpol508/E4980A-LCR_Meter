@@ -13,14 +13,49 @@ class E4980A:
 
     @staticmethod
     def scan_ports() -> list:
-        """สแกนหาพอร์ต VISA ทั้งหมดที่เชื่อมต่ออยู่ (ใช้ร่วมกับหน้าต่าง GUI)"""
+        """สแกนหาพอร์ต VISA ทั้งหมดที่เชื่อมต่ออยู่จริง (ใช้ร่วมกับหน้าต่าง GUI)
+
+        [แก้ไข] แค่ rm.list_resources() อย่างเดียวไม่พอ เพราะ VISA backend (โดยเฉพาะ
+        NI-VISA) มักค้าง/แคชชื่อ resource ของอุปกรณ์ที่เคยเสียบไว้ในระบบ (เช่น USB alias
+        หรือ session ที่ไม่ได้ปิด) ทำให้ dropdown โชว์ชื่อสายเดิมค้างอยู่ทั้งที่ถอดสายไปแล้ว
+        จึงต้องเปิดแต่ละ resource จริงและสอบถาม *IDN? แบบ timeout สั้นๆ เพื่อยืนยันว่ามี
+        อุปกรณ์ตอบสนองอยู่จริง — ถ้าไม่ตอบสนองจะถือว่าไม่มีสายต่ออยู่และไม่นำมาแสดง
+        """
+        rm = None
         try:
             rm = pyvisa.ResourceManager()
-            resources = rm.list_resources()
-            return list(resources)
+            candidates = rm.list_resources()
+
+            verified = []
+            for address in candidates:
+                inst = None
+                try:
+                    inst = rm.open_resource(address)
+                    inst.timeout = 800  # ms — สั้นพอที่จะไม่ทำให้ UI ค้างนานตอน Refresh
+                    inst.query("*IDN?")  # ถ้าไม่มีอุปกรณ์จริงตอบสนอง จะ throw exception
+                    verified.append(address)
+                except Exception:
+                    # เปิดได้แต่ไม่ตอบสนอง (หรือเปิดไม่ได้เลย) = ไม่มีอุปกรณ์จริงต่ออยู่ที่ address นี้
+                    continue
+                finally:
+                    if inst is not None:
+                        try:
+                            inst.close()
+                        except Exception:
+                            pass
+
+            return verified
         except Exception as e:
             print(f"VISA Scan Error: {e}")
             return []
+        finally:
+            # ปิด ResourceManager session ของการสแกนนี้เสมอ ป้องกัน VISA session ค้าง/รั่ว
+            # ซึ่งเป็นอีกสาเหตุที่ทำให้ระบบเห็น resource ที่ไม่มีอุปกรณ์จริงต่ออยู่แล้ว
+            if rm is not None:
+                try:
+                    rm.close()
+                except Exception:
+                    pass
 
     # ==========================================
     # ระบบเชื่อมต่อ (Connection Management)

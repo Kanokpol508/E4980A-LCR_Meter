@@ -11,8 +11,7 @@ class E4980A:
         self.is_connected = False
         self.OVERLOAD_LIMIT = 9.9e37                # ค่าคงที่สำหรับตรวจสอบสถานะท่วมย่านวัด
 
-    @staticmethod
-    def scan_ports() -> list:
+    def scan_ports(self) -> list:
         """สแกนหาพอร์ต VISA ทั้งหมดที่เชื่อมต่ออยู่จริง (ใช้ร่วมกับหน้าต่าง GUI)
 
         [แก้ไข] แค่ rm.list_resources() อย่างเดียวไม่พอ เพราะ VISA backend (โดยเฉพาะ
@@ -20,17 +19,25 @@ class E4980A:
         หรือ session ที่ไม่ได้ปิด) ทำให้ dropdown โชว์ชื่อสายเดิมค้างอยู่ทั้งที่ถอดสายไปแล้ว
         จึงต้องเปิดแต่ละ resource จริงและสอบถาม *IDN? แบบ timeout สั้นๆ เพื่อยืนยันว่ามี
         อุปกรณ์ตอบสนองอยู่จริง — ถ้าไม่ตอบสนองจะถือว่าไม่มีสายต่ออยู่และไม่นำมาแสดง
+
+        [แก้ไข] เดิมฟังก์ชันนี้เป็น @staticmethod ที่สร้าง pyvisa.ResourceManager() ของตัวเอง
+        แยกจาก self.rm แล้วปิดทิ้ง (rm.close()) ทุกครั้งหลังสแกนเสร็จ ปัญหาคือ VISA backend
+        หลายตัว (โดยเฉพาะ GPIB) ไม่ได้แยก session ของแต่ละ ResourceManager() ออกจากกัน
+        อย่างสมบูรณ์ — การปิด RM ตัวที่ใช้สแกนทิ้งไปกระทบ session ระดับ board ที่ self.rm
+        (ตัวที่ connect() ใช้จริง) ใช้อยู่ด้วย ทำให้ self.rm กลายเป็น session ที่ใช้ไม่ได้
+        (Invalid session handle) ไปเงียบๆ และเพราะ self.rm ถูกสร้างครั้งเดียวตอน __init__
+        แล้วไม่เคยสร้างใหม่อีกเลย ทุก connect() หลังจากสแกนซ้ำจึงพังตลอดไป
+        จึงเปลี่ยนมาใช้ self.rm ตัวเดียวกับที่ใช้ connect() แทน — มี ResourceManager
+        instance เดียวตลอดอายุโปรแกรม ไม่มีการสร้าง/ปิดซ้ำระหว่างสแกน
         """
-        rm = None
         try:
-            rm = pyvisa.ResourceManager()
-            candidates = rm.list_resources()
+            candidates = self.rm.list_resources()
 
             verified = []
             for address in candidates:
                 inst = None
                 try:
-                    inst = rm.open_resource(address)
+                    inst = self.rm.open_resource(address)
                     inst.timeout = 800  # ms — สั้นพอที่จะไม่ทำให้ UI ค้างนานตอน Refresh
                     inst.query("*IDN?")  # ถ้าไม่มีอุปกรณ์จริงตอบสนอง จะ throw exception
                     verified.append(address)
@@ -48,22 +55,19 @@ class E4980A:
         except Exception as e:
             print(f"VISA Scan Error: {e}")
             return []
-        finally:
-            # ปิด ResourceManager session ของการสแกนนี้เสมอ ป้องกัน VISA session ค้าง/รั่ว
-            # ซึ่งเป็นอีกสาเหตุที่ทำให้ระบบเห็น resource ที่ไม่มีอุปกรณ์จริงต่ออยู่แล้ว
-            if rm is not None:
-                try:
-                    rm.close()
-                except Exception:
-                    pass
 
     # ==========================================
     # ระบบเชื่อมต่อ (Connection Management)
     # ==========================================
-    def connect(self, resource_address):
+    def connect(self, resource_address, _retry: bool = True):
         """เชื่อมต่อกับเครื่อง LCR Meter
         [แก้ไข] เพิ่ม guard: ถ้ามี session ค้างอยู่ (เช่น เคย connect() ไว้แล้วไม่ได้ disconnect())
         ให้ปิดของเก่าทิ้งก่อนเปิดใหม่เสมอ ป้องกัน VISA resource leak ตอนใช้ instance เดียวซ้ำหลายรอบ
+
+        [แก้ไข] เพิ่ม self-healing: ถ้า self.rm session เสีย (เช่น "Invalid session handle" —
+        อาจเกิดจากถอด/เสียบสาย USB-GPIB กลางคัน หรือไดรเวอร์ VISA รีเซ็ต session เอง)
+        ให้สร้าง ResourceManager ใหม่แล้วลองเชื่อมต่อซ้ำอีก 1 ครั้งอัตโนมัติ แทนที่จะพัง
+        ค้างตลอดไปจนกว่าจะปิดโปรแกรมแล้วเปิดใหม่
         """
         if self.is_connected and self.inst:
             try:
@@ -93,6 +97,21 @@ class E4980A:
             self.is_connected = False
             error_msg = f"❌ ไม่สามารถเชื่อมต่อได้: {str(e)}"
             print(error_msg)
+
+            # [แก้ไข] ถ้าเป็นอาการ session เสีย (invalid/closed) และยังไม่เคยลองซ้ำ
+            # ให้สร้าง ResourceManager ใหม่แล้ว retry อัตโนมัติ 1 ครั้ง
+            if _retry and ("invalid session" in str(e).lower() or "resource might be closed" in str(e).lower()):
+                try:
+                    try:
+                        self.rm.close()
+                    except Exception:
+                        pass
+                    self.rm = pyvisa.ResourceManager()
+                    print("♻️ ตรวจพบ VISA session เสีย — สร้าง ResourceManager ใหม่และลองเชื่อมต่อซ้ำ")
+                    return self.connect(resource_address, _retry=False)
+                except Exception:
+                    pass
+
             return False, error_msg
 
     def disconnect(self):

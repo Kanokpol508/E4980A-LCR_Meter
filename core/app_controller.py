@@ -363,7 +363,7 @@ class AppController(QObject):
 
     def scan_visa_ports(self):
         self.view.conn_panel.combo_visa.clear()
-        resources = E4980A.scan_ports()
+        resources = self.lcr.scan_ports()
         if resources:
             self.view.conn_panel.combo_visa.addItems(resources)
             self.log.info(f"สแกนพบอุปกรณ์ VISA {len(resources)} รายการ: {', '.join(resources)}")

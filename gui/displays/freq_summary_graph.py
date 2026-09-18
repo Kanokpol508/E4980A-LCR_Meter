@@ -501,8 +501,17 @@ class FreqSummaryGraph(QWidget):
             else:
                 self.errbar_pri.setVisible(False)
             if self.chk_data_labels.isChecked():
-                factor, suffix, decimals = pick_series_unit(means.tolist())
+                # [แก้ไข] เดิมเลือกหน่วยเดียว (factor/suffix/decimals) จากทั้งเส้นด้วย
+                # pick_series_unit(means.tolist()) — ถ้าเส้นนี้มีค่ากวาดข้ามหลายสิบเท่าตัว
+                # (เช่น Capacitance vs Frequency ที่ต่างกันได้เป็น 7 order of magnitude
+                # ระหว่าง 100Hz กับ 2MHz) หน่วยที่เลือกจะถูกบังคับให้เล็กลงตามจุดที่เล็ก
+                # ที่สุดในเส้น (ดู pick_series_unit()) ทำให้จุดที่ค่าใหญ่ถูกหารด้วยหน่วยที่
+                # เล็กเกินไปมหาศาล กลายเป็นตัวเลขบวมผิดปกติ (เช่น 0.011 F แสดงเป็น
+                # "11027180000.00" แทนที่จะเป็น "11.03m") ไม่ตรงกับค่าจริงในตารางสถิติ
+                # ตอนนี้เลือกหน่วยแยก "ทีละจุด" (ส่ง list ค่าเดียว) แทน ให้แต่ละ label
+                # แสดงค่าที่อ่านง่ายและตรงกับค่าจริงของจุดนั้นเสมอ ไม่ขึ้นกับจุดอื่นในเส้น
                 for x, y in zip(label_x, means):
+                    factor, suffix, decimals = pick_series_unit([y])
                     t = pg.TextItem(format_with_unit(y, factor, suffix, decimals, show_suffix=False), color='#0a3d91', anchor=(0.5, 1.2))
                     t.setPos(x, y)
                     self.plot_widget.addItem(t)
@@ -526,8 +535,10 @@ class FreqSummaryGraph(QWidget):
             else:
                 self.errbar_sec.setVisible(False)
             if self.chk_data_labels.isChecked():
-                factor, suffix, decimals = pick_series_unit(means.tolist())
+                # [แก้ไข] เหตุผลเดียวกับ Primary ด้านบน — เลือกหน่วยทีละจุดแทนหน่วยเดียว
+                # ร่วมทั้งเส้น กัน label บวมผิดปกติเมื่อเส้นมีค่ากวาดข้ามหลายสิบเท่าตัว
                 for x, y in zip(label_x, means):
+                    factor, suffix, decimals = pick_series_unit([y])
                     t = pg.TextItem(format_with_unit(y, factor, suffix, decimals, show_suffix=False), color='#8f0050', anchor=(0.5, -0.2))
                     t.setPos(x, y)
                     self.plot_widget.addItem(t)

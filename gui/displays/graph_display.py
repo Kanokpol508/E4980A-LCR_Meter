@@ -392,9 +392,10 @@ class GraphDisplay(QWidget):
                 # (ดู pick_series_unit()) ทำให้จุดที่ค่าใหญ่ถูกหารด้วยหน่วยที่เล็กเกินไป
                 # มหาศาล กลายเป็นตัวเลขบวมผิดปกติ ไม่ตรงกับค่าจริงในตารางสถิติ (ดูปัญหา
                 # เดียวกันใน freq_summary_graph.py) ตอนนี้เลือกหน่วยแยก "ทีละจุด" แทน
+                # และ show_suffix=True กันความกำกวมเมื่อจุดต่างๆ อยู่คนละชั้นหน่วย
                 for xi, yi in zip(label_x, pri_y):
                     factor, suffix, decimals = pick_series_unit([yi])
-                    t = pg.TextItem(format_with_unit(yi, factor, suffix, decimals, show_suffix=False), color='#0a3d91', anchor=(0.5, 1.2))
+                    t = pg.TextItem(format_with_unit(yi, factor, suffix, decimals, show_suffix=True), color='#0a3d91', anchor=(0.5, 1.2))
                     t.setPos(xi, yi)
                     self.plot_widget.addItem(t)
                     self._data_label_items.append(t)
@@ -411,9 +412,10 @@ class GraphDisplay(QWidget):
             if self.chk_data_labels.isChecked():
                 # [แก้ไข] เหตุผลเดียวกับ Primary ด้านบน — เลือกหน่วยทีละจุดแทนหน่วยเดียว
                 # ร่วมทั้งเส้น กัน label บวมผิดปกติเมื่อเส้นมีค่ากวาดข้ามหลายสิบเท่าตัว
+                # และ show_suffix=True กันความกำกวมเมื่อจุดต่างๆ อยู่คนละชั้นหน่วย
                 for xi, yi in zip(label_x, sec_y):
                     factor, suffix, decimals = pick_series_unit([yi])
-                    t = pg.TextItem(format_with_unit(yi, factor, suffix, decimals, show_suffix=False), color='#8f0050', anchor=(0.5, -0.2))
+                    t = pg.TextItem(format_with_unit(yi, factor, suffix, decimals, show_suffix=True), color='#8f0050', anchor=(0.5, -0.2))
                     t.setPos(xi, yi)
                     self.plot_widget.addItem(t)
                     self._data_label_items.append(t)

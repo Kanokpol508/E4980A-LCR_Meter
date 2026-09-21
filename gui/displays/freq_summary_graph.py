@@ -32,6 +32,14 @@ def _split_name_unit(label: str):
     return label.strip(), None
 
 
+def _symbol_only(text: str) -> str:
+    """เอาเฉพาะ 'สัญลักษณ์' ท้ายชื่อพารามิเตอร์ (หลัง comma สุดท้าย) เช่น
+    'Inductance, Ls' -> 'Ls', 'Quality Factor, Q' -> 'Q' ใช้ย่อ label แกน Y ตอนรวม
+    2 พารามิเตอร์เข้าด้วยกันกันข้อความยาวเกินจนถูกตัด/บีบตอน render แนวตั้ง
+    (ชื่อเต็มยังเห็นได้จาก Legend ของกราฟอยู่แล้ว)"""
+    return text.rsplit(',', 1)[-1].strip() if ',' in text else text
+
+
 # ขอบเขตแกน X ตามสเปคเครื่อง E4980A (20Hz - 2MHz) เผื่อขอบไว้อีกนิด (2.1MHz)
 # กันไม่ให้จุดข้อมูลที่วัดได้ที่ 2MHz พอดีไปติดชิดขอบกราฟจนมองไม่เห็นเต็มจุด
 FREQ_MIN = 20
@@ -308,6 +316,14 @@ class FreqSummaryGraph(QWidget):
         self._style_axes_dark(self.plot_widget)
         self.plot_widget.setLabel('bottom', 'Frequency (Hz)', **self.label_style)
         self.plot_widget.setLabel('left', 'Parameter Value', **self.label_style)
+        # [แก้ไข] ปิด autoSIPrefix ของ pyqtgraph ไม่ให้แปะตัวคูณ "(x0.001)" / "(x1e-06)"
+        # ต่อท้ายหัวแกน Y เอง เพราะตัวคูณนี้ใช้ได้กับแค่ตัวเลขบนแกน (tick) เท่านั้น ไม่ใช่
+        # ตัวคูณเดียวกับหน่วย (µ, n, p) ที่ Data Label ของแต่ละจุดใช้ (ซึ่งเลือกทีละจุด
+        # อิสระ) ผู้ใช้เผลอเอาไปคูณกับ label ข้างจุดแล้วได้ค่าผิด — ปิดไว้ให้ผู้ใช้ยึด
+        # หน่วยที่ label ต่อท้ายแต่ละจุดเป็นหลักแทน (_EngAxisItem.tickStrings ยังคง
+        # ย่อหน่วยของตัวเลขบนแกนเองได้ตามปกติ ไม่กระทบ)
+        self.plot_widget.getAxis('bottom').enableAutoSIPrefix(False)
+        self.plot_widget.getAxis('left').enableAutoSIPrefix(False)
 
         # ตั้งช่วงเริ่มต้นให้เป็นช่วงความถี่ทั่วไปของเครื่อง LCR (20Hz - 2.1MHz)
         # เผื่อขอบไว้นิดหน่อยกันข้อมูลที่วัดได้พอดี 2MHz ไปติดขอบกราฟ
@@ -432,14 +448,20 @@ class FreqSummaryGraph(QWidget):
     def _group_y_label(self, show_pri: bool, show_sec: bool) -> str:
         """ตั้งชื่อแกน Y ตาม 'กลุ่มพารามิเตอร์' ที่ติ๊กเปิดอยู่จริง
         ถ้าหน่วยเหมือนกันทั้งคู่ (เช่น Re/Im เป็น Ω ทั้งคู่) ให้รวมเป็นกลุ่มเดียว
-        เช่น 'Resistance, R & Reactance, X (Ω)' แทนที่จะเขียนหน่วยซ้ำสองรอบ"""
+        เช่น 'R & X (Ω)' แทนที่จะเขียนหน่วยซ้ำสองรอบ
+
+        [แก้ไข] เดิมกรณีหน่วยไม่เหมือนกันใช้ self.pri_name/self.sec_name เต็มๆ ยาวเกินไป
+        จน pyqtgraph render แนวตั้งไม่พอ ตัวอักษรถูกตัด/บีบดูเพี้ยน ทั้งบนหน้าจอและตอน
+        Save as JPEG ตอนนี้ย่อเหลือแค่สัญลักษณ์สั้นๆ แทน (ชื่อเต็มยังเห็นได้จาก Legend)"""
         pri_text, pri_unit = _split_name_unit(self.pri_name)
         sec_text, sec_unit = _split_name_unit(self.sec_name)
 
         if show_pri and show_sec:
             if pri_unit and pri_unit == sec_unit:
-                return f"{pri_text} & {sec_text} ({pri_unit})"
-            return f"{self.pri_name} & {self.sec_name}"
+                return f"{_symbol_only(pri_text)} & {_symbol_only(sec_text)} ({pri_unit})"
+            pri_part = f"{_symbol_only(pri_text)} ({pri_unit})" if pri_unit else _symbol_only(pri_text)
+            sec_part = f"{_symbol_only(sec_text)} ({sec_unit})" if sec_unit else _symbol_only(sec_text)
+            return f"{pri_part} & {sec_part}"
         elif show_pri:
             return self.pri_name
         elif show_sec:

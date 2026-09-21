@@ -40,6 +40,14 @@ def _split_name_unit(label: str):
     return label.strip(), None
 
 
+def _symbol_only(text: str) -> str:
+    """เอาเฉพาะ 'สัญลักษณ์' ท้ายชื่อพารามิเตอร์ (หลัง comma สุดท้าย) เช่น
+    'Inductance, Ls' -> 'Ls', 'Quality Factor, Q' -> 'Q' ใช้ย่อ label แกน Y ตอนรวม
+    2 พารามิเตอร์เข้าด้วยกัน (เช่น 'Ls (H) & Q') กันข้อความยาวเกินจนถูกตัด/บีบตอน
+    render แนวตั้ง (ชื่อเต็มยังเห็นได้จาก Legend ของกราฟอยู่แล้ว)"""
+    return text.rsplit(',', 1)[-1].strip() if ',' in text else text
+
+
 class _EngAxisItem(pg.AxisItem):
     """แกนตัวเลข (ใช้ได้ทั้งแกน X และ Y): ย่อหน่วย k, M, G, m, µ, n, p ให้อัตโนมัติ
     เลือก 'หน่วยเดียว' ให้ใช้ร่วมกันทั้งชุด tick ที่กำลังวาด (ดูจากค่าที่มากที่สุดในชุดนั้น)
@@ -248,6 +256,11 @@ class GraphDisplay(QWidget):
         self._style_axes_dark(self.plot_widget)
         self.plot_widget.setLabel('bottom', self.x_label, **self.label_style)
         self.plot_widget.setLabel('left', 'Value', **self.label_style)
+        # [แก้ไข] ปิด autoSIPrefix ของ pyqtgraph ไม่ให้แปะตัวคูณ "(x...)" ต่อท้ายหัวแกน Y เอง
+        # เหตุผลเดียวกับใน freq_summary_graph.py — กันผู้ใช้เผลอเอาตัวคูณนี้ไปคูณกับ
+        # Data Label ที่แต่ละจุดมีหน่วย (µ, n, p) ของตัวเองอยู่แล้ว
+        self.plot_widget.getAxis('bottom').enableAutoSIPrefix(False)
+        self.plot_widget.getAxis('left').enableAutoSIPrefix(False)
 
         vb = self.plot_widget.getViewBox()
         vb.setLimits(xMin=0)  # ล็อคไม่ให้เลื่อนซ้ายทะลุเลข 0 ไปติดลบ
@@ -325,14 +338,22 @@ class GraphDisplay(QWidget):
     # --------------------------------------------------------
     def _group_y_label(self, show_pri: bool, show_sec: bool) -> str:
         """ตั้งชื่อแกน Y ตาม 'กลุ่มพารามิเตอร์' ที่เลือกอยู่จริง ถ้าหน่วยเหมือนกันทั้งคู่
-        (เช่น Re/Im เป็น Ω ทั้งคู่) ให้รวมเป็นกลุ่มเดียว แทนที่จะเขียนหน่วยซ้ำสองรอบ"""
+        (เช่น Re/Im เป็น Ω ทั้งคู่) ให้รวมเป็นกลุ่มเดียว แทนที่จะเขียนหน่วยซ้ำสองรอบ
+
+        [แก้ไข] เดิมกรณีหน่วยไม่เหมือนกันใช้ self.pri_name/self.sec_name เต็มๆ
+        (เช่น 'Inductance, Ls (H) & Quality Factor, Q') ยาวเกินไปจน pyqtgraph
+        render แนวตั้ง (rotate 90°) ไม่พอที่ ตัวอักษรเลยถูกตัด/บีบดูเพี้ยน ทั้งบนหน้าจอ
+        และตอน Save as JPEG (export ใช้ layout เดียวกัน) ตอนนี้ย่อเหลือแค่สัญลักษณ์สั้นๆ
+        (เช่น 'Ls (H) & Q') แทน — ชื่อเต็มยังเห็นได้จาก Legend ของกราฟอยู่แล้ว"""
         pri_text, pri_unit = _split_name_unit(self.pri_name)
         sec_text, sec_unit = _split_name_unit(self.sec_name)
 
         if show_pri and show_sec:
             if pri_unit and pri_unit == sec_unit:
-                return f"{pri_text} & {sec_text} ({pri_unit})"
-            return f"{self.pri_name} & {self.sec_name}"
+                return f"{_symbol_only(pri_text)} & {_symbol_only(sec_text)} ({pri_unit})"
+            pri_part = f"{_symbol_only(pri_text)} ({pri_unit})" if pri_unit else _symbol_only(pri_text)
+            sec_part = f"{_symbol_only(sec_text)} ({sec_unit})" if sec_unit else _symbol_only(sec_text)
+            return f"{pri_part} & {sec_part}"
         elif show_pri:
             return self.pri_name
         elif show_sec:

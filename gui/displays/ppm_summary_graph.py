@@ -33,6 +33,14 @@ def _split_name_unit(label: str):
     return label.strip(), None
 
 
+def _symbol_only(text: str) -> str:
+    """เอาเฉพาะ 'สัญลักษณ์' ท้ายชื่อพารามิเตอร์ (หลัง comma สุดท้าย) เช่น
+    'Inductance, Ls' -> 'Ls', 'Quality Factor, Q' -> 'Q' ใช้ย่อ label แกน Y ตอนรวม
+    2 พารามิเตอร์เข้าด้วยกัน กันข้อความยาวเกินจนถูกตัด/บีบตอน render แนวตั้ง
+    (ชื่อเต็มยังเห็นได้จาก Legend ของกราฟอยู่แล้ว)"""
+    return text.rsplit(',', 1)[-1].strip() if ',' in text else text
+
+
 # ขอบเขตแกน X ตามสเปคเครื่อง E4980A (20Hz - 2MHz) เผื่อขอบไว้อีกนิด (2.1MHz)
 # กันไม่ให้จุดข้อมูลที่วัดได้ที่ 2MHz พอดีไปติดชิดขอบกราฟจนมองไม่เห็นเต็มจุด
 FREQ_MIN = 20
@@ -479,8 +487,11 @@ class PpmSummaryGraph(QWidget):
         return fx, vy, ey
 
     def _group_y_label(self, show_pri: bool, show_sec: bool) -> str:
+        # [แก้ไข] เดิมใช้ self.pri_name/self.sec_name เต็มๆ ยาวเกินไปจน pyqtgraph
+        # render แนวตั้งไม่พอ ตัวอักษรถูกตัด/บีบดูเพี้ยน ทั้งบนหน้าจอและตอน Save as JPEG
+        # ตอนนี้ย่อเหลือแค่สัญลักษณ์สั้นๆ แทน (ชื่อเต็มยังเห็นได้จาก Legend)
         if show_pri and show_sec:
-            return f"{self.pri_name} & {self.sec_name} Deviation (ppm)"
+            return f"{_symbol_only(self.pri_name)} & {_symbol_only(self.sec_name)} Deviation (ppm)"
         elif show_pri:
             return f"{self.pri_name} Deviation (ppm)"
         elif show_sec:

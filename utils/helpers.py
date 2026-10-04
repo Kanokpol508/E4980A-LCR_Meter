@@ -5,37 +5,68 @@ import math
 from PyQt6.QtWidgets import QComboBox, QSpinBox, QDoubleSpinBox, QAbstractSpinBox
 
 
+def _to_decimal(value: float):
+    """float -> Decimal ของ |value| โดยกรองสัญญาณรบกวนของ floating point (ระดับ 1e-16)
+    ออกด้วยการเก็บ 15 หลักนัยสำคัญก่อน (ความละเอียดที่ float64 รับประกันได้) —
+    เช่น ค่าเฉลี่ย 999.9361999999999 (ที่จริงคือ 999.9362) จะถูกอ่านเป็น 999.9362
+    แทนที่จะโดนตัดเป็น ...1999"""
+    from decimal import Decimal
+    return Decimal(f"{abs(float(value)):.15g}")
+
+
+def _trunc_decimal(value: float, places: int):
+    """ตัดทิ้งทศนิยม (ไม่ปัดเศษ) ด้วยเลขฐานสิบแบบ exact — คืน Decimal
+    ใช้ repr(value) (สตริงสั้นสุดที่แปลงกลับเป็น float ตัวเดิมได้พอดี) เป็นฐาน
+    จึงไม่เกิดปัญหา floating point เช่น 999.89 กลายเป็น 999.8899999
+    (วิธีเดิมใช้ epsilon 1e-9 ซึ่งเล็กกว่าความละเอียดของ float เมื่อ mantissa*10^decimals
+    มีขนาดประมาณ 1e10) ใช้ได้กับทุกค่าของ places"""
+    from decimal import Decimal, ROUND_DOWN
+    d = _to_decimal(value)
+    return d.quantize(Decimal(1).scaleb(-places), rounding=ROUND_DOWN)
+
+
 def truncate_sci(value: float, decimals: int = 2) -> str:
     """แปลงเป็น scientific notation (เช่น '1.23e-09') โดย 'ตัดทิ้ง' ทศนิยมส่วนเกิน
     ไม่ปัดเศษ ต่างจาก f'{value:.2e}' ของ Python ที่ปัดเศษเสมอ (round-half-to-even)
 
-    ใช้กับค่าทางฟิสิกส์ (Cp, Ls, D, Q ฯลฯ) ใน Data Labels ของกราฟ ที่ผู้ใช้ต้องการ
-    เห็นค่าดิบที่วัดได้จริงแบบตรงไปตรงมา ไม่อยากให้ตัวเลขท้ายถูกปัดขึ้น/ลงจนดูเหมือน
-    ค่าที่เครื่องไม่ได้วัดออกมาจริงๆ
+    ใช้กับค่าทางฟิสิกส์ (Cp, Ls, D, Q, R, X ฯลฯ) ที่ผู้ใช้ต้องการเห็นค่าดิบที่วัดได้
+    จริงแบบตรงไปตรงมา รองรับ decimals กี่หลักก็ได้ (ใช้ Decimal แบบ exact)
     """
+    from decimal import Decimal
     if value is None or not math.isfinite(value):
         return "-"
     if value == 0:
         return f"{0:.{decimals}f}e+00"
 
     sign = "-" if value < 0 else ""
-    value = abs(value)
-
-    exponent = math.floor(math.log10(value))
-    mantissa = value / (10 ** exponent)
-
-    factor = 10 ** decimals
-    # ตัดทิ้งตรงๆ (math.trunc) แทนการปัดเศษ — กันปัญหา floating point ด้วย
-    # epsilon เล็กน้อยก่อนตัด ไม่งั้นค่าเช่น 1.999999999996 (ที่ควรเป็น 2.00 พอดี)
-    # จะโดนตัดเหลือ 1.99 เพราะ floating point representation คลาดเคลื่อนเล็กน้อย
-    truncated = math.trunc(mantissa * factor + 1e-9) / factor
-
-    if truncated >= 10:  # เช่น mantissa ตัดแล้วกลายเป็น 10.00 -> ปรับ exponent ขึ้น 1
-        truncated /= 10
-        exponent += 1
+    d = _to_decimal(value)
+    exponent = d.adjusted()                      # เลขชี้กำลังฐาน 10 แบบ exact
+    mantissa = d.scaleb(-exponent)               # 1 <= mantissa < 10
+    truncated = mantissa.quantize(Decimal(1).scaleb(-decimals), rounding="ROUND_DOWN")
 
     exp_sign = "+" if exponent >= 0 else "-"
     return f"{sign}{truncated:.{decimals}f}e{exp_sign}{abs(exponent):02d}"
+
+
+def truncate_sig(value: float, sig: int = 9, min_decimals: int = 2, signed: bool = False) -> str:
+    """แปลงเป็นทศนิยมคงที่โดยกำหนดจำนวน 'หลักนัยสำคัญ' (significant digits) แบบตัดทิ้ง
+    ไม่ปัดเศษ — จำนวนตำแหน่งทศนิยมปรับตามขนาดของค่าอัตโนมัติ จึงรองรับทั้งค่า
+    ใหญ่ (68881.62) และค่าเล็กมาก (0.0000527089) โดยความคลาดเคลื่อนสัมพัทธ์
+    ไม่เกิน 10^-(sig-1) เสมอ (sig=9 -> < 1e-6 %)
+
+    min_decimals: ทศนิยมขั้นต่ำ เพื่อให้ค่าปกติหน้าตาเดิม (เช่น PPM = 2 ตำแหน่ง)
+    signed: True = ใส่ '+' นำหน้าค่าบวก
+    """
+    if value is None or not math.isfinite(value):
+        return "-"
+    if value == 0:
+        text = f"{0:.{min_decimals}f}"
+        return ("+" if signed else "") + text
+    mag = _to_decimal(value).adjusted()
+    places = max(min_decimals, sig - 1 - mag)
+    q = _trunc_decimal(abs(value), places)
+    prefix = "-" if value < 0 else ("+" if signed else "")
+    return f"{prefix}{q:.{places}f}"
 
 
 def truncate_fixed(value: float, decimals: int = 2, signed: bool = True) -> str:

@@ -4,7 +4,7 @@
 import math
 import statistics
 
-from utils.helpers import truncate_sci
+from utils.helpers import truncate_sci, truncate_sig
 
 
 # ==========================================================
@@ -77,20 +77,20 @@ def _calc_stats_block(values: list, ref=None) -> dict:
 # ==========================================================
 
 def _fmt(val, sci: bool = True) -> str:
+    """Mean/SD/Min/Max -> scientific 9 ตำแหน่ง (ตัดทิ้ง ไม่ปัดเศษ)
+    sci=False (%RSD) -> ทศนิยมคงที่ 9 หลักนัยสำคัญ ขั้นต่ำ 4 ตำแหน่ง
+    (เดิมคงที่ 4 ตำแหน่ง ทำให้ค่าเล็กอย่าง 0.0000527 แสดงเป็น 0.0001 คลาดเคลื่อน ~90%)"""
     if val is None:
         return "-"
-    # [แก้ไข] เดิมใช้ f"{val:.5e}" ซึ่งปัดเศษ (round) และเก็บแค่ 5 ตำแหน่ง — ตอนนี้ใช้
-    # truncate_sci() แทน (ตัดทิ้ง ไม่ปัดเศษ) พร้อมเพิ่มเป็น 9 ตำแหน่ง ให้เป็นหลักการ
-    # เดียวกับ Raw Data Table (utils/helpers.RAW_VALUE_DECIMALS ใน raw_data_table.py)
-    # เพราะค่าพวกนี้ (Mean, SD, Min, Max) ถูกใช้ทั้งในตารางสถิติบนหน้าจอ และ export
-    # ออกไปเป็นรายงาน Excel จริง จึงควรแม่นยำ/สม่ำเสมอเท่ากับ Raw Data
-    return truncate_sci(val, 9) if sci else f"{val:.4f}"
+    return truncate_sci(val, 9) if sci else truncate_sig(val, sig=9, min_decimals=4)
 
 
 def _fmt_ppm(val) -> str:
+    """PPM Dev / Type A -> 9 หลักนัยสำคัญ ขั้นต่ำ 2 ตำแหน่ง พร้อมเครื่องหมาย +/-
+    (ค่าปกติหน้าตาเดิม เช่น -110.20002; ค่าเล็กจะเพิ่มทศนิยมให้เอง)"""
     if val is None:
         return "-"
-    return f"{val:+.2f}"
+    return truncate_sig(val, sig=9, min_decimals=2, signed=True)
 
 
 # ==========================================================

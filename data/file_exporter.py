@@ -26,6 +26,7 @@ results.raw_table_rows แทน (ข้อมูลชุดเดียวก�
 Table ยังคำนวณออกมาได้แทนที่จะว่างเปล่า
 """
 
+import re
 import time
 from pathlib import Path
 
@@ -270,6 +271,34 @@ def _sort_key(item: dict):
     return meta.get("measurement_time_iso") or meta.get("measurement_time") or ""
 
 
+_NUM_SCI = re.compile(r'^[+-]?\d+(\.\d+)?[eE][+-]?\d+$')
+_NUM_FIX = re.compile(r'^[+-]?\d+(\.\d+)?$')
+
+
+def _set_cell_value(cell, value):
+    """เขียนค่าลงเซลล์ โดยถ้าเป็นข้อความตัวเลข (เช่น '9.998900000e+02', '+0.36', '100.00')
+    จะแปลงเป็น 'ตัวเลขจริง' + number_format ให้หน้าตาเท่าเดิม เพื่อให้ Excel ใช้ฟังก์ชัน
+    AVERAGE/STDEV ฯลฯ กับเซลล์ได้ (เดิมเก็บเป็น text ทำให้ได้ #DIV/0!)
+    ข้อความอื่น (เช่น '1/10', '-', 'SUCCESS', '1 V') คงเป็นข้อความตามเดิม"""
+    if isinstance(value, str):
+        t = value.strip()
+        if _NUM_SCI.match(t):
+            mant = t.lower().split('e')[0]
+            dec = len(mant.split('.')[1]) if '.' in mant else 0
+            cell.value = float(t)
+            cell.number_format = '0.' + '0' * dec + 'E+00' if dec else '0E+00'
+            return
+        if _NUM_FIX.match(t):
+            dec = len(t.split('.')[1]) if '.' in t else 0
+            num = float(t)
+            cell.value = int(num) if dec == 0 else num
+            base = '0.' + '0' * dec if dec else '0'
+            cell.number_format = f'+{base};-{base};{base}' if t[0] in '+-' else base
+            return
+    cell.value = value
+
+
+
 def _autosize(ws, min_width=12, max_width=42, start_row=1):
     for col_cells in ws.columns:
         cells = [c for c in col_cells if c.row >= start_row]
@@ -379,7 +408,8 @@ def _add_statistics_sheet(wb: Workbook, loaded_saves: list):
             name_cell.fill = PatternFill(start_color=name_fill, end_color=name_fill, fill_type="solid")
             for col_idx, value in enumerate(row, start=2):
                 group = groups[col_idx - 1]
-                cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                cell = ws.cell(row=row_idx, column=col_idx)
+                _set_cell_value(cell, value)
                 cell.alignment = _CENTER
                 cell.border = _THIN_BORDER
                 cell.font = _DATA_FONT
@@ -464,7 +494,8 @@ def _write_raw_data_tab(ws, item: dict, exclude_ppm: bool = False, exclude_nomin
     for row_data in results.get("raw_table_rows", []):
         for col_idx, (_, getter, group) in enumerate(col_defs, start=1):
             value = getter(row_data)
-            cell = ws.cell(row=r, column=col_idx, value=value)
+            cell = ws.cell(row=r, column=col_idx)
+            _set_cell_value(cell, value)
             cell.alignment = _CENTER
             cell.border = _THIN_BORDER
             cell.font = _DATA_FONT

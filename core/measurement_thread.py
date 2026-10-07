@@ -145,6 +145,8 @@ class MeasurementWorker(QThread):
                     'freq':      freq,
                     'primary':   float(pri),
                     'secondary': float(sec),
+                    'primary_raw':   lcr.last_raw_strings[0],
+                    'secondary_raw': lcr.last_raw_strings[1],
                     'status':    stat
                 })
             else:
@@ -213,6 +215,8 @@ class MeasurementWorker(QThread):
                             'sample_index': usable_sample_index,
                             'primary':      float(pri),
                             'secondary':    float(sec),
+                            'primary_raw':   lcr.last_raw_strings[0],
+                            'secondary_raw': lcr.last_raw_strings[1],
                             'status':       stat
                         })
                 elif not is_discarded:
@@ -310,6 +314,8 @@ class MeasurementWorker(QThread):
                             'sample_index': usable_sample_index,
                             'primary':      float(pri),
                             'secondary':    float(sec),
+                            'primary_raw':   lcr.last_raw_strings[0],
+                            'secondary_raw': lcr.last_raw_strings[1],
                             'status':       stat
                         })
                 elif not is_discarded:

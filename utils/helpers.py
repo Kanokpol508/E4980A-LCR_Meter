@@ -69,6 +69,18 @@ def truncate_sig(value: float, sig: int = 9, min_decimals: int = 2, signed: bool
     return f"{prefix}{q:.{places}f}"
 
 
+def format_full_sci(value: float) -> str:
+    """แสดงค่า float แบบ "เต็ม ไม่ตัด ไม่ปัด" ในรูป scientific (เช่น '9.998896557E-11')
+    ใช้ repr() = สตริงสั้นที่สุดที่แปลงกลับเป็น float ตัวเดิมได้ตรงทุกบิต (lossless)
+    จึงตรวจย้อนกลับได้ว่าค่าที่โชว์ = ค่าที่เก็บ/คำนวณจริงทุกประการ"""
+    from decimal import Decimal
+    if value is None or not math.isfinite(value):
+        return "-"
+    if value == 0:
+        return "0.0E+00"
+    return format(Decimal(repr(float(value))), "E")
+
+
 def truncate_fixed(value: float, decimals: int = 2, signed: bool = True) -> str:
     """แปลงเป็นทศนิยมคงที่ (เช่น '+123.45') โดย 'ตัดทิ้ง' ไม่ปัดเศษ — ใช้กับค่า
     PPM Deviation ใน Data Labels ที่ต้องการทศนิยม 2 ตำแหน่งแบบไม่ปัดเศษ"""

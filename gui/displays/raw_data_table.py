@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QGridLayout, QGroupBox, QTabl
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QBrush
 
-from utils.helpers import truncate_sci
+from utils.helpers import format_full_sci
 
 # [NEW] จำนวนทศนิยม (นัยสำคัญ) ที่ใช้แสดงค่า Primary/Secondary ในตาราง — ตั้งไว้ที่ 9
 # ตำแหน่งให้ตรงกับความละเอียดจริงที่เครื่อง E4980A ส่งกลับมาทาง :FETCh? (รูปแบบ
@@ -188,15 +188,18 @@ class RawDataTable(QWidget):
         # Data Labels ในกราฟ) และเพิ่มเป็น 9 ตำแหน่งเพื่อเก็บนัยสำคัญให้มากที่สุด
         # เท่าที่เครื่องส่งมาจริง (ดู RAW_VALUE_DECIMALS ด้านบน)
         pri = data.get('primary')
-        pri_str = truncate_sci(pri, RAW_VALUE_DECIMALS) if isinstance(pri, (int, float)) else str(pri)
+        # แสดงค่าเต็ม (lossless) ไม่ตัด ไม่ปัด — ตรงกับค่าที่เก็บและใช้คำนวณสถิติทุกบิต
+        pri_str = format_full_sci(pri) if isinstance(pri, (int, float)) else str(pri)
         item_pri = QTableWidgetItem(pri_str)
+        item_pri.setData(Qt.ItemDataRole.UserRole, data.get('primary_raw'))  # สตริงดิบจากเครื่อง
         item_pri.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setItem(row_idx, 7, item_pri)
 
         # 8: Secondary
         sec = data.get('secondary')
-        sec_str = truncate_sci(sec, RAW_VALUE_DECIMALS) if isinstance(sec, (int, float)) else str(sec)
+        sec_str = format_full_sci(sec) if isinstance(sec, (int, float)) else str(sec)
         item_sec = QTableWidgetItem(sec_str)
+        item_sec.setData(Qt.ItemDataRole.UserRole, data.get('secondary_raw'))
         item_sec.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setItem(row_idx, 8, item_sec)
 
@@ -246,6 +249,9 @@ class RawDataTable(QWidget):
             def cell(col):
                 item = self.table.item(r, col)
                 return item.text() if item else ""
+            def raw(col):
+                item = self.table.item(r, col)
+                return item.data(Qt.ItemDataRole.UserRole) if item else None
             rows.append({
                 'no': cell(0),
                 'nominal': cell(1),
@@ -256,6 +262,8 @@ class RawDataTable(QWidget):
                 'sample_text': cell(6),
                 'primary': cell(7),
                 'secondary': cell(8),
+                'primary_raw': raw(7),
+                'secondary_raw': raw(8),
                 'status': cell(9),
             })
         return rows

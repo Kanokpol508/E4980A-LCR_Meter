@@ -905,6 +905,8 @@ class AppController(QObject):
             'sample_text': sample_text,
             'primary': raw_pri,
             'secondary': raw_sec,
+            'primary_raw': data.get('primary_raw'),
+            'secondary_raw': data.get('secondary_raw'),
             'status': status
         })
         # ----------------------------------------

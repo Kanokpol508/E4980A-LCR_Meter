@@ -9,6 +9,7 @@ class E4980A:
         self.rm = pyvisa.ResourceManager()
         self.inst = None
         self.is_connected = False
+        self.last_raw_strings = (None, None)        # สตริงดิบ (primary, secondary) ของการอ่านล่าสุด
         self.OVERLOAD_LIMIT = 9.9e37                # ค่าคงที่สำหรับตรวจสอบสถานะท่วมย่านวัด
 
     def scan_ports(self) -> list:
@@ -438,6 +439,8 @@ class E4980A:
         """[NEW] แยก logic การแปลงผลลัพธ์ดิบจากเครื่อง (ใช้ร่วมกันทั้ง trigger_and_fetch()
         และ fetch_measurement() กันโค้ดซ้ำ) คืนค่าเป็น (primary, secondary, status)"""
         parts = raw_data.strip().split(',')
+        # เก็บสตริงดิบที่เครื่องส่งมา (ก่อนแปลงเป็น float) ไว้ตรวจสอบย้อนหลัง
+        self.last_raw_strings = (parts[0].strip(), parts[1].strip()) if len(parts) >= 2 else (None, None)
 
         # รองรับ 3 ค่า (ตอนปิด Comparator) หรือ 4 ค่า (ตอนเปิด Comparator)
         if len(parts) not in [3, 4]:

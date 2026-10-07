@@ -235,6 +235,7 @@ def _build_stats_rows(save_data: dict, exclude_cols: set = None):
             return [fmt[key] for key, _, _ in columns]
 
         rows = [_row_of(s) for s in stats_list]
+        stats_list_numeric = stats_list
     else:
         graph_x = results.get("graph_x_data", [])
         graph_raw_pri = results.get("graph_raw_pri_y", [])
@@ -260,8 +261,9 @@ def _build_stats_rows(save_data: dict, exclude_cols: set = None):
             return [fmt[key] for key, _, _ in columns]
 
         rows = [_row_of(s) for s in stats]
+        stats_list_numeric = stats
 
-    return mode, columns, rows
+    return mode, columns, rows, stats_list_numeric
 
 
 def _sort_key(item: dict):
@@ -327,6 +329,108 @@ def _write_header_row(ws, row_idx: int, headers: list):
 
 
 # ==========================================
+# Raw-data layout / full-precision values / formula helpers
+# ==========================================
+_FULL_SCI_FMT = '0.000000000000000E+00'     # แสดง 16 หลักนัยสำคัญ (ค่าที่เก็บในเซลล์เป็น float เต็มเสมออยู่แล้ว)
+_STAT_SCI_FMT = '0.000000000E+00'
+_STAT_FIX_FMT = '0.000000000000'
+
+
+def _raw_layout(exclude_ppm: bool, exclude_nominal: bool) -> dict:
+    """ตำแหน่งในแท็บ Raw Data (ต้องตรงกับ _write_raw_data_tab): แถวแรกของข้อมูล + ตัวอักษรคอลัมน์ Primary/Secondary"""
+    n_fields = len(_SESSION_INFO_FIELDS) - (2 if exclude_ppm else 0)
+    header_row = 4 + 1 + n_fields + 1
+    pri_idx = 7 if exclude_nominal else 8          # 1-based: No., [Nominal], SCPI, Freq, AVG, Signal, Samples, Primary, Secondary, Status
+    return {
+        "first_row": header_row + 1,
+        "pri_col": get_column_letter(pri_idx),
+        "sec_col": get_column_letter(pri_idx + 1),
+    }
+
+
+def _raw_sheet_name(idx: int, mode: str, n_saves: int) -> str:
+    return f"Raw Data {idx}" if (mode == "SINGLE" and n_saves > 1) else "Raw Data"
+
+
+def _full_raw_arrays(data: dict):
+    """ค่าดิบ float เต็มความละเอียด (pri_list, sec_list) เรียงตามลำดับแถวใน raw_table_rows
+    คืน None ถ้าไม่มี/จำนวนไม่ตรงกับแถวในตาราง (Save เก่าที่ข้อมูลไม่ครบ)"""
+    inputs = data.get("inputs", {})
+    results = data.get("results", {})
+    n_rows = len(results.get("raw_table_rows", []))
+    if inputs.get("run_mode", "SINGLE") == "SINGLE":
+        runs = results.get("single_runs", [])
+        pri = [s[0] for run in runs for s in run]
+        sec = [s[1] for run in runs for s in run]
+    else:
+        pri = list(results.get("graph_raw_pri_y", []))
+        sec = list(results.get("graph_raw_sec_y", []))
+    if n_rows and len(pri) == n_rows and len(sec) == n_rows:
+        return pri, sec
+    return None
+
+
+def _stat_row_spans(data: dict):
+    """ช่วงแถว (0-based, inclusive) ของข้อมูลดิบที่ใช้คำนวณสถิติแต่ละแถว เรียงเหมือนแถวในตารางสถิติ
+    คืน None ถ้าสร้างช่วงต่อเนื่องไม่ได้ (ความถี่ซ้ำไม่ติดกัน / ข้อมูลไม่ครบ) -> ใช้ค่าคงที่แทนสูตร"""
+    inputs = data.get("inputs", {})
+    results = data.get("results", {})
+    if _full_raw_arrays(data) is None:
+        return None
+    if inputs.get("run_mode", "SINGLE") == "SINGLE":
+        spans, start = [], 0
+        for run in results.get("single_runs", []):
+            if run:
+                spans.append((start, start + len(run) - 1))
+            start += len(run)
+        return spans
+    groups = {}
+    for i, f in enumerate(results.get("graph_x_data", [])):
+        groups.setdefault(round(float(f), 6), []).append(i)
+    spans = []
+    for key in sorted(groups):
+        idx = groups[key]
+        if idx[-1] - idx[0] + 1 != len(idx):
+            return None
+        spans.append((idx[0], idx[-1]))
+    return spans
+
+
+def _quote_sheet(name: str) -> str:
+    return "'" + name.replace("'", "''") + "'"
+
+
+def _stat_formula(key: str, static_text: str, n: int, pri_rng: str, sec_rng: str, pri_ref, sec_ref):
+    """สูตร Excel ของช่องสถิติ (key เช่น 'pri_mean') หรือ None ถ้าให้คงค่าไว้ (เช่น '-' / N<2)
+    คืน (formula, number_format)"""
+    if key in ("nominal", "freq", "n", "n_samples") or static_text == "-":
+        return None
+    if key.startswith("pri_"):
+        rng, ref, name = pri_rng, pri_ref, key[4:]
+    elif key.startswith("sec_"):
+        rng, ref, name = sec_rng, sec_ref, key[4:]
+    else:
+        return None
+    if name == "mean":
+        return f"=AVERAGE({rng})", _STAT_SCI_FMT
+    if name == "min":
+        return f"=MIN({rng})", _STAT_SCI_FMT
+    if name == "max":
+        return f"=MAX({rng})", _STAT_SCI_FMT
+    if name == "sd":
+        return (f"=STDEV({rng})", _STAT_SCI_FMT) if n > 1 else None
+    if name == "rsd_pct":
+        return f"=STDEV({rng})/ABS(AVERAGE({rng}))*100", _STAT_FIX_FMT
+    if name == "ppm":
+        if ref is None or ref == 0:
+            return None
+        return f"=(AVERAGE({rng})-{repr(float(ref))})/ABS({repr(float(ref))})*1000000", _STAT_FIX_FMT
+    if name == "type_a_ppm":
+        return f"=(STDEV({rng})/SQRT(COUNT({rng})))/ABS(AVERAGE({rng}))*1000000", _STAT_FIX_FMT
+    return None
+
+
+# ==========================================
 # Sheet builders
 # ==========================================
 def _add_data_record_sheet(wb: Workbook, record_details: dict, save_names: list):
@@ -378,7 +482,10 @@ def _add_data_record_sheet(wb: Workbook, record_details: dict, save_names: list)
     total_cell.font = _DATA_FONT
 
 
-def _add_statistics_sheet(wb: Workbook, loaded_saves: list):
+def _add_statistics_sheet(wb: Workbook, loaded_saves: list, raw_available: bool = False):
+    """แท็บ Statistics Table — ถ้ามีแท็บ Raw Data ในไฟล์เดียวกัน (raw_available) ช่องสถิติจะเป็น "สูตร Excel"
+    ที่อ้างค่าดิบเต็มความละเอียด ให้ผู้ใช้ตรวจสอบเองได้ (ช่องที่ทำสูตรไม่ได้จะคงเป็นค่าคงที่)
+"""
     ws = wb.create_sheet("Statistics Table")
     ws.sheet_view.showGridLines = True
 
@@ -390,26 +497,64 @@ def _add_statistics_sheet(wb: Workbook, loaded_saves: list):
     if not _any_nominal_filled(loaded_saves):
         exclude_cols.add("nominal")
 
-    _, columns, _ = _build_stats_rows(loaded_saves[0]["data"], exclude_cols)
+    layout = _raw_layout(not _any_ppm_enabled(loaded_saves), not _any_nominal_filled(loaded_saves))
+    mode0 = loaded_saves[0]["data"].get("inputs", {}).get("run_mode", "SINGLE")
+
+    _, columns, _, _ = _build_stats_rows(loaded_saves[0]["data"], exclude_cols)
     headers = ["Save Name"] + [label for _, label, _ in columns]
     groups = [0] + [g for _, _, g in columns]
     _write_grouped_header(ws, 1, headers, groups)
     ws.freeze_panes = "A2"
 
     row_idx = 2
-    for item in loaded_saves:
-        _, _, rows = _build_stats_rows(item["data"], exclude_cols)
-        for row in rows:
+    for save_idx, item in enumerate(loaded_saves, start=1):
+        data = item["data"]
+        inputs = data.get("inputs", {})
+        _, _, rows, _ = _build_stats_rows(data, exclude_cols)
+
+        # ช่วงแถวข้อมูลดิบต่อแถวสถิติ (สำหรับสูตร) — ใช้ได้เฉพาะเมื่อมีแท็บ Raw Data ของ Save นี้จริง
+        raw_sheet = None
+        spans = None
+        if raw_available and (mode0 == "SINGLE" or save_idx == 1):
+            raw_sheet = _raw_sheet_name(save_idx, mode0, len(loaded_saves))
+            spans = _stat_row_spans(data)
+            if spans is not None and len(spans) != len(rows):
+                spans = None
+        ppm_on = inputs.get("ppm_enabled", False)
+        pri_ref = _safe_float(inputs.get("ppm_pri_ref")) if ppm_on else None
+        sec_ref = _safe_float(inputs.get("ppm_sec_ref")) if ppm_on else None
+
+        for r_i, row in enumerate(rows):
             name_cell = ws.cell(row=row_idx, column=1, value=item["save_name"])
             name_cell.alignment = _LEFT
             name_cell.border = _THIN_BORDER
             name_cell.font = _LABEL_FONT
             name_fill = _GROUP_BODY_COLOR[0]
             name_cell.fill = PatternFill(start_color=name_fill, end_color=name_fill, fill_type="solid")
+
+            pri_rng = sec_rng = None
+            n_here = 0
+            if spans is not None:
+                first = layout["first_row"] + spans[r_i][0]
+                last = layout["first_row"] + spans[r_i][1]
+                q = _quote_sheet(raw_sheet)
+                pri_rng = f"{q}!${layout['pri_col']}${first}:${layout['pri_col']}${last}"
+                sec_rng = f"{q}!${layout['sec_col']}${first}:${layout['sec_col']}${last}"
+                n_here = spans[r_i][1] - spans[r_i][0] + 1
+
             for col_idx, value in enumerate(row, start=2):
+                key = columns[col_idx - 2][0]
                 group = groups[col_idx - 1]
                 cell = ws.cell(row=row_idx, column=col_idx)
-                _set_cell_value(cell, value)
+
+                formula = None
+                if pri_rng is not None:
+                    formula = _stat_formula(key, str(value), n_here, pri_rng, sec_rng, pri_ref, sec_ref)
+                if formula is not None:
+                    cell.value, cell.number_format = formula
+                else:
+                    _set_cell_value(cell, value)
+
                 cell.alignment = _CENTER
                 cell.border = _THIN_BORDER
                 cell.font = _DATA_FONT
@@ -491,11 +636,30 @@ def _write_raw_data_tab(ws, item: dict, exclude_ppm: bool = False, exclude_nomin
     ws.freeze_panes = ws.cell(row=r + 1, column=1).coordinate
     r += 1
 
-    for row_data in results.get("raw_table_rows", []):
+    # ค่า Primary/Secondary: เขียนเป็น float เต็มความละเอียด (ไม่ตัด/ไม่ปัด) เสมอ
+    # ลำดับความสำคัญ: อาร์เรย์ float เต็มที่เก็บไว้ -> สตริงดิบจากเครื่อง -> สตริงในตาราง
+    full_arrays = _full_raw_arrays(data)
+    pri_col_idx = [i for i, c in enumerate(col_defs, start=1) if c[0].startswith("Primary")][0]
+    sec_col_idx = pri_col_idx + 1
+
+    for row_i, row_data in enumerate(results.get("raw_table_rows", [])):
         for col_idx, (_, getter, group) in enumerate(col_defs, start=1):
             value = getter(row_data)
             cell = ws.cell(row=r, column=col_idx)
-            _set_cell_value(cell, value)
+            if col_idx in (pri_col_idx, sec_col_idx):
+                num = None
+                if full_arrays is not None:
+                    num = full_arrays[0 if col_idx == pri_col_idx else 1][row_i]
+                else:
+                    key = "primary" if col_idx == pri_col_idx else "secondary"
+                    num = _safe_float(row_data.get(key + "_raw")) or _safe_float(row_data.get(key))
+                if num is not None:
+                    cell.value = float(num)
+                    cell.number_format = _FULL_SCI_FMT
+                else:
+                    _set_cell_value(cell, value)
+            else:
+                _set_cell_value(cell, value)
             cell.alignment = _CENTER
             cell.border = _THIN_BORDER
             cell.font = _DATA_FONT
@@ -580,10 +744,12 @@ def export_measurements_to_excel(
         _add_data_record_sheet(wb, record_details, [it["save_name"] for it in loaded_saves])
 
     if include_stats:
-        _add_statistics_sheet(wb, loaded_saves)
+        _add_statistics_sheet(wb, loaded_saves, raw_available=include_raw)
 
     if include_raw:
         _add_raw_data_sheets(wb, loaded_saves)
+
+    wb.calculation.fullCalcOnLoad = True    # ให้ Excel คำนวณสูตรใหม่ทั้งหมดทุกครั้งที่เปิดไฟล์
 
     if not wb.sheetnames:
         # กันกรณีไม่ติ๊กอะไรเลย -> ยังต้องมีอย่างน้อย 1 sheet ไม่งั้น openpyxl error ตอน save

@@ -389,7 +389,7 @@ class InputPanel(QWidget):
             "แนะนำ: ≥ 10 ครั้ง สำหรับงาน Metrology"
         )
 
-        # [แก้ไข] เดิมเป็นช่อง "Discard First" ให้ผู้ใช้กรอกเอง (SINGLE mode) — เอาช่องกรอก
+        # เดิมเป็นช่อง "Discard First" ให้ผู้ใช้กรอกเอง (SINGLE mode) — เอาช่องกรอก
         # ออกแล้ว โปรแกรมทิ้งค่าแรก DISCARD_FIRST_COUNT (=3) ครั้งให้อัตโนมัติเสมอเบื้องหลัง
         # (ทำงานเฉพาะครั้งแรกของ session เหมือนเดิม) ผู้ใช้ไม่ต้องตั้งค่าเอง แต่ยังเห็นผลรวม
         # ผ่าน Label "Total Readings" ด้านล่างว่ามีการ Discard อยู่จริง
@@ -491,7 +491,7 @@ class InputPanel(QWidget):
         self.input_samples_sweep.setValue(10)
         self.input_samples_sweep.setFixedWidth(COUNT_FIELD_WIDTH)
 
-        # [แก้ไข] เดิมเป็นช่อง "Discard First Reading" ให้ผู้ใช้กรอกเอง — เอาช่องกรอกออก
+        # เดิมเป็นช่อง "Discard First Reading" ให้ผู้ใช้กรอกเอง — เอาช่องกรอกออก
         # โปรแกรมทิ้งค่าแรก DISCARD_FIRST_COUNT (=3) ค่าแรกของทุกความถี่ให้อัตโนมัติเสมอ
         # เบื้องหลัง ผู้ใช้ไม่ต้องตั้งค่าเอง แต่ยังเห็นผลรวมผ่าน Label "Total Readings" ด้านล่าง
 
@@ -531,7 +531,7 @@ class InputPanel(QWidget):
         self.input_samples.setRange(1, 999)
         self.input_samples.setValue(10)
 
-        # [แก้ไข] เดิมเป็นช่อง "Discard First Reading" ให้ผู้ใช้กรอกเอง — เอาช่องกรอกออก
+        # เดิมเป็นช่อง "Discard First Reading" ให้ผู้ใช้กรอกเอง — เอาช่องกรอกออก
         # โปรแกรมทิ้งค่าแรก DISCARD_FIRST_COUNT (=3) ค่าแรกของทุกความถี่ให้อัตโนมัติเสมอ
         # เบื้องหลัง ผู้ใช้ไม่ต้องตั้งค่าเอง แต่ยังเห็นผลรวมผ่าน Label "Total Readings" ด้านล่าง
 

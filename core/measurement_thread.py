@@ -12,7 +12,7 @@ class MeasurementWorker(QThread):
 
     def __init__(self, lcr, settings: dict):
         super().__init__()
-        self.lcr        = lcr          # [แก้ไข] instance ที่เชื่อมต่อไว้แล้วจากปุ่ม Connect (ไม่ปิดเองตอนจบ)
+        self.lcr        = lcr          # instance ที่เชื่อมต่อไว้แล้วจากปุ่ม Connect (ไม่ปิดเองตอนจบ)
         self.settings   = settings
         self.is_running = True
 
@@ -57,7 +57,7 @@ class MeasurementWorker(QThread):
             # รอให้ค่าที่เซ็ตเข้าไปทั้งหมดประมวลผลเสร็จสิ้น
             lcr.wait_until_ready()
 
-            # [NEW] อ่านค่า Signal Level "จริง" ที่เครื่องยืนยันว่ากำลังตั้งอยู่ (query กลับ
+            # อ่านค่า Signal Level "จริง" ที่เครื่องยืนยันว่ากำลังตั้งอยู่ (query กลับ
             # จากเครื่องจริงๆ) แทนที่จะใช้แค่ค่าที่ผู้ใช้กรอกใน UI เฉยๆ — เก็บลงใน
             # self.settings ซึ่งเป็น dict object เดียวกับ _active_run_settings ใน
             # app_controller.py (ส่งมาโดยอ้างอิง ไม่ใช่ copy) ทำให้ raw_table อ่านค่านี้ได้ทันที
@@ -88,7 +88,7 @@ class MeasurementWorker(QThread):
         except Exception as e:
             self.error_occurred.emit(f"Hardware Error:\n{str(e)}")
         finally:
-            # [แก้ไข] ไม่ disconnect() ที่นี่แล้ว — Connection ถูกจัดการโดยปุ่ม Connect/Disconnect
+            # ไม่ disconnect() ที่นี่แล้ว — Connection ถูกจัดการโดยปุ่ม Connect/Disconnect
             # ที่ผู้ใช้กดเอง ไม่ใช่เปิด-ปิดทุกครั้งที่วัดเสร็จเหมือนก่อนหน้านี้
             self.finished.emit()
 
@@ -128,7 +128,7 @@ class MeasurementWorker(QThread):
             is_discarded = is_first_session and (round_idx < discard_single)
 
             lcr.wait_until_ready()
-            # [แก้ไข] ใช้ trigger_and_fetch() แทน trigger()+fetch_measurement() แยกกัน
+            # ใช้ trigger_and_fetch() แทน trigger()+fetch_measurement() แยกกัน
             # ป้องกันบั๊ก response ค้างใน buffer ของเครื่อง (อ่านค่าเก่า+ใหม่ปนกัน)
             pri, sec, stat = lcr.trigger_and_fetch()
 
@@ -169,11 +169,11 @@ class MeasurementWorker(QThread):
         if step_f <= 0:
             step_f = 1.0
 
-        # [แก้ไข] ใช้ round() แทน int() เพื่อกัน floating-point error
+        # ใช้ round() แทน int() เพื่อกัน floating-point error
         # เช่น (2000000 - 100) / 100 อาจได้ 19998.999999999998 แทนที่จะเป็น 19999.0 พอดี
         # ทำให้ int() ตัดเศษทิ้งผิดจุด จุดสุดท้ายที่วัดจริงคลาดจากที่ตั้งไว้ (เช่นได้ 1999900 แทน 2000000)
         n_points_calculated = round((stop_f - start_f) / step_f) + 1
-        # [แก้ไข] เอาเพดาน 201 จุดออก — ค่านี้เดิมอ้างอิงผิดมาจากสเปค Hardware LIST Sweep
+        # เอาเพดาน 201 จุดออก — ค่านี้เดิมอ้างอิงผิดมาจากสเปค Hardware LIST Sweep
         # ของเครื่อง (:LIST:FREQ) ซึ่งจำกัดจริงแค่โหมด LIST บนตัวเครื่องเท่านั้น
         # แต่โหมด SWEEP นี้สั่งความถี่ทีละจุดผ่าน set_frequency() (SCPI :FREQ) ไม่ได้ใช้
         # ฟีเจอร์ LIST ของเครื่อง จึงไม่มีข้อจำกัด 201 จุดนี้ในทางเทคนิค
@@ -196,7 +196,7 @@ class MeasurementWorker(QThread):
                 if not self.is_running:
                     break
 
-                # [แก้ไข] ใช้ trigger_and_fetch() แทน trigger()+fetch_measurement() แยกกัน
+                # ใช้ trigger_and_fetch() แทน trigger()+fetch_measurement() แยกกัน
                 pri, sec, stat = lcr.trigger_and_fetch()
 
                 done_points += 1
@@ -223,7 +223,7 @@ class MeasurementWorker(QThread):
                     self._handle_hardware_status(stat, current_freq)
 
     # ========================================================
-    # [ใหม่] โหมด Frequency List + Samples per Sweep
+    # โหมด Frequency List + Samples per Sweep
     # ========================================================
     @staticmethod
     def _parse_freq_list(raw_text: str) -> list:
@@ -295,7 +295,7 @@ class MeasurementWorker(QThread):
                 if not self.is_running:
                     break
 
-                # [แก้ไข] ใช้ trigger_and_fetch() แทน trigger()+fetch_measurement() แยกกัน
+                # ใช้ trigger_and_fetch() แทน trigger()+fetch_measurement() แยกกัน
                 pri, sec, stat = lcr.trigger_and_fetch()
 
                 done_points += 1

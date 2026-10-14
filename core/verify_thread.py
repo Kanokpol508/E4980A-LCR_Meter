@@ -9,7 +9,7 @@ class VerifyWorker(QThread):
 
     def __init__(self, lcr, settings: dict):
         super().__init__()
-        # [แก้ไข] รับ instance ที่เชื่อมต่อไว้แล้วจากปุ่ม Connect แทนที่จะเปิด Connection ใหม่เอง
+        # รับ instance ที่เชื่อมต่อไว้แล้วจากปุ่ม Connect แทนที่จะเปิด Connection ใหม่เอง
         self.lcr = lcr
         self.settings = settings
         self.TOLERANCE = 0.001          # 0.1%
@@ -126,5 +126,5 @@ class VerifyWorker(QThread):
             self.finished_signal.emit(False, [], f"เกิดข้อผิดพลาดในการตรวจสอบ: {str(e)}")
             
         finally:
-            # [แก้ไข] ไม่ disconnect() ที่นี่แล้ว — Connection ถูกจัดการโดยปุ่ม Connect/Disconnect ที่ผู้ใช้กดเอง
+            # ไม่ disconnect() ที่นี่แล้ว — Connection ถูกจัดการโดยปุ่ม Connect/Disconnect ที่ผู้ใช้กดเอง
             pass

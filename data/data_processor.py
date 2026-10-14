@@ -259,7 +259,7 @@ def calculate_frequency_stats(raw_records: list, pri_ref=None, sec_ref=None) -> 
 
 
 # ==========================================================
-# [NEW] Incremental accumulator สำหรับ LIST/SWEEP mode
+# Incremental accumulator สำหรับ LIST/SWEEP mode
 # ==========================================================
 #
 # ปัญหาเดิม: calculate_frequency_stats() ต้องได้รับ raw_records ครบทุกจุดแล้ว "กวาดคำนวณ

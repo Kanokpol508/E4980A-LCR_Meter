@@ -246,7 +246,7 @@ class StatisticsTable(QWidget):
                ถ้าส่งมาทั้งคู่ จะใช้ stats_list เป็นหลัก (ไม่คำนวณซ้ำ)
         สูตรทั้งหมดอยู่ใน data_processor.py — ที่นี่แค่แสดงผล
         (SWEEP ใช้สูตรและการแสดงผลเดียวกับ LIST ทุกประการ)
-        - [NEW] nominal_value: ข้อความ Nominal Value ที่ผู้ใช้กรอก (ค่าคงที่ตลอด session)
+        - nominal_value: ข้อความ Nominal Value ที่ผู้ใช้กรอก (ค่าคงที่ตลอด session)
           หากไม่ได้กรอกจะแสดง "-" ในทุกแถว
         """
         if mode and mode != self._current_mode:
@@ -264,7 +264,7 @@ class StatisticsTable(QWidget):
             self._render_list(raw_records, pri_ref, sec_ref, nominal_text=nominal_text)
 
     def _render_single(self, run_groups: list, pri_ref=None, sec_ref=None, nominal_text: str = "-"):
-        """[แก้ไข] เดิมรวมทุกรอบเป็นแถวเดียว (calculate_single_stats บนข้อมูลทั้งหมด)
+        """เดิมรวมทุกรอบเป็นแถวเดียว (calculate_single_stats บนข้อมูลทั้งหมด)
         ตอนนี้แยกคำนวณทีละรอบ (1 รอบ = 1 แถว) ด้วย calculate_single_stats_per_run()
         และแก้บั๊กเดิมที่ไม่เคยส่ง pri_ref/sec_ref เข้าไปเลย ทำให้คอลัมน์ PPM Dev ของ
         โหมด SINGLE ไม่เคยคำนวณค่าให้แม้จะกรอก Reference ไว้แล้วก็ตาม"""
@@ -284,7 +284,7 @@ class StatisticsTable(QWidget):
         self._render_list_from_stats(stats, nominal_text=nominal_text)
 
     def _render_list_from_stats(self, stats: list, nominal_text: str = "-"):
-        """[NEW] วาดตารางจากผลลัพธ์สถิติที่คำนวณไว้แล้ว (list of dict รูปแบบเดียวกับ
+        """วาดตารางจากผลลัพธ์สถิติที่คำนวณไว้แล้ว (list of dict รูปแบบเดียวกับ
         calculate_frequency_stats()) — ไม่คำนวณซ้ำ ใช้เมื่อผู้เรียกส่ง stats_list มาให้ตรงๆ
         (เช่นจาก FrequencyStatsAccumulator) — setUpdatesEnabled(False) คร่อมการวาดทั้งก้อน
         ลดจำนวนครั้งที่ Qt repaint ระหว่างตั้งค่าเซลล์ทีละอัน (มีผลชัดเจนตอนตารางมีหลายพันแถว)"""

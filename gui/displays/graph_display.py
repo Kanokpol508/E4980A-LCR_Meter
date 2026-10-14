@@ -1,6 +1,6 @@
 # กราฟ Live Trend (วาดด้วย pyqtgraph)
 #
-# [แก้ไข] เดิมเป็น 2 กราฟแยก (Primary กับ Secondary คนละแกน Y คนละ PlotWidget)
+# เดิมเป็น 2 กราฟแยก (Primary กับ Secondary คนละแกน Y คนละ PlotWidget)
 # ตอนนี้ปรับให้เป็น "กราฟเดียว" (แกน Y ร่วมกัน) พร้อม Plot Display Options
 # แบบเดียวกับ freq_summary_graph.py / ppm_summary_graph.py ได้แก่:
 #   - Dropdown เลือก Plot Primary / Plot Secondary / Plot Both
@@ -88,7 +88,7 @@ class _EngAxisItem(pg.AxisItem):
                 factor, suffix, tier_idx = f, s, i
                 break
 
-        # [แก้ไข] เดิมเลือกหน่วยจากค่ามากสุด (max_abs) เพียงอย่างเดียว ทำให้ช่วงค่าที่
+        # เดิมเลือกหน่วยจากค่ามากสุด (max_abs) เพียงอย่างเดียว ทำให้ช่วงค่าที่
         # "คาบเส้นแบ่งหน่วยพอดี" เช่น 999.96-1000.06 Ω (คาบ 1000 ซึ่งเป็นเส้นแบ่งของ 'k')
         # ถูกบังคับหารด้วย 1000 ทั้งชุด กลายเป็นตัวเลขเศษส่วนอ่านยากอย่าง "0.99998k"
         # ทั้งที่แสดงแบบเลขล้วน "999.98" อ่านง่ายกว่ามาก — ตอนนี้เช็คค่าที่เล็กที่สุด
@@ -113,7 +113,7 @@ class _EngAxisItem(pg.AxisItem):
         else:
             decimals = 0
 
-        # [แก้ไข] เดิม cap ทศนิยมไว้ที่ 4 ตำแหน่งเสมอ ทำให้ช่วงค่าที่แคบมากๆ (เช่น
+        # เดิม cap ทศนิยมไว้ที่ 4 ตำแหน่งเสมอ ทำให้ช่วงค่าที่แคบมากๆ (เช่น
         # 999.95-1000.05 Ω ที่ถูกย่อเป็นหน่วย k) ปัดชนกันจนโชว์ label ซ้ำกัน (ทั้งคู่
         # กลายเป็น "1.0000k") ดูเหมือนแกนผิดเพี้ยนไม่ตรงกับกราฟ
         # ตอนนี้เพิ่มทศนิยมทีละ 1 จนกว่า label ของทุก tick จะไม่ซ้ำกันแล้ว (หรือชน
@@ -256,7 +256,7 @@ class GraphDisplay(QWidget):
         self._style_axes_dark(self.plot_widget)
         self.plot_widget.setLabel('bottom', self.x_label, **self.label_style)
         self.plot_widget.setLabel('left', 'Value', **self.label_style)
-        # [แก้ไข] ปิด autoSIPrefix ของ pyqtgraph ไม่ให้แปะตัวคูณ "(x...)" ต่อท้ายหัวแกน Y เอง
+        # ปิด autoSIPrefix ของ pyqtgraph ไม่ให้แปะตัวคูณ "(x...)" ต่อท้ายหัวแกน Y เอง
         # เหตุผลเดียวกับใน freq_summary_graph.py — กันผู้ใช้เผลอเอาตัวคูณนี้ไปคูณกับ
         # Data Label ที่แต่ละจุดมีหน่วย (µ, n, p) ของตัวเองอยู่แล้ว
         self.plot_widget.getAxis('bottom').enableAutoSIPrefix(False)
@@ -340,7 +340,7 @@ class GraphDisplay(QWidget):
         """ตั้งชื่อแกน Y ตาม 'กลุ่มพารามิเตอร์' ที่เลือกอยู่จริง ถ้าหน่วยเหมือนกันทั้งคู่
         (เช่น Re/Im เป็น Ω ทั้งคู่) ให้รวมเป็นกลุ่มเดียว แทนที่จะเขียนหน่วยซ้ำสองรอบ
 
-        [แก้ไข] เดิมกรณีหน่วยไม่เหมือนกันใช้ self.pri_name/self.sec_name เต็มๆ
+        เดิมกรณีหน่วยไม่เหมือนกันใช้ self.pri_name/self.sec_name เต็มๆ
         (เช่น 'Inductance, Ls (H) & Quality Factor, Q') ยาวเกินไปจน pyqtgraph
         render แนวตั้ง (rotate 90°) ไม่พอที่ ตัวอักษรเลยถูกตัด/บีบดูเพี้ยน ทั้งบนหน้าจอ
         และตอน Save as JPEG (export ใช้ layout เดียวกัน) ตอนนี้ย่อเหลือแค่สัญลักษณ์สั้นๆ
@@ -385,7 +385,7 @@ class GraphDisplay(QWidget):
 
         x = np.array(self._x_data, dtype=float) if self._x_data else np.array([])
 
-        # [แก้ไข] บั๊ก Log Scale ผิดเพี้ยน: PlotDataItem (เส้นกราฟ) ทำ log10() ให้ข้อมูล
+        # บั๊ก Log Scale ผิดเพี้ยน: PlotDataItem (เส้นกราฟ) ทำ log10() ให้ข้อมูล
         # "อัตโนมัติ" อยู่แล้วเมื่อ setLogMode(x=True) เปิดอยู่ จึงต้องป้อนค่า x ดิบให้มันเสมอ
         # แต่ TextItem (Data Labels) ไม่ได้อยู่ใน pipeline auto-log นี้ (แค่ setPos ธรรมดา)
         # ถ้าป้อน x ดิบให้ TextItem ตอน Log mode เปิดอยู่ ViewBox จะตีความค่า x ดิบเป็น
@@ -407,7 +407,7 @@ class GraphDisplay(QWidget):
             if self.chk_show_legend.isChecked():
                 self.legend.addItem(self.curve_primary, self.pri_name)
             if self.chk_data_labels.isChecked():
-                # [แก้ไข] เดิมคำนวณหน่วยเดียวใช้ร่วมกันทั้งเส้น (pick_series_unit(pri_y.tolist()))
+                # เดิมคำนวณหน่วยเดียวใช้ร่วมกันทั้งเส้น (pick_series_unit(pri_y.tolist()))
                 # ถ้าเส้นนี้มีค่ากวาดข้ามหลายสิบเท่าตัว (เช่น SWEEP/LIST mode ที่ค่าดิบมาจาก
                 # หลายความถี่ต่างกันมาก) หน่วยจะถูกบังคับให้เล็กลงตามจุดที่เล็กที่สุดในเส้น
                 # (ดู pick_series_unit()) ทำให้จุดที่ค่าใหญ่ถูกหารด้วยหน่วยที่เล็กเกินไป
@@ -431,7 +431,7 @@ class GraphDisplay(QWidget):
             if self.chk_show_legend.isChecked():
                 self.legend.addItem(self.curve_secondary, self.sec_name)
             if self.chk_data_labels.isChecked():
-                # [แก้ไข] เหตุผลเดียวกับ Primary ด้านบน — เลือกหน่วยทีละจุดแทนหน่วยเดียว
+                # เหตุผลเดียวกับ Primary ด้านบน — เลือกหน่วยทีละจุดแทนหน่วยเดียว
                 # ร่วมทั้งเส้น กัน label บวมผิดปกติเมื่อเส้นมีค่ากวาดข้ามหลายสิบเท่าตัว
                 # และ show_suffix=True กันความกำกวมเมื่อจุดต่างๆ อยู่คนละชั้นหน่วย
                 for xi, yi in zip(label_x, sec_y):

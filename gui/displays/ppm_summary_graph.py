@@ -141,7 +141,7 @@ class _EngAxisItem(pg.AxisItem):
                 factor, suffix, tier_idx = f, s, i
                 break
 
-        # [แก้ไข] เดิมเลือกหน่วยจากค่ามากสุด (max_abs) เพียงอย่างเดียว ทำให้ช่วงค่าที่
+        # เดิมเลือกหน่วยจากค่ามากสุด (max_abs) เพียงอย่างเดียว ทำให้ช่วงค่าที่
         # "คาบเส้นแบ่งหน่วยพอดี" ถูกบังคับหารด้วย 1000 ทั้งชุด กลายเป็นตัวเลขเศษส่วน
         # อ่านยากอย่าง "0.99998k" ทั้งที่แสดงแบบเลขล้วน "999.98" อ่านง่ายกว่ามาก —
         # ตอนนี้เช็คค่าที่เล็กที่สุด (min_abs) ด้วย ถ้าเมื่อย่อหน่วยแล้วเหลือน้อยกว่า 1
@@ -167,7 +167,7 @@ class _EngAxisItem(pg.AxisItem):
         else:
             decimals = 0
 
-        # [แก้ไข] เดิม cap ทศนิยมไว้ที่ 4 ตำแหน่งเสมอ ทำให้ช่วงค่าที่แคบมากๆ ปัดชนกัน
+        # เดิม cap ทศนิยมไว้ที่ 4 ตำแหน่งเสมอ ทำให้ช่วงค่าที่แคบมากๆ ปัดชนกัน
         # จนโชว์ label ซ้ำกัน ดูเหมือนแกนผิดเพี้ยนไม่ตรงกับกราฟ ตอนนี้เพิ่มทศนิยมทีละ 1
         # จนกว่า label ของทุก tick จะไม่ซ้ำกันแล้ว (หรือชนเพดานความปลอดภัยที่ 6 ตำแหน่ง
         # กันเคสหลุดจริงๆ ไม่ให้ตัวเลขยาวจนอ่านไม่ได้)
@@ -487,7 +487,7 @@ class PpmSummaryGraph(QWidget):
         return fx, vy, ey
 
     def _group_y_label(self, show_pri: bool, show_sec: bool) -> str:
-        # [แก้ไข] เดิมใช้ self.pri_name/self.sec_name เต็มๆ ยาวเกินไปจน pyqtgraph
+        # เดิมใช้ self.pri_name/self.sec_name เต็มๆ ยาวเกินไปจน pyqtgraph
         # render แนวตั้งไม่พอ ตัวอักษรถูกตัด/บีบดูเพี้ยน ทั้งบนหน้าจอและตอน Save as JPEG
         # ตอนนี้ย่อเหลือแค่สัญลักษณ์สั้นๆ แทน (ชื่อเต็มยังเห็นได้จาก Legend)
         if show_pri and show_sec:
@@ -526,7 +526,7 @@ class PpmSummaryGraph(QWidget):
 
         # ---- Primary ----
         if show_pri:
-            # [แก้ไข] เหตุผลเดียวกับ freq_summary_graph.py — PlotDataItem ทำ log10 อัตโนมัติ
+            # เหตุผลเดียวกับ freq_summary_graph.py — PlotDataItem ทำ log10 อัตโนมัติ
             # เองอยู่แล้วเมื่อ setLogMode(x=True) ต้องป้อนความถี่ดิบเข้า setData()
             # ส่วน TextItem (Data Labels) ต้องคำนวณ log10 เองเพราะไม่อยู่ใน auto-log pipeline
             raw_fx = np.array(pri_fx, dtype=float)
@@ -538,7 +538,7 @@ class PpmSummaryGraph(QWidget):
                 self.legend.addItem(self.curve_pri, pri_legend_name)
             if self.chk_error_bar.isChecked():
                 ey = np.array(pri_ey, dtype=float)
-                # [แก้ไข] ErrorBarItem ไม่อยู่ใน pipeline auto-log ของ setLogMode() (เพิ่มด้วย
+                # ErrorBarItem ไม่อยู่ใน pipeline auto-log ของ setLogMode() (เพิ่มด้วย
                 # addItem() ไม่ใช่ plot()) ต้องป้อน x ที่ log10 มาแล้วเอง (label_fx) เสมอ
                 self.errbar_pri.setData(x=label_fx, y=vy, height=ey * 2)
                 self.errbar_pri.setVisible(True)
@@ -565,7 +565,7 @@ class PpmSummaryGraph(QWidget):
                 self.legend.addItem(self.curve_sec, sec_legend_name)
             if self.chk_error_bar.isChecked():
                 ey = np.array(sec_ey, dtype=float)
-                # [แก้ไข] เหตุผลเดียวกับ errbar_pri ด้านบน
+                # เหตุผลเดียวกับ errbar_pri ด้านบน
                 self.errbar_sec.setData(x=label_fx, y=vy, height=ey * 2)
                 self.errbar_sec.setVisible(True)
             else:

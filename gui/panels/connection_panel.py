@@ -25,7 +25,7 @@ class ConnectionPanel(QWidget):
         h_visa.addWidget(self.btn_refresh)
         v_visa.addLayout(h_visa)
 
-        # --- แถวล่าง: [ใหม่] ปุ่ม Connect / Disconnect + สถานะการเชื่อมต่อ ---
+        # --- แถวล่าง: ปุ่ม Connect / Disconnect + สถานะการเชื่อมต่อ ---
         h_conn = QHBoxLayout()
 
         self.btn_connect = QPushButton("CONNECT")

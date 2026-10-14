@@ -141,7 +141,7 @@ class _EngAxisItem(pg.AxisItem):
                 factor, suffix, tier_idx = f, s, i
                 break
 
-        # [แก้ไข] เดิมเลือกหน่วยจากค่ามากสุด (max_abs) เพียงอย่างเดียว ทำให้ช่วงค่าที่
+        # เดิมเลือกหน่วยจากค่ามากสุด (max_abs) เพียงอย่างเดียว ทำให้ช่วงค่าที่
         # "คาบเส้นแบ่งหน่วยพอดี" เช่น 999.96-1000.06 Ω (คาบ 1000 ซึ่งเป็นเส้นแบ่งของ 'k')
         # ถูกบังคับหารด้วย 1000 ทั้งชุด กลายเป็นตัวเลขเศษส่วนอ่านยากอย่าง "0.99998k"
         # ทั้งที่แสดงแบบเลขล้วน "999.98" อ่านง่ายกว่ามาก — ตอนนี้เช็คค่าที่เล็กที่สุด
@@ -168,7 +168,7 @@ class _EngAxisItem(pg.AxisItem):
         else:
             decimals = 0
 
-        # [แก้ไข] เดิม cap ทศนิยมไว้ที่ 4 ตำแหน่งเสมอ ทำให้ช่วงค่าที่แคบมากๆ (เช่น
+        # เดิม cap ทศนิยมไว้ที่ 4 ตำแหน่งเสมอ ทำให้ช่วงค่าที่แคบมากๆ (เช่น
         # 999.95-1000.05 Ω ที่ถูกย่อเป็นหน่วย k) ปัดชนกันจนโชว์ label ซ้ำกัน (ทั้งคู่
         # กลายเป็น "1.0000k") ดูเหมือนแกนผิดเพี้ยนไม่ตรงกับกราฟ
         # ตอนนี้เพิ่มทศนิยมทีละ 1 จนกว่า label ของทุก tick จะไม่ซ้ำกันแล้ว (หรือชน
@@ -316,7 +316,7 @@ class FreqSummaryGraph(QWidget):
         self._style_axes_dark(self.plot_widget)
         self.plot_widget.setLabel('bottom', 'Frequency (Hz)', **self.label_style)
         self.plot_widget.setLabel('left', 'Parameter Value', **self.label_style)
-        # [แก้ไข] ปิด autoSIPrefix ของ pyqtgraph ไม่ให้แปะตัวคูณ "(x0.001)" / "(x1e-06)"
+        # ปิด autoSIPrefix ของ pyqtgraph ไม่ให้แปะตัวคูณ "(x0.001)" / "(x1e-06)"
         # ต่อท้ายหัวแกน Y เอง เพราะตัวคูณนี้ใช้ได้กับแค่ตัวเลขบนแกน (tick) เท่านั้น ไม่ใช่
         # ตัวคูณเดียวกับหน่วย (µ, n, p) ที่ Data Label ของแต่ละจุดใช้ (ซึ่งเลือกทีละจุด
         # อิสระ) ผู้ใช้เผลอเอาไปคูณกับ label ข้างจุดแล้วได้ค่าผิด — ปิดไว้ให้ผู้ใช้ยึด
@@ -484,7 +484,7 @@ class FreqSummaryGraph(QWidget):
         is_log = (self.combo_x_scale.currentText().lower() == 'log')
 
         freqs = np.array(self._freqs, dtype=float) if self._freqs else np.array([])
-        # [แก้ไข] บั๊ก Log Scale ผิดเพี้ยน: pyqtgraph's PlotDataItem (เส้นกราฟ/error bar) จะทำ
+        # บั๊ก Log Scale ผิดเพี้ยน: pyqtgraph's PlotDataItem (เส้นกราฟ/error bar) จะทำ
         # log10() ให้กับข้อมูลที่ป้อนเข้าไป "อัตโนมัติ" อยู่แล้วเมื่อ setLogMode(x=True) เปิดอยู่
         # โค้ดเดิม log10(freqs) เองก่อนป้อนเข้า setData() ทำให้โดน log10 ซ้ำสอง
         # (กลายเป็น log10(log10(f)) ตำแหน่งจุดเลยหดมารวมกันแคบๆ แถว x=2-3 ผิดตำแหน่งจริง)
@@ -513,7 +513,7 @@ class FreqSummaryGraph(QWidget):
                 self.legend.addItem(self.curve_pri, pri_legend_name)
             if self.chk_error_bar.isChecked():
                 sds = np.array(self._pri_sd, dtype=float)
-                # [แก้ไข] ErrorBarItem ถูกเพิ่มด้วย addItem() ไม่ใช่ plot() จึงไม่อยู่ใน
+                # ErrorBarItem ถูกเพิ่มด้วย addItem() ไม่ใช่ plot() จึงไม่อยู่ใน
                 # รายการ items ที่ setLogMode() ของ PlotItem จะแจ้งเตือน/ทำ log10 ให้อัตโนมัติ
                 # เหมือน PlotDataItem (เส้นกราฟ) — ต้องป้อนตำแหน่ง x ที่ log10 มาแล้วเอง
                 # (label_x) ไม่งั้น ViewBox จะตีความค่าความถี่ดิบเป็นพิกัด log-space ตรงๆ
@@ -523,7 +523,7 @@ class FreqSummaryGraph(QWidget):
             else:
                 self.errbar_pri.setVisible(False)
             if self.chk_data_labels.isChecked():
-                # [แก้ไข] เดิมเลือกหน่วยเดียว (factor/suffix/decimals) จากทั้งเส้นด้วย
+                # เดิมเลือกหน่วยเดียว (factor/suffix/decimals) จากทั้งเส้นด้วย
                 # pick_series_unit(means.tolist()) — ถ้าเส้นนี้มีค่ากวาดข้ามหลายสิบเท่าตัว
                 # (เช่น Capacitance vs Frequency ที่ต่างกันได้เป็น 7 order of magnitude
                 # ระหว่าง 100Hz กับ 2MHz) หน่วยที่เลือกจะถูกบังคับให้เล็กลงตามจุดที่เล็ก
@@ -533,7 +533,7 @@ class FreqSummaryGraph(QWidget):
                 # ตอนนี้เลือกหน่วยแยก "ทีละจุด" (ส่ง list ค่าเดียว) แทน ให้แต่ละ label
                 # แสดงค่าที่อ่านง่ายและตรงกับค่าจริงของจุดนั้นเสมอ ไม่ขึ้นกับจุดอื่นในเส้น
                 #
-                # [แก้ไข] เดิม show_suffix=False (ไม่ต่อท้ายตัวอักษรหน่วย) ใช้ได้ตอนทุกจุด
+                # เดิม show_suffix=False (ไม่ต่อท้ายตัวอักษรหน่วย) ใช้ได้ตอนทุกจุด
                 # ในเส้นใช้หน่วยเดียวกัน (อ่านหน่วยจากแกน Y ได้) แต่ตอนนี้แต่ละจุดเลือกหน่วย
                 # ของตัวเองแยกกันแล้ว จุดที่ข้ามชั้นหน่วยไปจากจุดอื่น (เช่น µ กับ n ปนกันใน
                 # เส้นเดียว) จะโชว์ตัวเลขไม่มีหน่วยกำกับ ดูเหมือนผิดขนาดทั้งที่ค่าถูกต้อง
@@ -559,13 +559,13 @@ class FreqSummaryGraph(QWidget):
                 self.legend.addItem(self.curve_sec, sec_legend_name)
             if self.chk_error_bar.isChecked():
                 sds = np.array(self._sec_sd, dtype=float)
-                # [แก้ไข] เหตุผลเดียวกับ errbar_pri ด้านบน — ต้องใช้ label_x (log10 แล้ว)
+                # เหตุผลเดียวกับ errbar_pri ด้านบน — ต้องใช้ label_x (log10 แล้ว)
                 self.errbar_sec.setData(x=label_x, y=means, height=sds * 2)
                 self.errbar_sec.setVisible(True)
             else:
                 self.errbar_sec.setVisible(False)
             if self.chk_data_labels.isChecked():
-                # [แก้ไข] เหตุผลเดียวกับ Primary ด้านบน — เลือกหน่วยทีละจุดแทนหน่วยเดียว
+                # เหตุผลเดียวกับ Primary ด้านบน — เลือกหน่วยทีละจุดแทนหน่วยเดียว
                 # ร่วมทั้งเส้น กัน label บวมผิดปกติเมื่อเส้นมีค่ากวาดข้ามหลายสิบเท่าตัว
                 # และ show_suffix=True กันความกำกวมเมื่อจุดต่างๆ อยู่คนละชั้นหน่วย
                 for x, y in zip(label_x, means):

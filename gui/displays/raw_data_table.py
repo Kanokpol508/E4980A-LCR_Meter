@@ -8,7 +8,7 @@ from PyQt6.QtGui import QColor, QBrush
 
 from utils.helpers import format_full_sci
 
-# [NEW] จำนวนทศนิยม (นัยสำคัญ) ที่ใช้แสดงค่า Primary/Secondary ในตาราง — ตั้งไว้ที่ 9
+# จำนวนทศนิยม (นัยสำคัญ) ที่ใช้แสดงค่า Primary/Secondary ในตาราง — ตั้งไว้ที่ 9
 # ตำแหน่งให้ตรงกับความละเอียดจริงที่เครื่อง E4980A ส่งกลับมาทาง :FETCh? (รูปแบบ
 # ค่าเริ่มต้นของเครื่องคือ 9 หลักหลังจุดทศนิยม เช่น "+1.059517689E-24" ตามคู่มือ)
 # มากกว่านี้จะเป็นแค่ floating-point noise จากการแปลง string -> float ไม่ใช่นัยสำคัญ
@@ -24,8 +24,8 @@ class RawDataTable(QWidget):
     - [NEW] มี Session Info Bar เหนือตาราง แสดงค่าคงที่ตลอด session
       (Mode/สัญญาณ/สายวัด/ย่าน/PPM Ref ฯลฯ) แยกจากตารางเพราะไม่เปลี่ยนต่อแถว
     """
-    # [NEW] คำอธิบาย (label) ของแต่ละ key ใน session info — ใช้ทั้งตอนสร้าง UI และ update
-    # [แก้ไข] ย้าย SCPI Mode / Signal Level / Averaging ออกจาก Session Info Bar ไปบันทึก
+    # คำอธิบาย (label) ของแต่ละ key ใน session info — ใช้ทั้งตอนสร้าง UI และ update
+    # ย้าย SCPI Mode / Signal Level / Averaging ออกจาก Session Info Bar ไปบันทึก
     # เป็นคอลัมน์ต่อแถวในตารางแทน (ผู้ใช้ปลดล็อกให้แก้ค่าเหล่านี้ระหว่าง session ได้แล้ว
     # จึงไม่ใช่ค่าคงที่ตลอด session อีกต่อไป — ต้องอ้างอิงต่อแถวถึงจะถูกต้อง)
     SESSION_INFO_FIELDS = [
@@ -47,7 +47,7 @@ class RawDataTable(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(6)
 
-        # [NEW] Session Info Bar — แสดงค่าคงที่ตลอด session การวัดนี้
+        # Session Info Bar — แสดงค่าคงที่ตลอด session การวัดนี้
         self.group_session_info = QGroupBox("Measurement Session Info")
         grid_info = QGridLayout()
         grid_info.setHorizontalSpacing(18)
@@ -90,8 +90,8 @@ class RawDataTable(QWidget):
         self.table.setColumnCount(10)
 
         # คอลัมน์พื้นฐาน (ทุกโหมดใช้ "Samples (N)" เหมือนกันแล้ว)
-        # [NEW] Nominal Value อยู่ถัดจาก No., SCPI Mode อยู่ถัดจาก Nominal Value
-        # [NEW] AVG อยู่ถัดจาก Frequency (Hz), Signal Level อยู่ถัดจาก AVG
+        # Nominal Value อยู่ถัดจาก No., SCPI Mode อยู่ถัดจาก Nominal Value
+        # AVG อยู่ถัดจาก Frequency (Hz), Signal Level อยู่ถัดจาก AVG
         headers = ["No.", "Nominal Value", "SCPI Mode", "Frequency (Hz)", "AVG", "Signal Level",
                    "Samples (N)", "Primary", "Secondary", "Status"]
 
@@ -183,7 +183,7 @@ class RawDataTable(QWidget):
         self.table.setItem(row_idx, 6, item_sample)
 
         # 7: Primary
-        # [แก้ไข] เดิม f"{pri:.5e}" ปัดเศษ (round) และตัดความละเอียดเหลือแค่ 5 ตำแหน่ง
+        # เดิม f"{pri:.5e}" ปัดเศษ (round) และตัดความละเอียดเหลือแค่ 5 ตำแหน่ง
         # เปลี่ยนมาใช้ truncate_sci() ที่ "ตัดทิ้ง" ไม่ปัดเศษ (ตรงกับหลักการเดียวกับ
         # Data Labels ในกราฟ) และเพิ่มเป็น 9 ตำแหน่งเพื่อเก็บนัยสำคัญให้มากที่สุด
         # เท่าที่เครื่องส่งมาจริง (ดู RAW_VALUE_DECIMALS ด้านบน)
@@ -226,7 +226,7 @@ class RawDataTable(QWidget):
         return font
 
     def update_session_info(self, info: dict):
-        """[NEW] อัปเดตค่าใน Session Info Bar — เรียกตอนวัดเสร็จ หรือตอน Open Save
+        """อัปเดตค่าใน Session Info Bar — เรียกตอนวัดเสร็จ หรือตอน Open Save
         info: dict ที่มี key ตรงกับ SESSION_INFO_FIELDS (ค่าที่ไม่มีจะแสดงเป็น '-')"""
         for key, _ in self.SESSION_INFO_FIELDS:
             value = info.get(key)
@@ -234,7 +234,7 @@ class RawDataTable(QWidget):
             self._session_info_labels[key].setText(text)
 
     def clear_session_info(self):
-        """[NEW] รีเซ็ต Session Info Bar กลับเป็น '-' ทั้งหมด (เรียกตอน Clear Data)"""
+        """รีเซ็ต Session Info Bar กลับเป็น '-' ทั้งหมด (เรียกตอน Clear Data)"""
         for _, lbl in self._session_info_labels.items():
             lbl.setText("-")
 
@@ -242,7 +242,7 @@ class RawDataTable(QWidget):
         self.table.setRowCount(0)
 
     def get_rows(self) -> list:
-        """[NEW] คืนค่าทุกแถวในตารางเป็น list ของ dict (ใช้ตอน Save Result)
+        """คืนค่าทุกแถวในตารางเป็น list ของ dict (ใช้ตอน Save Result)
         เก็บเป็นข้อความตามที่แสดงผลจริง เพื่อให้ Open Save คืนค่าตารางได้ตรงเป๊ะ"""
         rows = []
         for r in range(self.table.rowCount()):

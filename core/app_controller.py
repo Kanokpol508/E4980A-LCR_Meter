@@ -23,8 +23,8 @@ class AppController(QObject):
         self.is_ppm_error = False               # ป้องกัน AttributeError: เปิด PPM แต่ไม่กรอก Ref
         self.is_visa_error = True
         self.is_freqlist_error = False          # ป้องกัน AttributeError
-        self.is_correction_error = True         # [NEW] บังคับให้ทำ OPEN + SHORT Correction ก่อนกด START ได้
-        self._stopped_by_user = False           # [NEW] แยกกรณีวัดจบเองกับผู้ใช้กด Stop เอง (กันป๊อปอัพเด้งตอนกด Stop)
+        self.is_correction_error = True         # บังคับให้ทำ OPEN + SHORT Correction ก่อนกด START ได้
+        self._stopped_by_user = False           # แยกกรณีวัดจบเองกับผู้ใช้กด Stop เอง (กันป๊อปอัพเด้งตอนกด Stop)
 
         self.worker = None
         self.corr_worker = None
@@ -32,7 +32,7 @@ class AppController(QObject):
         self.progress_dialog = None
         self.current_corr_type = None
 
-        # [NEW] Instance เดียวที่ถือ Connection ค้างไว้ตลอด session (ใช้ร่วมกับปุ่ม Connect/Disconnect)
+        # Instance เดียวที่ถือ Connection ค้างไว้ตลอด session (ใช้ร่วมกับปุ่ม Connect/Disconnect)
         # Worker แต่ละตัว (Measurement/Correction/Verify) จะใช้ instance นี้ร่วมกัน
         # แทนที่จะเปิด-ปิด VISA session ใหม่ทุกครั้งที่กดปุ่ม
         self.lcr = E4980A()
@@ -46,22 +46,22 @@ class AppController(QObject):
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
 
-        # [NEW] โหมด SINGLE: แต่ละครั้งที่กด Start = 1 "รอบ" (run) แยกกัน
+        # โหมด SINGLE: แต่ละครั้งที่กด Start = 1 "รอบ" (run) แยกกัน
         # self.single_runs = [[(pri, sec), ...], [(pri, sec), ...], ...] — แต่ละ sub-list
         # คือค่าดิบของรอบนั้นๆ ใช้แยกคำนวณสถิติทีละรอบใน Statistics Table (ไม่ปนกัน
         # แม้จะวัดที่ความถี่เดียวกัน) ส่วน Raw Data Table/กราฟยังคง "ต่อข้อมูล" กันทุกรอบ
         self.single_runs = []
-        # [NEW] ตัวนับ Samples ของ "รอบปัจจุบัน" เท่านั้น (รีเซ็ตทุกครั้งที่กด Start ใหม่ในโหมด SINGLE)
+        # ตัวนับ Samples ของ "รอบปัจจุบัน" เท่านั้น (รีเซ็ตทุกครั้งที่กด Start ใหม่ในโหมด SINGLE)
         # แยกจาก no_val (ตัวนับสะสมทั้ง session ใช้กับคอลัมน์ No.) เพื่อไม่ให้เลข Samples
         # เพี้ยนเป็น 6/5, 7/5 ตอนกดวัดซ้ำรอบสอง
         self._single_run_sample_no = 0
 
-        # [NEW] สะสมสถิติต่อความถี่แบบ incremental (LIST/SWEEP) — แทนการคำนวณจากค่าดิบ
+        # สะสมสถิติต่อความถี่แบบ incremental (LIST/SWEEP) — แทนการคำนวณจากค่าดิบ
         # ทั้งหมดใหม่ทุกครั้ง (ดู FrequencyStatsAccumulator ใน data/data_processor.py)
         # ป้องกันโปรแกรมค้างตอนสวีปยาวๆ ที่มีจุดข้อมูลสะสมจำนวนมาก
         self._freq_stats_acc = FrequencyStatsAccumulator()
 
-        # [NEW] แทนที่จะรีเฟรชกราฟ Live Trend + Statistics Table + กราฟสรุปตามความถี่ทุกครั้ง
+        # แทนที่จะรีเฟรชกราฟ Live Trend + Statistics Table + กราฟสรุปตามความถี่ทุกครั้ง
         # ที่มีจุดข้อมูลใหม่ 1 จุด (ทำให้ UI thread งานสะสมล้นตอนวัดนานๆ/จุดเยอะๆ) เปลี่ยนเป็น
         # "ตั้งค่าสถานะรออัปเดต" (_stats_ui_dirty) แล้วให้ timer นี้เป็นตัวรีเฟรชจริงเป็นช่วงๆ
         # (ทุก 1 วิ) แทน — ยังเห็นแนวโน้มระหว่างวัดได้ตามปกติ (หน่วงจากจุดจริงไม่เกิน ~1 วิ)
@@ -72,11 +72,11 @@ class AppController(QObject):
         self._stats_refresh_timer.setInterval(1000)
         self._stats_refresh_timer.timeout.connect(self._flush_stats_ui_if_dirty)
         self._stats_refresh_timer.start()
-        # [NEW] settings ของรอบวัดล่าสุดที่กด Start — ใช้ประกอบ SCPI Mode/AVG/Signal Level
+        # settings ของรอบวัดล่าสุดที่กด Start — ใช้ประกอบ SCPI Mode/AVG/Signal Level
         # ต่อแถวใน Raw Data Table (ดูเหตุผลที่ start_measurement())
         self._active_run_settings = {}
 
-        # [NEW] เวลาที่วัดเสร็จล่าสุด (ใช้เป็นเวลา Save จริงๆ ไม่ใช่เวลาที่กดปุ่ม Save)
+        # เวลาที่วัดเสร็จล่าสุด (ใช้เป็นเวลา Save จริงๆ ไม่ใช่เวลาที่กดปุ่ม Save)
         self.last_measurement_time = None
         self.last_measurement_time_iso = None
 
@@ -126,14 +126,14 @@ class AppController(QObject):
         v.conn_panel.btn_refresh.clicked.connect(self.scan_visa_ports)
         v.conn_panel.combo_visa.currentTextChanged.connect(self.validate_visa)
 
-        # [NEW] ปุ่ม Connect / Disconnect
+        # ปุ่ม Connect / Disconnect
         v.conn_panel.btn_connect.clicked.connect(self.handle_connect)
         v.conn_panel.btn_disconnect.clicked.connect(self.handle_disconnect)
 
-        # [NEW] ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก V เป็น A ให้ไปปรับเพดานตัวเลขทันที
+        # ผูกสัญญาณเมื่อผู้ใช้เปลี่ยนหน่วยจาก V เป็น A ให้ไปปรับเพดานตัวเลขทันที
         v.input_panel.combo_level_mode.currentIndexChanged.connect(self.update_hardware_limits)
 
-        # [NEW] ผูกสัญญาณความถี่ทุกโหมด (SINGLE/SWEEP/LIST) + เปลี่ยนโหมดการรัน
+        # ผูกสัญญาณความถี่ทุกโหมด (SINGLE/SWEEP/LIST) + เปลี่ยนโหมดการรัน
         # ให้ไปเช็คเงื่อนไข Voltage max 15V/20V ใหม่ทุกครั้งที่ความถี่หรือโหมดเปลี่ยน
         # (ตามคู่มือ Table 3-12: Freq > 1 MHz จำกัด Voltage ไว้ที่ 15 Vrms)
         v.input_panel.combo_run_mode.currentIndexChanged.connect(self.update_hardware_limits)
@@ -141,7 +141,7 @@ class AppController(QObject):
         v.input_panel.input_stop_freq.valueChanged.connect(self.update_hardware_limits)
         v.input_panel.input_freq_list.freq_changed.connect(self.update_hardware_limits)
 
-        # [NEW] เช็คเงื่อนไข Range 100mΩ ทุกครั้งที่ผู้ใช้เปลี่ยน Range เอง หรือพิมพ์ค่า Signal Level เอง
+        # เช็คเงื่อนไข Range 100mΩ ทุกครั้งที่ผู้ใช้เปลี่ยน Range เอง หรือพิมพ์ค่า Signal Level เอง
         # (แยกจาก update_hardware_limits เพื่อไม่ให้ setRange() ข้างในนั้น trigger ตัวเองซ้ำวนลูป)
         v.input_panel.combo_range.currentIndexChanged.connect(self.check_range_signal_level_conflict)
         v.input_panel.input_volt.valueChanged.connect(self.check_range_signal_level_conflict)
@@ -162,7 +162,7 @@ class AppController(QObject):
         v.ctrl_panel.btn_start.clicked.connect(self.start_measurement)
         v.ctrl_panel.btn_stop.clicked.connect(self.stop_measurement)
 
-        # [NEW] ระบบ Save / View Save Result — ใช้ปุ่มเดิมที่อยู่ข้าง Measurement Result (lcd_display)
+        # ระบบ Save / View Save Result — ใช้ปุ่มเดิมที่อยู่ข้าง Measurement Result (lcd_display)
         v.lcd_display.btn_save.clicked.connect(self.handle_save_result)
         v.lcd_display.btn_view.clicked.connect(self.handle_view_save_result)
         v.lcd_display.btn_export_excel.clicked.connect(self.handle_export_excel)
@@ -185,20 +185,6 @@ class AppController(QObject):
         v.input_panel.input_freq_list.freq_changed.connect(self.validate_freq_list)
 
         # รีเซ็ตสถานะปุ่ม Correction เมื่อเปลี่ยน "Cable Length" เท่านั้น
-        # เหตุผล (อ้างอิงคู่มือ E4980A หน้า 116): OPEN/SHORT Correction แบบ "all frequency
-        # points" ที่โปรแกรมนี้ใช้ (:CORR:OPEN:EXEC / :CORR:SHOR:EXEC) จะวัดค่าที่ 51 จุด
-        # ความถี่คงที่เสมอ "regardless of the test frequency settings" และค่าที่ชดเชยคือ
-        # stray admittance ในช่วงจาก "calibration plane" ซึ่งถูกกำหนดโดย Cable Length
-        # ไปถึงจุดต่อ DUT (หน้า 115) — คือปัจจัยเดียวที่มีเอกสารระบุชัดว่ากระทบ correction
-        # data ของโหมดนี้โดยตรง จึงเหลือ trigger รีเซ็ตไว้แค่ตัวเดียวคือ combo_cable
-        #
-        # ส่วน Meas Mode (SCPI mode) และ Signal Level ไม่รีเซ็ตอีกต่อไป เพราะ:
-        # - Meas Mode (CPD/ZTD/...): เป็นแค่การแปลงค่า R-X ที่วัดได้ไปแสดงเป็นพารามิเตอร์
-        #   ต่างกัน ไม่ได้เปลี่ยนตัว correction data ที่เก็บไว้ในเครื่อง
-        # - Signal Level: คู่มือหน้า 117 มีคำเตือนทั่วไปว่า "settings of frequency/level
-        #   is changed" อาจทำให้ correction ไม่ valid แต่คำเตือนนี้ครอบคลุมโหมด SPOT
-        #   correction (วัดที่จุดเดียวตามความถี่/level ปัจจุบัน) เป็นหลัก ไม่ใช่โหมด
-        #   "all frequency points" ที่โปรแกรมนี้ใช้ซึ่งสวีปคงที่ 51 จุดเสมอ
         v.input_panel.combo_cable.currentIndexChanged.connect(self._reset_correction_status)
 
     # ========================================================
@@ -218,11 +204,11 @@ class AppController(QObject):
             v.input_panel.lbl_calculated_points.setText("-")
             return
 
-        # [แก้ไข] ใช้ round() แทน int() เพื่อกัน floating-point error
+        # ใช้ round() แทน int() เพื่อกัน floating-point error
         # เช่น (2000000 - 100) / 100 อาจได้ 19998.999999999998 แทนที่จะเป็น 19999.0 พอดี
         # ทำให้ int() ตัดเศษทิ้งผิดจุด จุดสุดท้ายที่วัดจริงคลาดจากที่ตั้งไว้ (เช่นได้ 1999900 แทน 2000000)
         n_points = round((stop - start) / step) + 1
-        # [แก้ไข] เอาเพดาน 201 จุดออก — ค่านี้เดิมอ้างอิงผิดมาจากสเปค Hardware LIST Sweep
+        # เอาเพดาน 201 จุดออก — ค่านี้เดิมอ้างอิงผิดมาจากสเปค Hardware LIST Sweep
         # ของเครื่อง (:LIST:FREQ) ซึ่งจำกัดจริงแค่โหมด LIST บนตัวเครื่องเท่านั้น
         # แต่โหมด SWEEP ในโปรแกรมนี้สั่งความถี่ทีละจุดผ่าน set_frequency() (SCPI :FREQ)
         # ไม่ได้ใช้ฟีเจอร์ LIST ของเครื่อง จึงไม่มีข้อจำกัด 201 จุดนี้
@@ -286,7 +272,7 @@ class AppController(QObject):
         level_mode = v.input_panel.combo_level_mode.currentData()
 
         if level_mode == "Voltage":
-            VOLT_MIN = 0.0001   # 0.1 mVrms (หน้า 2 Overview + Table 3-12)
+            VOLT_MIN = 0.0001
             max_freq = self.get_max_test_frequency()
             if max_freq > 1_000_000.0:
                 volt_max = 15.0
@@ -394,7 +380,7 @@ class AppController(QObject):
         v = self.view
 
         # --- Connection Panel ---
-        # [แก้ไข] ตอน lock (กำลังวัด/Correction/Verify) ต้องล็อกปุ่ม Connect/Disconnect ด้วย
+        # ตอน lock (กำลังวัด/Correction/Verify) ต้องล็อกปุ่ม Connect/Disconnect ด้วย
         # เพื่อป้องกันผู้ใช้ตัดการเชื่อมต่อกลางคัน — ตอนปลดล็อกค่อยคืนสถานะตาม self.lcr.is_connected จริง
         v.conn_panel.btn_connect.setEnabled(not locked and not self.lcr.is_connected)
         v.conn_panel.btn_disconnect.setEnabled(not locked and self.lcr.is_connected)
@@ -435,7 +421,7 @@ class AppController(QObject):
             QMessageBox.warning(v, "ตรวจสอบล้มเหลว", "กรุณากด CONNECT เพื่อเชื่อมต่อเครื่อง LCR Meter ก่อนทำการตรวจสอบการตั้งค่า")
             return
 
-        # [จุดที่ 4] Verify & Apply ส่งความถี่จาก input_freq (Single Point) เสมอ
+        # Verify & Apply ส่งความถี่จาก input_freq (Single Point) เสมอ
         # ถ้าผู้ใช้อยู่ใน SWEEP/LIST mode ความถี่ที่ส่งไปอาจไม่ตรงกับที่ใช้วัดจริง
         # แจ้งเตือนเพื่อให้รับทราบก่อนดำเนินการ (ไม่บล็อก เพราะยังมีประโยชน์สำหรับ
         # เช็คค่าตั้งอื่นๆ เช่น Signal Level, Aperture, Cable ที่ใช้ร่วมกันทุกโหมด)
@@ -533,7 +519,7 @@ class AppController(QObject):
         self.progress_dialog.setCancelButton(None)
         self.progress_dialog.show()
 
-        # [แก้ไข] ส่งค่า Cable Length ปัจจุบันจาก GUI ไปด้วย เพื่อตั้งที่เครื่องก่อนทำ Correction เสมอ
+        # ส่งค่า Cable Length ปัจจุบันจาก GUI ไปด้วย เพื่อตั้งที่เครื่องก่อนทำ Correction เสมอ
         cable_text = v.input_panel.combo_cable.currentText()
         self.corr_worker = CorrectionWorker(self.lcr, corr_type, cable_text)
         self.corr_worker.finished_signal.connect(self.handle_correction_finished)
@@ -562,7 +548,7 @@ class AppController(QObject):
             QMessageBox.critical(self.view, "Correction ล้มเหลว", f"❌ {msg}")
 
         self.current_corr_type = None
-        self.check_correction_status()  # [NEW] อัปเดตสถานะปุ่ม START ทุกครั้งที่ Correction เสร็จ (สำเร็จหรือล้มเหลว)
+        self.check_correction_status()  # อัปเดตสถานะปุ่ม START ทุกครั้งที่ Correction เสร็จ (สำเร็จหรือล้มเหลว)
 
     def _reset_correction_status(self):
         """
@@ -595,7 +581,7 @@ class AppController(QObject):
                 "⚠️ การตั้งค่าเปลี่ยน — SHORT Correction อาจไม่ valid แล้ว กรุณาทำ Correction ใหม่"
             )
 
-        self.check_correction_status()  # [NEW] อัปเดตสถานะปุ่ม START ทันทีที่ Correction ถูก invalidate
+        self.check_correction_status()  # อัปเดตสถานะปุ่ม START ทันทีที่ Correction ถูก invalidate
 
     def handle_clear_graph(self):
         reply = QMessageBox.question(
@@ -702,7 +688,7 @@ class AppController(QObject):
         is_first_single_session = is_single and len(self.graph_x_data) == 0
         self._stopped_by_user = False  # [NEW] เริ่มวัดใหม่ทุกครั้ง ถือว่ายังไม่ได้ถูกกด Stop
 
-        # [แก้ไข] เตรียมตาราง Raw Data ก่อนเริ่มวัด
+        # เตรียมตาราง Raw Data ก่อนเริ่มวัด
         # เดิม: เรียก set_mode() (ซึ่งข้างในมี clear_table() ซ่อนอยู่) ทุกครั้งที่กด Start
         # ทำให้โหมด SINGLE ที่ตั้งใจ "ต่อข้อมูล" รอบใหม่ ถูกล้างตารางทิ้งไปด้วยทุกรอบ
         # ตอนนี้เรียก set_mode() (ซึ่งจะ clear ตาราง) เฉพาะตอนเปลี่ยนโหมดจริง หรือเป็น
@@ -718,14 +704,14 @@ class AppController(QObject):
             self.graph_sec_y = []
             self.graph_raw_pri_y = []
             self.graph_raw_sec_y = []
-            self._freq_stats_acc.clear()  # [NEW] ล้างสถิติสะสมต่อความถี่เมื่อเริ่ม session ใหม่
+            self._freq_stats_acc.clear()  # ล้างสถิติสะสมต่อความถี่เมื่อเริ่ม session ใหม่
             v.graph_display.clear_plots()
             v.freq_summary_graph.clear()
             v.ppm_summary_graph.clear()
             v.raw_table.clear_table()  # ล้างข้อมูลดิบเก่าเมื่อเริ่มวัดใหม่
 
         if is_single:
-            # [NEW] 1 ครั้งกด Start ในโหมด SINGLE = 1 "รอบ" (run) ใหม่เสมอ — ใช้แยกคำนวณ
+            # 1 ครั้งกด Start ในโหมด SINGLE = 1 "รอบ" (run) ใหม่เสมอ — ใช้แยกคำนวณ
             # สถิติทีละรอบใน Statistics Table (ไม่ปนกันแม้ freq จะเท่าเดิมทุกรอบ)
             if is_first_single_session:
                 self.single_runs = []
@@ -769,7 +755,7 @@ class AppController(QObject):
         }
 
         self.worker = MeasurementWorker(self.lcr, settings)
-        # [NEW] เก็บ settings ของรอบนี้ไว้ใช้ตอน append_row ลง Raw Data Table
+        # เก็บ settings ของรอบนี้ไว้ใช้ตอน append_row ลง Raw Data Table
         # (SCPI Mode/AVG/Signal Level ปลดล็อกให้แก้ระหว่างมีข้อมูลค้างได้แล้ว จึงต้องอ้างอิง
         # ค่าที่ "ใช้จริง" ตอนกด Start ของรอบนี้ ไม่ใช่อ่าน UI สดตอน handle_data_ready
         # เพราะผู้ใช้อาจเปลี่ยนค่าทิ้งไว้ก่อนรอบถัดไปแล้ว)
@@ -801,7 +787,7 @@ class AppController(QObject):
 
     def stop_measurement(self):
         if self.worker and self.worker.isRunning():
-            self._stopped_by_user = True  # [NEW] กันป๊อปอัพ "วัดเสร็จสมบูรณ์" เด้งตอนผู้ใช้ตั้งใจกด Stop เอง
+            self._stopped_by_user = True  # กันป๊อปอัพ "วัดเสร็จสมบูรณ์" เด้งตอนผู้ใช้ตั้งใจกด Stop เอง
             self.worker.stop()
             self.view.ctrl_panel.btn_stop.setText("STOPPING...")
             self.view.ctrl_panel.btn_stop.setEnabled(False)
@@ -821,14 +807,14 @@ class AppController(QObject):
         # 1. ค่าดิบจากฮาร์ดแวร์
         raw_pri = data.get('primary', 0.0)
         raw_sec = data.get('secondary', 0.0)
-        status  = data.get('status', 'SUCCESS')  # [NEW] รับค่า status ที่มาจาก Thread
+        status  = data.get('status', 'SUCCESS')  # รับค่า status ที่มาจาก Thread
 
         # เก็บค่าดิบลง Array ไว้คำนวณ Type A Uncertainty
         self.graph_raw_pri_y.append(raw_pri)
         self.graph_raw_sec_y.append(raw_sec)
 
         # กราฟและ LCD แสดงค่าดิบเสมอ (ไม่มี Graph Deviation แล้ว)
-        # [แก้ไข] เดิม f"{raw_pri:.5e}" ปัดเศษ (round) เหลือ 5 ตำแหน่ง เปลี่ยนเป็น
+        # เดิม f"{raw_pri:.5e}" ปัดเศษ (round) เหลือ 5 ตำแหน่ง เปลี่ยนเป็น
         # truncate_sci() ตัดทิ้ง ไม่ปัดเศษ 9 ตำแหน่ง ให้หลักการเดียวกับ Raw Data Table
         v.lcd_display.lbl_pri_val.setText(truncate_sci(raw_pri, 9))
         v.lcd_display.lbl_sec_val.setText(truncate_sci(raw_sec, 9))
@@ -838,15 +824,15 @@ class AppController(QObject):
         is_list = (run_mode == "LIST")
         is_sweep = (run_mode == "SWEEP")
 
-        # --- [NEW] ลอจิกเตรียมข้อมูลให้ Raw Data Table ---
+        # --- ลอจิกเตรียมข้อมูลให้ Raw Data Table ---
         no_val = len(self.graph_x_data) + 1  # ลำดับที่ของการวัด (1, 2, 3... สะสมทั้ง session)
-        # [แก้ไข] current_freq มาจาก data['freq'] ซึ่งเป็นค่าความถี่ "ที่ใช้วัดจริง" ของรอบนี้
+        # current_freq มาจาก data['freq'] ซึ่งเป็นค่าความถี่ "ที่ใช้วัดจริง" ของรอบนี้
         # (worker ส่งมาจาก settings snapshot ตอนกด Start ไม่ใช่อ่าน UI สดๆ) — ใช้ค่านี้เป็น
         # หลักเสมอ แทนที่จะอ่าน v.input_panel.input_freq.value() ซ้ำ เพราะตอนนี้ input_freq
         # ปลดล็อกแล้ว ผู้ใช้อาจเปลี่ยนความถี่ระหว่างรอบได้ ถ้าอ่าน UI สดจะได้ค่าใหม่ผิดรอบ
         current_freq = data.get('freq', 0)
 
-        # [NEW] เก็บค่าดิบ + ความถี่ที่ใช้จริงของรอบนี้ลงรอบปัจจุบัน (self.single_runs[-1])
+        # เก็บค่าดิบ + ความถี่ที่ใช้จริงของรอบนี้ลงรอบปัจจุบัน (self.single_runs[-1])
         # ด้วย — ใช้แยกคำนวณสถิติทีละรอบใน Statistics Table โดยแต่ละรอบจะจำความถี่ของตัวเอง
         # ไว้ตรงตัว ไม่ต้องพึ่งค่า input_freq ปัจจุบันตอนคำนวณ (start_measurement() การันตี
         # ว่ามี sub-list พร้อมรออยู่แล้ว)
@@ -856,12 +842,12 @@ class AppController(QObject):
         # จัดรูปแบบข้อความ "Samples (N)" ให้ตรงกับโหมด
         if is_single:
             n_single = v.input_panel.input_n_single.value()
-            # [แก้ไข] เดิมใช้ no_val (เลขสะสมทั้ง session) หารกับ n_single ของรอบล่าสุด
+            # เดิมใช้ no_val (เลขสะสมทั้ง session) หารกับ n_single ของรอบล่าสุด
             # ทำให้กด Start ซ้ำรอบ 2 แล้วเห็นเลขเพี้ยนเป็น 6/5, 7/5, 8/5 แทนที่จะเป็น 1/5, 2/5...
             # ตอนนี้ใช้ลำดับ "ภายในรอบปัจจุบัน" (len ของ self.single_runs[-1] หลัง append ไปแล้ว)
             run_no = len(self.single_runs[-1]) if self.single_runs else no_val
             sample_text = f"{run_no}/{n_single}"  # ตัวอย่าง: 1/5, 2/5 (รีเซ็ตใหม่ทุกครั้งที่กด Start)
-            freq_val = current_freq  # [แก้ไข] ใช้ความถี่จริงของรอบนี้ ไม่ใช่ UI สดที่อาจเปลี่ยนไปแล้ว
+            freq_val = current_freq  # ใช้ความถี่จริงของรอบนี้ ไม่ใช่ UI สดที่อาจเปลี่ยนไปแล้ว
         elif is_list:
             n_samples = v.input_panel.input_samples.value()
             current_sample = data.get('sample_index', 1)
@@ -874,10 +860,9 @@ class AppController(QObject):
             freq_val = current_freq
 
         # ส่งให้ Raw Data Table แสดงผล
-        # [NEW] Nominal Value: ข้อความอิสระที่ผู้ใช้กรอกใน Measurement Type — ถ้าไม่ได้
-        # กรอกไว้ ให้แสดงเป็น "-" ในตาราง
+        # Nominal Value: ข้อความอิสระที่ผู้ใช้กรอกใน Measurement Type — ถ้าไม่ได้กรอกไว้ ให้แสดงเป็น "-" ในตาราง
         nominal_text = v.input_panel.edit_nominal_value.text().strip() or "-"
-        # [NEW] SCPI Mode / AVG / Signal Level ย้ายมาบันทึกต่อแถวแทน Session Info Bar
+        # SCPI Mode / AVG / Signal Level ย้ายมาบันทึกต่อแถวแทน Session Info Bar
         # (ช่องเหล่านี้ปลดล็อกให้แก้ระหว่างมีข้อมูลค้างได้แล้ว) — ใช้ค่าจาก settings ของ
         # รอบที่กด Start จริง ไม่ใช่อ่าน UI สด เพื่อให้แต่ละแถวตรงกับค่าที่ใช้วัดจริง
         rs = self._active_run_settings
@@ -885,7 +870,7 @@ class AppController(QObject):
         avg_text = str(rs.get('avg', v.input_panel.input_avg.value()))
         level_mode = rs.get('level_mode', v.input_panel.combo_level_mode.currentData())
         level_unit_row = "A" if level_mode == "Current" else "V"
-        # [แก้ไข] ใช้ค่า "จริง" ที่เครื่องยืนยันกลับมา (query โดย measurement_thread.py ผ่าน
+        # ใช้ค่า "จริง" ที่เครื่องยืนยันกลับมา (query โดย measurement_thread.py ผ่าน
         # lcr.get_signal_level()) แทนค่าที่ผู้ใช้กรอกใน UI เฉยๆ — ถ้า query ไม่สำเร็จ
         # (actual_volt เป็น None) ให้ fallback ไปใช้ค่าที่ตั้งไว้แทน พร้อมต่อท้ายด้วย "*"
         # เพื่อให้ผู้ใช้รู้ว่าเป็นค่าที่ "ตั้งไว้" ไม่ใช่ค่าที่เครื่องยืนยันจริง
@@ -919,12 +904,12 @@ class AppController(QObject):
         self.graph_pri_y.append(raw_pri)
         self.graph_sec_y.append(raw_sec)
 
-        # [NEW] อัปเดตสถิติสะสมต่อความถี่แบบ incremental (O(1)/จุด) — ใช้แทนการคำนวณจาก
+        # อัปเดตสถิติสะสมต่อความถี่แบบ incremental (O(1)/จุด) — ใช้แทนการคำนวณจาก
         # ค่าดิบทั้งหมดใหม่ทุกครั้งใน update_statistics_table() (ดู FrequencyStatsAccumulator)
         if is_list or is_sweep:
             self._freq_stats_acc.add(current_freq, raw_pri, raw_sec)
 
-        # [แก้ไข] เดิมเรียก v.graph_display.update_plots() + self.update_statistics_table()
+        # เดิมเรียก v.graph_display.update_plots() + self.update_statistics_table()
         # (รีบิลด์กราฟ/ตารางสถิติใหม่ทั้งหมด) ทุกครั้งที่มีจุดข้อมูลใหม่ 1 จุด — พอสวีปมีจุดข้อมูล
         # สะสมมาก (สวีปยาว/วัดต่อเนื่องหลายชั่วโมง) ต้นทุนต่อจุดโตขึ้นเรื่อยๆ จนโปรแกรมค้าง
         # ไม่ตอบสนอง ตอนนี้แค่ตั้งสถานะ "รออัปเดต" แล้วให้ self._stats_refresh_timer (ทำงานทุก
@@ -933,7 +918,7 @@ class AppController(QObject):
         # โปรแกรมค้างแม้เปิดทิ้งไว้นาน — ข้อมูลดิบและสถิติที่คำนวณยังคงถูกต้องครบ 100% เสมอ
         self._stats_ui_dirty = True
 
-        # --- [NEW] อัปเดต Progress / Current Reading ใต้กราฟสรุปตามความถี่ & กราฟ PPM ---
+        # --- อัปเดต Progress / Current Reading ใต้กราฟสรุปตามความถี่ & กราฟ PPM ---
         # มีความหมายเฉพาะโหมด LIST/SWEEP (ที่วัดหลายความถี่ วนซ้ำหลายรอบต่อความถี่)
         if is_list or is_sweep:
             freq_display = self._format_freq_display(current_freq)
@@ -990,7 +975,7 @@ class AppController(QObject):
             return f"{freq:g} Hz"
 
     def _flush_stats_ui_if_dirty(self):
-        """[NEW] เรียกโดย self._stats_refresh_timer ทุก ~1 วิ — รีเฟรชกราฟ Live Trend +
+        """เรียกโดย self._stats_refresh_timer ทุก ~1 วิ — รีเฟรชกราฟ Live Trend +
         Statistics Table + กราฟสรุปตามความถี่/PPM จริง เฉพาะตอนมีข้อมูลใหม่เข้ามาจริงเท่านั้น
         (ข้าม tick เปล่าๆ ตอนไม่มีข้อมูลใหม่ ไม่เสียงานฟรี)"""
         if not self._stats_ui_dirty:
@@ -999,7 +984,7 @@ class AppController(QObject):
         self._refresh_trend_ui()
 
     def _refresh_trend_ui(self):
-        """[NEW] รีเฟรชกราฟ Live Trend + Statistics Table + กราฟสรุปตามความถี่/PPM ด้วยข้อมูล
+        """รีเฟรชกราฟ Live Trend + Statistics Table + กราฟสรุปตามความถี่/PPM ด้วยข้อมูล
         ล่าสุดที่มีอยู่ตอนนี้ทั้งหมด — แยกออกมาจาก handle_data_ready() เพื่อให้เรียกได้ทั้งจาก
         timer (ระหว่างวัด, throttled) และเรียกตรงๆ ทันทีตอนวัดจบ/ผู้ใช้กด Stop (ให้เห็นผลล่าสุด
         ทันทีไม่ต้องรอ timer รอบถัดไป)"""
@@ -1021,7 +1006,7 @@ class AppController(QObject):
         """คำนวณ/แสดงผล Statistics Table ใหม่ รองรับทุกโหมด: SINGLE (แยกสถิติทีละรอบ/1 Start
         = 1 แถว, คำนวณจากค่าดิบตรงๆ เพราะจำนวนรอบไม่เยอะ) / SWEEP-LIST (per-freq stats)
 
-        [แก้ไข] เดิมโหมด SWEEP/LIST จะสร้าง raw_records จากค่าดิบทั้งหมดแล้วเรียก
+        เดิมโหมด SWEEP/LIST จะสร้าง raw_records จากค่าดิบทั้งหมดแล้วเรียก
         calculate_frequency_stats() คำนวณใหม่จากศูนย์ทุกครั้งที่ฟังก์ชันนี้ถูกเรียก (และเรียกซ้ำ
         2 รอบในตัวเองด้วย — ครั้งแรกใน StatisticsTable ครั้งที่สองสำหรับ freq_summary_graph)
         ทำให้ต้นทุนโตขึ้นเรื่อยๆ ตามจำนวนจุดข้อมูลสะสม ตอนนี้เปลี่ยนไปใช้ผลลัพธ์จาก
@@ -1038,14 +1023,14 @@ class AppController(QObject):
         nominal_text = v.input_panel.edit_nominal_value.text().strip() or "-"
 
         if run_mode == "SINGLE":
-            # [แก้ไข] เดิมดึง fixed_freq = v.input_panel.input_freq.value() ค่าเดียวมาแปะให้
+            # เดิมดึง fixed_freq = v.input_panel.input_freq.value() ค่าเดียวมาแปะให้
             # ทุกรอบเท่ากันหมด ใช้ได้ตอน input_freq ยังถูกล็อกอยู่เท่านั้น — ตอนนี้ input_freq
             # ปลดล็อกแล้ว (ผู้ใช้เปลี่ยนความถี่วัดชิ้นงานเดิมระหว่าง session ได้) จึงต้องใช้
             # ความถี่ที่ถูก "stamp" ไว้กับข้อมูลดิบของแต่ละรอบเองแทน (self.single_runs เก็บเป็น
             # (pri, sec, freq) ต่อ sample — freq มาจาก settings snapshot ตอนกด Start ของรอบนั้น
             # ไม่ใช่อ่าน UI สด) แต่ละรอบจึงคงความถี่ที่วัดจริงไว้ถูกต้องแม้จะเปลี่ยน UI ไปแล้วก็ตาม
             #
-            # [แก้ไข] ส่งเป็น "กลุ่มต่อรอบ" (list ของ list) แทนที่จะรวมทุกรอบเป็น flat list เดียว
+            # ส่งเป็น "กลุ่มต่อรอบ" (list ของ list) แทนที่จะรวมทุกรอบเป็น flat list เดียว
             # เพื่อให้ Statistics Table คำนวณสถิติแยกทีละรอบ (1 ครั้งกด Start = 1 แถว) ไม่ปนกัน
             # แม้ freq จะเท่าเดิมทุกรอบก็ตาม (raw_data_table ยังคง "ต่อข้อมูล" ทุกแถวตามเดิม)
             raw_records = [
@@ -1119,7 +1104,7 @@ class AppController(QObject):
             self.view.ctrl_panel.btn_start.setText(f"⏳ RUNNING... {percent}%")
 
     def _get_session_info_dict(self, measurement_time: str = None) -> dict:
-        """[NEW] รวบรวมข้อมูล Session ปัจจุบัน (ค่าที่คงที่ตลอดการวัดครั้งนี้ ไม่เปลี่ยนต่อแถว)
+        """รวบรวมข้อมูล Session ปัจจุบัน (ค่าที่คงที่ตลอดการวัดครั้งนี้ ไม่เปลี่ยนต่อแถว)
         ใช้ 3 ที่: (1) แสดงใน Session Info Bar เหนือ Raw Data Table
         (2) บันทึกลง Save เพื่อโชว์ตอน Open Save (3) เตรียมไว้ให้ Export Excel ในอนาคต"""
         v = self.view
@@ -1148,30 +1133,30 @@ class AppController(QObject):
         self.set_ui_locked(False)
         self.worker = None
 
-        # [NEW] บังคับรีเฟรชกราฟ/ตารางสถิติทันทีตอนวัดจบ (ไม่ต้องรอ _stats_refresh_timer
+        # บังคับรีเฟรชกราฟ/ตารางสถิติทันทีตอนวัดจบ (ไม่ต้องรอ _stats_refresh_timer
         # รอบถัดไปซึ่งอาจช้าไปถึง ~1 วิ) เพื่อให้เห็นจุดข้อมูลสุดท้ายครบถ้วนทันที
         self._stats_ui_dirty = False
         self._refresh_trend_ui()
 
-        # [NEW] อัปเดต Progress ใต้กราฟสรุป/PPM ให้รู้ว่าวัดเสร็จแล้ว (เฉพาะถ้ามีการวัดจริง)
+        # อัปเดต Progress ใต้กราฟสรุป/PPM ให้รู้ว่าวัดเสร็จแล้ว (เฉพาะถ้ามีการวัดจริง)
         run_mode = self.get_current_run_mode()
         if run_mode in ("LIST", "SWEEP"):
             self.view.freq_summary_graph.set_progress("Complete")
             self.view.ppm_summary_graph.set_progress("Complete")
             self.view.graph_display.set_progress("Complete")
 
-        # [NEW] ป๊อปอัพแจ้งเตือนตอนวัดเสร็จ — เฉพาะกรณีวัดจบเองตามรอบจริงๆ เท่านั้น
+        # ป๊อปอัพแจ้งเตือนตอนวัดเสร็จ — เฉพาะกรณีวัดจบเองตามรอบจริงๆ เท่านั้น
         # ไม่เด้งตอนผู้ใช้ตั้งใจกด Stop เอง (กันความรำคาญ/สับสนว่า "จบ" ทั้งที่ตัวเองสั่งหยุด)
         if not self._stopped_by_user:
             QMessageBox.information(self.view, "วัดเสร็จสมบูรณ์", "การวัดเสร็จสมบูรณ์แล้ว ✅")
         self._stopped_by_user = False
 
-        # [NEW] จำเวลาที่วัดเสร็จไว้ ณ ตอนนี้ — นี่คือเวลาที่จะใช้ตอน Save Result จริงๆ
+        # จำเวลาที่วัดเสร็จไว้ ณ ตอนนี้ — นี่คือเวลาที่จะใช้ตอน Save Result จริงๆ
         # (ไม่ใช่เวลาที่ผู้ใช้กดปุ่ม Save Result ซึ่งอาจกดทีหลังก็ได้)
         self.last_measurement_time_iso = time.strftime("%Y-%m-%d %H:%M:%S")
         self.last_measurement_time = time.strftime("%d/%m/%Y %H:%M:%S")
 
-        # [NEW] อัปเดต Session Info Bar เหนือ Raw Data Table ด้วยค่าล่าสุดของ session นี้
+        # อัปเดต Session Info Bar เหนือ Raw Data Table ด้วยค่าล่าสุดของ session นี้
         self.view.raw_table.update_session_info(self._get_session_info_dict(self.last_measurement_time))
 
     def clear_graph_data(self):
@@ -1180,15 +1165,15 @@ class AppController(QObject):
         self.graph_sec_y = []
         self.graph_raw_pri_y = []
         self.graph_raw_sec_y = []
-        self.single_runs = []  # [NEW] เคลียร์กลุ่มข้อมูลดิบแยกตามรอบด้วย
-        self._freq_stats_acc.clear()  # [NEW] เคลียร์สถิติสะสมต่อความถี่ด้วย
-        self._stats_ui_dirty = False  # [NEW] กันรีเฟรชด้วยข้อมูลเก่าที่เพิ่งถูกล้างไปแล้ว
+        self.single_runs = []  # เคลียร์กลุ่มข้อมูลดิบแยกตามรอบด้วย
+        self._freq_stats_acc.clear()  # เคลียร์สถิติสะสมต่อความถี่ด้วย
+        self._stats_ui_dirty = False  # กันรีเฟรชด้วยข้อมูลเก่าที่เพิ่งถูกล้างไปแล้ว
         self.view.graph_display.clear_plots()
         self.view.freq_summary_graph.clear()
         self.view.ppm_summary_graph.clear()
         self.view.stats_table.clear_table()
-        self.view.raw_table.clear_table()  # [NEW] ล้างตารางข้อมูลดิบด้วย
-        self.view.raw_table.clear_session_info()  # [NEW] รีเซ็ต Session Info Bar ด้วย
+        self.view.raw_table.clear_table()  # ล้างตารางข้อมูลดิบด้วย
+        self.view.raw_table.clear_session_info()  # รีเซ็ต Session Info Bar ด้วย
         self.log.info("🗑 ล้างข้อมูลกราฟและตารางสถิติเรียบร้อย")
         self.update_session_lock()
 
@@ -1218,7 +1203,7 @@ class AppController(QObject):
         is_single = (run_mode == "SINGLE")
         should_lock = has_data and is_single
 
-        # [แก้ไข] ปลดล็อก Parameter Group / SCPI Mode ให้แก้ไขได้แม้มีข้อมูลค้างอยู่ในโหมด
+        # ปลดล็อก Parameter Group / SCPI Mode ให้แก้ไขได้แม้มีข้อมูลค้างอยู่ในโหมด
         # SINGLE (ตามที่ผู้ใช้ร้องขอ) — เดิมล็อกไว้เพราะกลัวข้อมูลรอบเก่ากับ SCPI Mode
         # ที่โชว์ไม่ตรงกัน แต่ตอนนี้ Raw Data Table เก็บ SCPI Mode ต่อแถวแล้ว (ไม่ได้พึ่ง
         # Session Info Bar อย่างเดียวอีกต่อไป) จึงปลอดภัยที่จะปลดล็อกทั้งสองช่องนี้
@@ -1230,7 +1215,7 @@ class AppController(QObject):
         ppm_inner_enabled = v.adv_panel.chk_dev_ppm_enable.isChecked() and not should_lock
         v.adv_panel.widget_dev_inner.setEnabled(ppm_inner_enabled)
 
-        # [NEW] ขยาย lock ให้ครอบคลุมทุกช่องที่มีผลต่อผลวัด/แสดงอยู่ใน Measurement Session
+        # ขยาย lock ให้ครอบคลุมทุกช่องที่มีผลต่อผลวัด/แสดงอยู่ใน Measurement Session
         # Info Bar (raw_data_table.py: SESSION_INFO_FIELDS) เดิมล็อกแค่ scpi_mode/run_mode/
         # freq-list ทำให้ยังแก้ signal level, avg, cable, range ระหว่างมีข้อมูลค้างอยู่ได้ —
         # พอกดวัดซ้ำ ค่าที่โชว์ใน Session Info Bar จะถูกเขียนทับด้วยค่าล่าสุดเงียบๆ ทำให้ข้อมูล
@@ -1240,20 +1225,20 @@ class AppController(QObject):
         # SESSION_INFO_FIELDS โดยตรง เพราะ update_statistics_table() ดึงค่านี้ "สด"
         # มาแปะให้ทุกรอบที่สะสมไว้เท่ากันหมดเสมอ (fixed_freq = input_freq.value()) ถ้าปล่อย
         # ให้เปลี่ยนได้ระหว่างมีข้อมูลค้าง รอบเก่าจะถูกเปลี่ยนป้ายความถี่ผิดตามไปด้วยทันที
-        # [แก้ไข] ตามที่คุยกันไว้ — ปลดล็อก input_freq เพื่อให้ผู้ใช้เปลี่ยนความถี่วัดอุปกรณ์
+        # ปลดล็อก input_freq เพื่อให้ผู้ใช้เปลี่ยนความถี่วัดอุปกรณ์
         # ชิ้นเดิมได้ระหว่าง session (เช่น อยากดูค่าที่ 1kHz แล้ว 10kHz ของชิ้นงานเดียวกัน)
         # ทำได้ปลอดภัยเพราะตอนนี้แต่ละรอบ (self.single_runs[-1]) ถูก stamp ความถี่ที่ใช้จริง
         # ของรอบนั้นไว้กับข้อมูลดิบเลย (มาจาก settings snapshot ตอนกด Start ผ่าน worker ไม่ใช่
         # อ่านค่า UI ปัจจุบันสดๆ ตอนคำนวณสถิติ) รอบเก่าจึงไม่มีทางถูกเปลี่ยนป้ายความถี่ผิดอีก
         # แม้จะเปลี่ยน input_freq ก่อนกด Start รอบถัดไปก็ตาม — ดู update_statistics_table()
-        # [แก้ไข] ปลดล็อก Signal Level (input_volt/combo_level_mode) และ AVG (input_avg)
+        # ปลดล็อก Signal Level (input_volt/combo_level_mode) และ AVG (input_avg)
         # ให้แก้ไขได้ระหว่างมีข้อมูลค้างอยู่ในโหมด SINGLE ตามที่ผู้ใช้ร้องขอ — เหตุผลเดียวกับ
         # Parameter Group/SCPI Mode ด้านบน: ค่าที่ใช้จริงต่อแถวถูก stamp ไว้ใน Raw Data Table
         # แล้ว ไม่ต้องพึ่ง Session Info Bar อย่างเดียวอีกต่อไป
         v.input_panel.input_volt.setEnabled(True)
         v.input_panel.combo_level_mode.setEnabled(True)
         v.input_panel.input_avg.setEnabled(True)
-        # [แก้ไข] ปลดล็อก Enable ALC ให้แก้ไขได้ระหว่างมีข้อมูลค้างในโหมด SINGLE ด้วย
+        # ปลดล็อก Enable ALC ให้แก้ไขได้ระหว่างมีข้อมูลค้างในโหมด SINGLE ด้วย
         # (ตามที่ผู้ใช้ร้องขอ) — เหตุผลเดียวกับ Signal Level/AVG ด้านบน
         v.input_panel.chk_alc.setEnabled(True)
 
@@ -1279,17 +1264,17 @@ class AppController(QObject):
             v.input_panel.input_freq_list.setEnabled(False)
             v.input_panel.input_samples.setEnabled(False)
 
-        # [restored] เช็คใหม่ทุกครั้งที่ session lock เปลี่ยน (เผื่อ mode เปลี่ยนระหว่างล็อก/ปลดล็อก)
+        # เช็คใหม่ทุกครั้งที่ session lock เปลี่ยน (เผื่อ mode เปลี่ยนระหว่างล็อก/ปลดล็อก)
         self.validate_freq_list()
 
     def validate_visa(self):
-        """[แก้ไข] ปุ่ม Start ต้องรอ 'เชื่อมต่อจริง' (self.lcr.is_connected) ไม่ใช่แค่มีรายการใน Dropdown
+        """ปุ่ม Start ต้องรอ 'เชื่อมต่อจริง' (self.lcr.is_connected) ไม่ใช่แค่มีรายการใน Dropdown
         ฟังก์ชันนี้ยังคงเรียกตอนเปลี่ยน Dropdown เพื่อ refresh สถานะปุ่ม Connect เท่านั้น"""
         self.is_visa_error = not self.lcr.is_connected
         self.update_start_button_state()
 
     def handle_connect(self):
-        """[NEW] เชื่อมต่อกับเครื่อง LCR Meter ค้างไว้ (ใช้ instance เดียวตลอด session)"""
+        """เชื่อมต่อกับเครื่อง LCR Meter ค้างไว้ (ใช้ instance เดียวตลอด session)"""
         v = self.view
         visa_address = v.conn_panel.combo_visa.currentText()
 
@@ -1314,7 +1299,7 @@ class AppController(QObject):
         self.validate_visa()
 
     def handle_disconnect(self):
-        """[NEW] ตัดการเชื่อมต่อกับเครื่อง LCR Meter"""
+        """ตัดการเชื่อมต่อกับเครื่อง LCR Meter"""
         v = self.view
 
         if self.worker is not None or self.corr_worker is not None or self.verify_worker is not None:
@@ -1334,7 +1319,7 @@ class AppController(QObject):
             self.view.input_panel.combo_scpi_mode.addItem(f"{scpi_code} ({display_text})", userData=scpi_code)
 
     def check_correction_status(self):
-        """[NEW] เช็คว่าทำ OPEN Correction และ SHORT Correction ครบทั้งคู่หรือยัง
+        """เช็คว่าทำ OPEN Correction และ SHORT Correction ครบทั้งคู่หรือยัง
         ใช้ text บนปุ่มเป็นแหล่งข้อมูลจริง (single source of truth) เหมือนกับ
         _reset_correction_status() เพื่อไม่ให้ status สองที่ไม่ตรงกัน"""
         adv = self.view.adv_panel
@@ -1350,7 +1335,7 @@ class AppController(QObject):
         v.ctrl_panel.lbl_warn_visa.setVisible(self.is_visa_error)
         v.ctrl_panel.lbl_warn_dev_start.setVisible(self.is_ppm_error)
         v.ctrl_panel.lbl_warn_freqlist_start.setVisible(self.is_freqlist_error)
-        # ไม่ต้องซ้ำเตือนถ้ายังต่อเครื่องไม่ได้ — โชว์เตือน Correction เฉพาะตอนต่อเครื่องแล้ว
+        # ไม่ต้องเตือนซ้ำถ้ายังต่อเครื่องไม่ได้ — โชว์เตือน Correction เฉพาะตอนต่อเครื่องแล้ว
         v.ctrl_panel.lbl_warn_correction_start.setVisible(
             self.is_correction_error and not self.is_visa_error
         )
@@ -1485,7 +1470,7 @@ class AppController(QObject):
         else:
             v.adv_panel.lbl_dev_warning.setText("")
             self.is_ppm_error = False
-            # [NEW] ปิด PPM ทั้งระบบ -> ล็อกตัวเลือก Plot Primary/Secondary ของกราฟ PPM ด้วย
+            # ปิด PPM ทั้งระบบ -> ล็อกตัวเลือก Plot Primary/Secondary ของกราฟ PPM ด้วย
             v.ppm_summary_graph.set_primary_option_enabled(False)
             v.ppm_summary_graph.set_secondary_option_enabled(False)
             self.update_start_button_state()
@@ -1531,7 +1516,7 @@ class AppController(QObject):
         self.update_start_button_state()
 
     # ========================================================
-    # [NEW] ระบบ Save / View Save Result / Open Save
+    # ระบบ Save / View Save Result / Open Save
     # ========================================================
     def _build_save_snapshot(self) -> dict:
         """รวบรวม Input ทั้งหมด + ผลลัพธ์ ณ ปัจจุบันเป็น dict เดียว พร้อมบันทึกลงไฟล์
@@ -1550,7 +1535,7 @@ class AppController(QObject):
                 "measurement_time_iso": measurement_time_iso,
                 "run_mode": run_mode,
             },
-            # [NEW] ข้อมูล Session (ค่าคงที่ตลอดการวัดครั้งนี้) — เตรียมไว้ให้ Open Save
+            # ข้อมูล Session (ค่าคงที่ตลอดการวัดครั้งนี้) — เตรียมไว้ให้ Open Save
             # โชว์ใน Session Info Bar และให้ Export Excel ในอนาคตดึงไปใช้ได้ทันที
             "session_info": self._get_session_info_dict(measurement_time),
             "inputs": {
@@ -1587,7 +1572,7 @@ class AppController(QObject):
                 "graph_sec_y": self.graph_sec_y,
                 "graph_raw_pri_y": self.graph_raw_pri_y,
                 "graph_raw_sec_y": self.graph_raw_sec_y,
-                # [NEW] เก็บกลุ่มข้อมูลดิบแยกตาม "รอบ" (1 ครั้งกด Start ในโหมด SINGLE = 1 รอบ)
+                # เก็บกลุ่มข้อมูลดิบแยกตาม "รอบ" (1 ครั้งกด Start ในโหมด SINGLE = 1 รอบ)
                 # ไว้ใช้คำนวณ Statistics Table แยกแถวต่อรอบ ตอน Open Save กลับมาดูทีหลัง
                 "single_runs": self.single_runs,
                 "raw_table_rows": v.raw_table.get_rows(),
@@ -1732,7 +1717,7 @@ class AppController(QObject):
         self.graph_sec_y = list(results.get("graph_sec_y", []))
         self.graph_raw_pri_y = list(results.get("graph_raw_pri_y", []))
         self.graph_raw_sec_y = list(results.get("graph_raw_sec_y", []))
-        # [NEW] คืนค่ากลุ่มข้อมูลดิบแยกตามรอบ (ใช้คำนวณ Statistics Table ต่อรอบใน SINGLE mode)
+        # คืนค่ากลุ่มข้อมูลดิบแยกตามรอบ (ใช้คำนวณ Statistics Table ต่อรอบใน SINGLE mode)
         # แต่ละ sample เก็บเป็น (pri, sec, freq) — freq ของรอบนั้นๆ โดยเฉพาะ (รองรับกรณี
         # เปลี่ยนความถี่ระหว่าง session ได้ตั้งแต่ input_freq ถูกปลดล็อก)
         # ไฟล์เก่าก่อนมีฟีเจอร์นี้จะไม่มี key "single_runs" เลย หรือมีแต่เป็น 2-tuple (pri, sec)
@@ -1747,7 +1732,7 @@ class AppController(QObject):
             for run in raw_single_runs
         ]
 
-        # [NEW] โหลดค่าดิบที่คืนมาเข้าตัวสะสมสถิติต่อความถี่ใหม่ทั้งหมด (accumulator ใหม่/ว่าง
+        # โหลดค่าดิบที่คืนมาเข้าตัวสะสมสถิติต่อความถี่ใหม่ทั้งหมด (accumulator ใหม่/ว่าง
         # ตอนเปิดโปรแกรม หรือยังไม่เคยผ่านข้อมูลชุดนี้มาก่อน) ให้ update_statistics_table()
         # ด้านล่างคำนวณสถิติ LIST/SWEEP ได้ถูกต้องตรงกับข้อมูลที่เพิ่งโหลดมา
         self._freq_stats_acc.rebuild_from_records([
@@ -1774,7 +1759,7 @@ class AppController(QObject):
         self.last_measurement_time = meta.get("measurement_time")
         self.last_measurement_time_iso = meta.get("measurement_time_iso")
 
-        # [NEW] แสดง Session Info Bar ตามที่บันทึกไว้ในไฟล์ Save
+        # แสดง Session Info Bar ตามที่บันทึกไว้ในไฟล์ Save
         # (ถ้าเป็น Save เก่าก่อนมีฟีเจอร์นี้ จะไม่มี key "session_info" -> คำนวณสดจาก input ที่เพิ่ง restore แทน)
         session_info = data.get("session_info") or self._get_session_info_dict(self.last_measurement_time)
         v.raw_table.update_session_info(session_info)

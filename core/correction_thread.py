@@ -16,7 +16,7 @@ class CorrectionWorker(QThread):
 
     def __init__(self, lcr, corr_type: str, cable_text: str = "0 m"):
         super().__init__()
-        # [แก้ไข] รับ instance ที่เชื่อมต่อไว้แล้วจากปุ่ม Connect แทนที่จะเปิด Connection ใหม่เอง
+        # รับ instance ที่เชื่อมต่อไว้แล้วจากปุ่ม Connect แทนที่จะเปิด Connection ใหม่เอง
         self.lcr = lcr
         self.corr_type = corr_type              # 'OPEN' หรือ 'SHORT'
         # Cable Length ปัจจุบันจาก GUI — ต้องตั้งที่เครื่องก่อนทำ Correction เสมอ
@@ -39,4 +39,4 @@ class CorrectionWorker(QThread):
 
         except Exception as e:
             self.finished_signal.emit(False, f"เกิดข้อผิดพลาดรุนแรง:\n{str(e)}")
-        # [แก้ไข] ไม่ disconnect() ที่นี่แล้ว — Connection ถูกจัดการโดยปุ่ม Connect/Disconnect ที่ผู้ใช้กดเอง
+        # ไม่ disconnect() ที่นี่แล้ว — Connection ถูกจัดการโดยปุ่ม Connect/Disconnect ที่ผู้ใช้กดเอง

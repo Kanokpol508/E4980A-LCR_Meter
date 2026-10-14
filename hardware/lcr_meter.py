@@ -15,13 +15,13 @@ class E4980A:
     def scan_ports(self) -> list:
         """สแกนหาพอร์ต VISA ทั้งหมดที่เชื่อมต่ออยู่จริง (ใช้ร่วมกับหน้าต่าง GUI)
 
-        [แก้ไข] แค่ rm.list_resources() อย่างเดียวไม่พอ เพราะ VISA backend (โดยเฉพาะ
+        แค่ rm.list_resources() อย่างเดียวไม่พอ เพราะ VISA backend (โดยเฉพาะ
         NI-VISA) มักค้าง/แคชชื่อ resource ของอุปกรณ์ที่เคยเสียบไว้ในระบบ (เช่น USB alias
         หรือ session ที่ไม่ได้ปิด) ทำให้ dropdown โชว์ชื่อสายเดิมค้างอยู่ทั้งที่ถอดสายไปแล้ว
         จึงต้องเปิดแต่ละ resource จริงและสอบถาม *IDN? แบบ timeout สั้นๆ เพื่อยืนยันว่ามี
         อุปกรณ์ตอบสนองอยู่จริง — ถ้าไม่ตอบสนองจะถือว่าไม่มีสายต่ออยู่และไม่นำมาแสดง
 
-        [แก้ไข] เดิมฟังก์ชันนี้เป็น @staticmethod ที่สร้าง pyvisa.ResourceManager() ของตัวเอง
+        เดิมฟังก์ชันนี้เป็น @staticmethod ที่สร้าง pyvisa.ResourceManager() ของตัวเอง
         แยกจาก self.rm แล้วปิดทิ้ง (rm.close()) ทุกครั้งหลังสแกนเสร็จ ปัญหาคือ VISA backend
         หลายตัว (โดยเฉพาะ GPIB) ไม่ได้แยก session ของแต่ละ ResourceManager() ออกจากกัน
         อย่างสมบูรณ์ — การปิด RM ตัวที่ใช้สแกนทิ้งไปกระทบ session ระดับ board ที่ self.rm
@@ -62,10 +62,10 @@ class E4980A:
     # ==========================================
     def connect(self, resource_address, _retry: bool = True):
         """เชื่อมต่อกับเครื่อง LCR Meter
-        [แก้ไข] เพิ่ม guard: ถ้ามี session ค้างอยู่ (เช่น เคย connect() ไว้แล้วไม่ได้ disconnect())
+        เพิ่ม guard: ถ้ามี session ค้างอยู่ (เช่น เคย connect() ไว้แล้วไม่ได้ disconnect())
         ให้ปิดของเก่าทิ้งก่อนเปิดใหม่เสมอ ป้องกัน VISA resource leak ตอนใช้ instance เดียวซ้ำหลายรอบ
 
-        [แก้ไข] เพิ่ม self-healing: ถ้า self.rm session เสีย (เช่น "Invalid session handle" —
+        เพิ่ม self-healing: ถ้า self.rm session เสีย (เช่น "Invalid session handle" —
         อาจเกิดจากถอด/เสียบสาย USB-GPIB กลางคัน หรือไดรเวอร์ VISA รีเซ็ต session เอง)
         ให้สร้าง ResourceManager ใหม่แล้วลองเชื่อมต่อซ้ำอีก 1 ครั้งอัตโนมัติ แทนที่จะพัง
         ค้างตลอดไปจนกว่าจะปิดโปรแกรมแล้วเปิดใหม่
@@ -199,7 +199,7 @@ class E4980A:
     def perform_correction(self, corr_type: str, cable_text: str = None) -> tuple[bool, str]:
         """สั่งเครื่องทำ OPEN หรือ SHORT Correction แบบเต็มรูปแบบ
 
-        [แก้ไข] ต้องตั้งค่า Cable Length ให้ตรงกับสายวัดจริงก่อนทำ Correction เสมอ
+        ต้องตั้งค่า Cable Length ให้ตรงกับสายวัดจริงก่อนทำ Correction เสมอ
         เพราะค่า OPEN/SHORT ที่วัดได้จะผูกกับ Cable Length ที่ตั้งไว้ ณ ขณะนั้น
         ถ้าไม่ส่ง cable_text (None) จะใช้ค่า Cable Length ที่ค้างอยู่ในเครื่องจากครั้งก่อนแทน
         (ควรหลีกเลี่ยง เพราะอาจไม่ตรงกับที่ผู้ใช้เลือกไว้ใน GUI)
@@ -216,12 +216,12 @@ class E4980A:
             original_timeout = self.inst.timeout
             self.inst.timeout = 180000
 
-            # 1.1 [ใหม่] ตั้งค่า Cable Length ให้ตรงกับสายวัดจริงก่อนทำ Correction เสมอ
+            # 1.1 ตั้งค่า Cable Length ให้ตรงกับสายวัดจริงก่อนทำ Correction เสมอ
             if cable_text is not None:
                 self.set_cable_length(cable_text)
                 self.wait_until_ready()
 
-            # 1.2 [ใหม่] บังคับปิด ALC ชั่วคราวก่อนทำ Correction เสมอ ไม่ว่า checkbox
+            # 1.2 บังคับปิด ALC ชั่วคราวก่อนทำ Correction เสมอ ไม่ว่า checkbox
             # ในหน้าจอ/สถานะเครื่องปัจจุบันจะเป็นอย่างไรก็ตาม
             # เหตุผล: ALC ใช้ feedback loop ปรับระดับสัญญาณให้ตรงกับค่าที่ตกคร่อม DUT จริง
             # แต่ตอน OPEN (วงจรเปิด) หรือ SHORT (วงจรลัด) ไม่มี DUT จริงให้ feedback ลู่เข้าได้
@@ -245,7 +245,7 @@ class E4980A:
             # 3. ใช้ wait_until_ready รอสถานะ OPC แทนการใส่ ;*OPC? ต่อท้าย
             self.wait_until_ready()
 
-            # 3.1 [แก้ไข] เช็ค error queue ทันทีหลัง EXEC
+            # 3.1 เช็ค error queue ทันทีหลัง EXEC
             # ป้องกัน error ค้าง (เช่น +43 Measurement failed จากขั้ว UNKNOWN ต่อไม่เหมาะสม)
             # หลุดไปโผล่ผิดที่ผิดเวลาตอนกด START วัดครั้งถัดไป (safety-net check ใน measurement_thread.py
             # จะอ่าน error ตัวแรกสุดในคิวแบบ FIFO ซึ่งอาจไม่ใช่ error ของการตั้งค่าที่เพิ่งทำจริง ๆ)
@@ -266,7 +266,7 @@ class E4980A:
                     self.inst.timeout = original_timeout
                 except:
                     pass
-                # 4.1 [ใหม่] คืนค่า ALC กลับตามที่เครื่องเคยเป็นก่อนเริ่ม Correction เสมอ
+                # 4.1 คืนค่า ALC กลับตามที่เครื่องเคยเป็นก่อนเริ่ม Correction เสมอ
                 # (ผู้ใช้ต้องกลับไปเจอสถานะเดิมทุกประการตอนไปวัดจริงต่อ)
                 if original_alc is not None:
                     try:
@@ -305,7 +305,7 @@ class E4980A:
 
     def get_signal_level(self, mode: str = 'Voltage') -> float:
         """
-        [NEW] อ่านค่าระดับสัญญาณทดสอบ "จริง" ที่เครื่องยืนยันว่ากำลังตั้งอยู่ ณ ขณะนี้
+        อ่านค่าระดับสัญญาณทดสอบ "จริง" ที่เครื่องยืนยันว่ากำลังตั้งอยู่ ณ ขณะนี้
         (Query กลับจากเครื่องจริงๆ ผ่าน SCPI ไม่ใช่ค่าที่ผู้ใช้กรอกไว้ในช่อง UI เฉยๆ)
         - mode = 'Current' -> query :CURRent:LEVel? (หน่วย A) ใช้กับ Inductor
         - mode = 'Voltage' -> query :VOLTage:LEVel? (หน่วย V) ใช้กับ Capacitor
@@ -355,7 +355,7 @@ class E4980A:
 
     def set_cable_length(self, cable_text: str):
         """
-        [ใหม่] ตั้งค่าการชดเชยความยาวสายวัด (Cable Length Correction)
+        ตั้งค่าการชดเชยความยาวสายวัด (Cable Length Correction)
         รับค่าจาก GUI Combobox เช่น "0 m", "1 m", "2 m", "4 m"
         แล้วแปลงเป็นตัวเลข 0/1/2/4 ก่อนส่งคำสั่ง :CORRection:LENGth
 
@@ -407,7 +407,7 @@ class E4980A:
     # ระบบอ่านค่า (Measurement Methods)
     # ==========================================
     def trigger_and_fetch(self):
-        """[แก้ไข] ทริกเกอร์ + อ่านค่าวัด ในคำสั่งเดียวแบบ atomic (แก้บั๊ก Buffer ค้าง)
+        """ทริกเกอร์ + อ่านค่าวัด ในคำสั่งเดียวแบบ atomic (แก้บั๊ก Buffer ค้าง)
         ใช้ "*TRG" เป็น query โดยตรง (write แล้วอ่านค่ากลับทันที) ตามที่คู่มือระบุว่า
         "*TRG" เทียบเท่ากับ ":TRIG;:FETCh?" — วิธีนี้ปลอดภัยกว่าการแยก trigger()+fetch_measurement()
         เป็นคนละคำสั่ง เพราะไม่มีการค้างของ response ใน buffer ของเครื่องอีกต่อไป
@@ -436,7 +436,7 @@ class E4980A:
             return None, None, f"TIMEOUT/IO_ERROR: {str(e)}"
 
     def _parse_fetch_response(self, raw_data: str):
-        """[NEW] แยก logic การแปลงผลลัพธ์ดิบจากเครื่อง (ใช้ร่วมกันทั้ง trigger_and_fetch()
+        """แยก logic การแปลงผลลัพธ์ดิบจากเครื่อง (ใช้ร่วมกันทั้ง trigger_and_fetch()
         และ fetch_measurement() กันโค้ดซ้ำ) คืนค่าเป็น (primary, secondary, status)"""
         parts = raw_data.strip().split(',')
         # เก็บสตริงดิบที่เครื่องส่งมา (ก่อนแปลงเป็น float) ไว้ตรวจสอบย้อนหลัง

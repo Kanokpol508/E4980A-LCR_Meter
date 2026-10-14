@@ -1,40 +1,42 @@
-# ไฟล์จุดเริ่มต้นรันโปรแกรม (Entry Point)
-
-import sys
 import os
+import sys
+import ctypes
+
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
 from gui.main_window import MainWindow
 from core.app_controller import AppController
 
+
+def resource_path(rel_path: str) -> str:
+    """หาพาธไฟล์ได้ทั้งตอนรันจากโค้ดและตอนเป็น exe (PyInstaller)"""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, rel_path)
+
+
 def main():
-    # 1. สร้างแอปพลิเคชัน PyQt
+    # ให้ Taskbar แสดงไอคอนของโปรแกรม ไม่ใช่ไอคอน Python (เฉพาะ Windows)
+    if sys.platform == "win32":
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "lcr.e4980a.meter"
+        )
+
     app = QApplication(sys.argv)
-    
-    # 2. โหลดไฟล์ QSS Theme โดยใช้ Path อ้างอิงจากตำแหน่งไฟล์ main.py (Absolute Path)
-    # ป้องกันบั๊กหาไฟล์ไม่เจอเมื่อรันโปรแกรมจากโฟลเดอร์อื่น หรือเมื่อนำไปแพ็กเป็น .exe
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    qss_path = os.path.join(base_dir, "assets", "styles.qss")
-    
-    try:
+    app.setWindowIcon(QIcon(resource_path("assets/icon.ico")))
+
+    # โหลดสไตล์ (ถ้าไฟล์เดิมของคุณโหลด styles.qss ที่อื่นอยู่แล้ว ให้ลบบล็อกนี้)
+    qss_path = resource_path("assets/styles.qss")
+    if os.path.exists(qss_path):
         with open(qss_path, "r", encoding="utf-8") as f:
             app.setStyleSheet(f.read())
-    except FileNotFoundError:
-        print(f"⚠️ คำเตือน: ไม่พบไฟล์ {qss_path} โปรแกรมจะใช้ธีมพื้นฐานแทน")
-    
-    # 3. สร้างหน้าต่าง GUI เปล่าๆ ขึ้นมา (View)
-    window = MainWindow()
-    
-    # 4. สร้าง Controller แล้วมอบหมายให้เข้าไปควบคุมหน้าต่าง (Controller -> View)
-    controller = AppController(window)
-    
-    # ตัดการเชื่อมต่อเครื่อง LCR Meter ให้เรียบร้อยก่อนโปรแกรมปิด
-    # ป้องกัน VISA session ค้างที่เครื่องหลังปิดโปรแกรมกะทันหัน
-    app.aboutToQuit.connect(lambda: controller.lcr.disconnect() if controller.lcr.is_connected else None)
 
-    # 5. แสดงหน้าจอและรันโปรแกรม
-    window.showMaximized()
+    window = MainWindow()
+    controller = AppController(window)  # เก็บไว้ในตัวแปรไม่ให้ถูกเก็บขยะ
+    window.showMaximized()              # เปิดหน้าต่างโปรแกรมแบบเต็มจอ
+
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

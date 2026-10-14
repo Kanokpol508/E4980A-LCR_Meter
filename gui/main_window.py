@@ -18,7 +18,7 @@ from gui.displays.raw_data_table import RawDataTable
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("E4980A(20Hz-2MHz) Precision LCR Meter Controller")
+        self.setWindowTitle("E4980A(20Hz-2MHz) Precision LCR Meter Controller by Kanokpol Kaewsri")
         self.resize(1280, 720)
         self.setLocale(QLocale(QLocale.Language.English, QLocale.Country.UnitedStates))
 

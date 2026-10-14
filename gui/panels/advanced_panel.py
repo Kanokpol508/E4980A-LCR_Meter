@@ -49,6 +49,9 @@ class AdvancedPanel(QWidget):
 
         # checkbox เปิด/ปิด PPM — ใช้งานได้ทุกโหมดการวัด (SINGLE, SWEEP, LIST)
         self.chk_dev_ppm_enable = QCheckBox("Enable PPM Deviation calculation")
+        # เมื่อติ๊กเปิด: ข้อความเป็นสีเขียว + ✅ (เหมือน Enable ALC ใน input_panel)
+        self.chk_dev_ppm_enable.toggled.connect(self._on_ppm_enable_toggled)
+        self._on_ppm_enable_toggled(self.chk_dev_ppm_enable.isChecked())
         v_ppm.addWidget(self.chk_dev_ppm_enable)
 
         # widget ที่ถูก enable/disable ตาม checkbox
@@ -96,3 +99,16 @@ class AdvancedPanel(QWidget):
 
         layout.addWidget(group_corr)
         layout.addWidget(self.group_ppm)
+
+    def _on_ppm_enable_toggled(self, checked: bool):
+        """เปลี่ยนข้อความ + สี checkbox 'Enable PPM Deviation calculation' ตามสถานะ
+        (รูปแบบเดียวกับ Enable ALC) — ใส่ :disabled ไว้ด้วยเพื่อให้เป็นสีเทาเมื่อถูกล็อกระหว่างวัด"""
+        if checked:
+            self.chk_dev_ppm_enable.setText("Enable PPM Deviation calculation ✅")
+            self.chk_dev_ppm_enable.setStyleSheet(
+                "QCheckBox { color: #2E8B57; font-weight: bold; } "
+                "QCheckBox:disabled { color: #A3ADC2; font-weight: normal; }"
+            )
+        else:
+            self.chk_dev_ppm_enable.setText("Enable PPM Deviation calculation")
+            self.chk_dev_ppm_enable.setStyleSheet("")

@@ -381,13 +381,8 @@ class InputPanel(QWidget):
         # จำนวนครั้งที่วัดซ้ำ (N) ใน SINGLE mode
         self.input_n_single = NoScrollSpinBox()
         self.input_n_single.setRange(1, 9999)
-        self.input_n_single.setValue(10)
+        self.input_n_single.setValue(5)
         self.input_n_single.setFixedWidth(COUNT_FIELD_WIDTH)
-        self.input_n_single.setToolTip(
-            "จำนวนครั้งที่วัดซ้ำต่อ 1 ครั้งที่กด Start\n"
-            "ยิ่งมาก Type A (ppm) ยิ่งน่าเชื่อถือ\n"
-            "แนะนำ: ≥ 10 ครั้ง สำหรับงาน Metrology"
-        )
 
         # เดิมเป็นช่อง "Discard First" ให้ผู้ใช้กรอกเอง (SINGLE mode) — เอาช่องกรอก
         # ออกแล้ว โปรแกรมทิ้งค่าแรก DISCARD_FIRST_COUNT (=3) ครั้งให้อัตโนมัติเสมอเบื้องหลัง
@@ -488,7 +483,7 @@ class InputPanel(QWidget):
 
         self.input_samples_sweep = NoScrollSpinBox()
         self.input_samples_sweep.setRange(1, 999)
-        self.input_samples_sweep.setValue(10)
+        self.input_samples_sweep.setValue(5)
         self.input_samples_sweep.setFixedWidth(COUNT_FIELD_WIDTH)
 
         # เดิมเป็นช่อง "Discard First Reading" ให้ผู้ใช้กรอกเอง — เอาช่องกรอกออก
@@ -529,7 +524,7 @@ class InputPanel(QWidget):
 
         self.input_samples = NoScrollSpinBox()
         self.input_samples.setRange(1, 999)
-        self.input_samples.setValue(10)
+        self.input_samples.setValue(5)
 
         # เดิมเป็นช่อง "Discard First Reading" ให้ผู้ใช้กรอกเอง — เอาช่องกรอกออก
         # โปรแกรมทิ้งค่าแรก DISCARD_FIRST_COUNT (=3) ค่าแรกของทุกความถี่ให้อัตโนมัติเสมอ

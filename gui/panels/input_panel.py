@@ -310,7 +310,7 @@ class InputPanel(QWidget):
         self.edit_nominal_value.setPlaceholderText("กรอก Nominal Value (ถ้ามี)")
 
         lbl_prop_group = QLabel("Parameter Group:")
-        lbl_scpi_mode = QLabel("SCPI Mode:")
+        lbl_scpi_mode = QLabel("FUNC:")
         lbl_nominal_value = QLabel("Nominal Value:")
         lbl_prop_group.setMaximumWidth(120)
         lbl_scpi_mode.setMaximumWidth(120)

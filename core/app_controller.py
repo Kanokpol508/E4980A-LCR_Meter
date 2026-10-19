@@ -72,7 +72,7 @@ class AppController(QObject):
         self._stats_refresh_timer.setInterval(1000)
         self._stats_refresh_timer.timeout.connect(self._flush_stats_ui_if_dirty)
         self._stats_refresh_timer.start()
-        # settings ของรอบวัดล่าสุดที่กด Start — ใช้ประกอบ SCPI Mode/AVG/Signal Level
+        # settings ของรอบวัดล่าสุดที่กด Start — ใช้ประกอบ FUNC/AVG/Signal Level
         # ต่อแถวใน Raw Data Table (ดูเหตุผลที่ start_measurement())
         self._active_run_settings = {}
 
@@ -667,7 +667,7 @@ class AppController(QObject):
 
     def _refresh_raw_table_headers(self):
         """อัปเดตชื่อคอลัมน์ Primary/Secondary ใน Raw Data Table
-        เมื่อผู้ใช้เปลี่ยน SCPI Mode เช่น CPD → Cp, D หรือ ZTD → Z, θd"""
+        เมื่อผู้ใช้เปลี่ยน FUNC เช่น CPD → Cp, D หรือ ZTD → Z, θd"""
         self.view.raw_table.update_headers(
             self.view.input_panel.combo_scpi_mode.currentData()
         )
@@ -693,7 +693,7 @@ class AppController(QObject):
         # ทำให้โหมด SINGLE ที่ตั้งใจ "ต่อข้อมูล" รอบใหม่ ถูกล้างตารางทิ้งไปด้วยทุกรอบ
         # ตอนนี้เรียก set_mode() (ซึ่งจะ clear ตาราง) เฉพาะตอนเปลี่ยนโหมดจริง หรือเป็น
         # SINGLE รอบแรกของ session ใหม่เท่านั้น — ถ้าเป็น SINGLE รอบต่อเนื่อง จะข้าม
-        # การ clear ไปเลย (อัปเดตแค่ชื่อคอลัมน์ Primary/Secondary เผื่อ SCPI mode เปลี่ยน)
+        # การ clear ไปเลย (อัปเดตแค่ชื่อคอลัมน์ Primary/Secondary เผื่อ FUNC เปลี่ยน)
         if not is_single or is_first_single_session:
             v.raw_table.set_mode(run_mode)
         v.raw_table.update_headers(v.input_panel.combo_scpi_mode.currentData())
@@ -756,7 +756,7 @@ class AppController(QObject):
 
         self.worker = MeasurementWorker(self.lcr, settings)
         # เก็บ settings ของรอบนี้ไว้ใช้ตอน append_row ลง Raw Data Table
-        # (SCPI Mode/AVG/Signal Level ปลดล็อกให้แก้ระหว่างมีข้อมูลค้างได้แล้ว จึงต้องอ้างอิง
+        # (FUNC/AVG/Signal Level ปลดล็อกให้แก้ระหว่างมีข้อมูลค้างได้แล้ว จึงต้องอ้างอิง
         # ค่าที่ "ใช้จริง" ตอนกด Start ของรอบนี้ ไม่ใช่อ่าน UI สดตอน handle_data_ready
         # เพราะผู้ใช้อาจเปลี่ยนค่าทิ้งไว้ก่อนรอบถัดไปแล้ว)
         self._active_run_settings = settings
@@ -862,7 +862,7 @@ class AppController(QObject):
         # ส่งให้ Raw Data Table แสดงผล
         # Nominal Value: ข้อความอิสระที่ผู้ใช้กรอกใน Measurement Type — ถ้าไม่ได้กรอกไว้ ให้แสดงเป็น "-" ในตาราง
         nominal_text = v.input_panel.edit_nominal_value.text().strip() or "-"
-        # SCPI Mode / AVG / Signal Level ย้ายมาบันทึกต่อแถวแทน Session Info Bar
+        # FUNC / AVG / Signal Level ย้ายมาบันทึกต่อแถวแทน Session Info Bar
         # (ช่องเหล่านี้ปลดล็อกให้แก้ระหว่างมีข้อมูลค้างได้แล้ว) — ใช้ค่าจาก settings ของ
         # รอบที่กด Start จริง ไม่ใช่อ่าน UI สด เพื่อให้แต่ละแถวตรงกับค่าที่ใช้วัดจริง
         rs = self._active_run_settings
@@ -1203,9 +1203,9 @@ class AppController(QObject):
         is_single = (run_mode == "SINGLE")
         should_lock = has_data and is_single
 
-        # ปลดล็อก Parameter Group / SCPI Mode ให้แก้ไขได้แม้มีข้อมูลค้างอยู่ในโหมด
-        # SINGLE (ตามที่ผู้ใช้ร้องขอ) — เดิมล็อกไว้เพราะกลัวข้อมูลรอบเก่ากับ SCPI Mode
-        # ที่โชว์ไม่ตรงกัน แต่ตอนนี้ Raw Data Table เก็บ SCPI Mode ต่อแถวแล้ว (ไม่ได้พึ่ง
+        # ปลดล็อก Parameter Group / FUNC ให้แก้ไขได้แม้มีข้อมูลค้างอยู่ในโหมด
+        # SINGLE (ตามที่ผู้ใช้ร้องขอ) — เดิมล็อกไว้เพราะกลัวข้อมูลรอบเก่ากับ FUNC
+        # ที่โชว์ไม่ตรงกัน แต่ตอนนี้ Raw Data Table เก็บ FUNC ต่อแถวแล้ว (ไม่ได้พึ่ง
         # Session Info Bar อย่างเดียวอีกต่อไป) จึงปลอดภัยที่จะปลดล็อกทั้งสองช่องนี้
         v.input_panel.combo_prop_group.setEnabled(True)
         v.input_panel.combo_scpi_mode.setEnabled(True)
@@ -1233,7 +1233,7 @@ class AppController(QObject):
         # แม้จะเปลี่ยน input_freq ก่อนกด Start รอบถัดไปก็ตาม — ดู update_statistics_table()
         # ปลดล็อก Signal Level (input_volt/combo_level_mode) และ AVG (input_avg)
         # ให้แก้ไขได้ระหว่างมีข้อมูลค้างอยู่ในโหมด SINGLE ตามที่ผู้ใช้ร้องขอ — เหตุผลเดียวกับ
-        # Parameter Group/SCPI Mode ด้านบน: ค่าที่ใช้จริงต่อแถวถูก stamp ไว้ใน Raw Data Table
+        # Parameter Group/FUNC ด้านบน: ค่าที่ใช้จริงต่อแถวถูก stamp ไว้ใน Raw Data Table
         # แล้ว ไม่ต้องพึ่ง Session Info Bar อย่างเดียวอีกต่อไป
         v.input_panel.input_volt.setEnabled(True)
         v.input_panel.combo_level_mode.setEnabled(True)

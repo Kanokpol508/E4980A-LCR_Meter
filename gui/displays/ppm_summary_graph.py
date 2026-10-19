@@ -211,7 +211,7 @@ class PpmSummaryGraph(QWidget):
         super().__init__(parent)
         self.label_style = {'color': '#1e293b', 'font-size': '10pt', 'font-weight': 'normal'}
 
-        # ชื่อพารามิเตอร์จริงตาม SCPI mode (อัปเดตผ่าน set_axis_labels) — ไม่รวมหน่วยเดิม
+        # ชื่อพารามิเตอร์จริงตาม FUNC (อัปเดตผ่าน set_axis_labels) — ไม่รวมหน่วยเดิม
         # เพราะกราฟนี้แกน Y เป็น ppm เสมอ
         self.pri_name = "Primary"
         self.sec_name = "Secondary"
@@ -433,7 +433,7 @@ class PpmSummaryGraph(QWidget):
 
     # --------------------------------------------------------
     def set_axis_labels(self, pri_label: str, sec_label: str):
-        """เรียกจาก app_controller ตอนเปลี่ยน SCPI mode — ใช้แค่ 'ชื่อ' พารามิเตอร์
+        """เรียกจาก app_controller ตอนเปลี่ยน FUNC — ใช้แค่ 'ชื่อ' พารามิเตอร์
         (ตัดหน่วยเดิมทิ้ง เพราะกราฟนี้แกน Y เป็น ppm เสมอ ไม่ใช่หน่วยเดิม เช่น Ω, F)"""
         self.pri_name, _ = _split_name_unit(pri_label)
         self.sec_name, _ = _split_name_unit(sec_label)

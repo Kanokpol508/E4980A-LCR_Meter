@@ -135,7 +135,7 @@ def _safe_float(text):
 
 
 def _scpi_axis_labels(scpi_mode: str) -> tuple:
-    """แปลง SCPI Mode เป็นชื่อแกนแบบย่อ (ตรรกะเดียวกับ RawDataTable.update_headers)"""
+    """แปลง FUNC เป็นชื่อแกนแบบย่อ (ตรรกะเดียวกับ RawDataTable.update_headers)"""
     pri, sec = "Primary", "Secondary"
     if not scpi_mode:
         return pri, sec
@@ -613,12 +613,12 @@ def _write_raw_data_tab(ws, item: dict, exclude_ppm: bool = False, exclude_nomin
     pri_label, sec_label = _scpi_axis_labels(scpi_mode)
 
     # นิยามคอลัมน์ทั้งหมด: (header, getter, กลุ่มสี) — ตัด "Nominal Value" ออกได้ถ้า exclude_nominal
-    # กลุ่มสีคอลัมน์: No./Nominal/SCPI Mode=identify(0), Freq/AVG/Signal/Samples=1,
+    # กลุ่มสีคอลัมน์: No./Nominal/FUNC=identify(0), Freq/AVG/Signal/Samples=1,
     # Primary=2, Secondary=3, Status=ไม่ระบายพื้น
     col_defs = [
         ("No.", lambda rd: rd.get("no", ""), 0),
         ("Nominal Value", lambda rd: rd.get("nominal", "-"), 0),
-        ("SCPI Mode", lambda rd: rd.get("scpi_mode", "-"), 0),
+        ("FUNC", lambda rd: rd.get("scpi_mode", "-"), 0),
         ("Frequency (Hz)", lambda rd: rd.get("freq", ""), 1),
         ("AVG", lambda rd: rd.get("avg", "-"), 1),
         ("Signal Level", lambda rd: rd.get("signal_level", "-"), 1),

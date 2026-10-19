@@ -158,7 +158,7 @@ class GraphDisplay(QWidget):
         super().__init__(parent)
         self.label_style = {'color': '#1e293b', 'font-size': '10pt', 'font-weight': 'normal'}
 
-        # ชื่อพารามิเตอร์จริงตาม SCPI mode (อัปเดตผ่าน set_axis_labels)
+        # ชื่อพารามิเตอร์จริงตาม FUNC (อัปเดตผ่าน set_axis_labels)
         self.pri_name = "Primary Value"
         self.sec_name = "Secondary Value"
         self.x_label = "Points / Frequency (Hz)"

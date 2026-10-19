@@ -213,7 +213,7 @@ class FreqSummaryGraph(QWidget):
         super().__init__(parent)
         self.label_style = {'color': '#1e293b', 'font-size': '10pt', 'font-weight': 'normal'}
 
-        # ชื่อพารามิเตอร์จริงตาม SCPI mode (อัปเดตผ่าน set_axis_labels)
+        # ชื่อพารามิเตอร์จริงตาม FUNC (อัปเดตผ่าน set_axis_labels)
         self.pri_name = "Primary"
         self.sec_name = "Secondary"
 
@@ -407,7 +407,7 @@ class FreqSummaryGraph(QWidget):
 
     # --------------------------------------------------------
     def set_axis_labels(self, pri_label: str, sec_label: str):
-        """เรียกจาก app_controller ตอนเปลี่ยน SCPI mode — เก็บชื่อพารามิเตอร์จริงไว้ใช้
+        """เรียกจาก app_controller ตอนเปลี่ยน FUNC — เก็บชื่อพารามิเตอร์จริงไว้ใช้
         เป็นทั้งชื่อแกน Y และชื่อเส้นใน Legend (แทนคำว่า Primary/Secondary เฉยๆ)"""
         self.pri_name = pri_label
         self.sec_name = sec_label

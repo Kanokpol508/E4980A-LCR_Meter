@@ -20,12 +20,12 @@ class RawDataTable(QWidget):
     ตารางแสดงข้อมูลดิบ (Raw Data) ที่อ่านได้จากเครื่องแบบ Real-time
     - แสดงค่าเรียงตามลำดับการวัด (No.)
     - แสดงสถานะ (Status) ของแต่ละจุด เพื่อตรวจสอบ Error/Overload
-    - เปลี่ยนหัวคอลัมน์แบบไดนามิกตามโหมดการวัดและ SCPI Mode
-    - [NEW] มี Session Info Bar เหนือตาราง แสดงค่าคงที่ตลอด session
+    - เปลี่ยนหัวคอลัมน์แบบไดนามิกตามโหมดการวัดและ FUNC
+    - มี Session Info Bar เหนือตาราง แสดงค่าคงที่ตลอด session
       (Mode/สัญญาณ/สายวัด/ย่าน/PPM Ref ฯลฯ) แยกจากตารางเพราะไม่เปลี่ยนต่อแถว
     """
     # คำอธิบาย (label) ของแต่ละ key ใน session info — ใช้ทั้งตอนสร้าง UI และ update
-    # ย้าย SCPI Mode / Signal Level / Averaging ออกจาก Session Info Bar ไปบันทึก
+    # ย้าย FUNC / Signal Level / Averaging ออกจาก Session Info Bar ไปบันทึก
     # เป็นคอลัมน์ต่อแถวในตารางแทน (ผู้ใช้ปลดล็อกให้แก้ค่าเหล่านี้ระหว่าง session ได้แล้ว
     # จึงไม่ใช่ค่าคงที่ตลอด session อีกต่อไป — ต้องอ้างอิงต่อแถวถึงจะถูกต้อง)
     SESSION_INFO_FIELDS = [
@@ -90,16 +90,16 @@ class RawDataTable(QWidget):
         self.table.setColumnCount(10)
 
         # คอลัมน์พื้นฐาน (ทุกโหมดใช้ "Samples (N)" เหมือนกันแล้ว)
-        # Nominal Value อยู่ถัดจาก No., SCPI Mode อยู่ถัดจาก Nominal Value
+        # Nominal Value อยู่ถัดจาก No., FUNC อยู่ถัดจาก Nominal Value
         # AVG อยู่ถัดจาก Frequency (Hz), Signal Level อยู่ถัดจาก AVG
-        headers = ["No.", "Nominal Value", "SCPI Mode", "Frequency (Hz)", "AVG", "Signal Level",
+        headers = ["No.", "Nominal Value", "FUNC", "Frequency (Hz)", "AVG", "Signal Level",
                    "Samples (N)", "Primary", "Secondary", "Status"]
 
         self.table.setHorizontalHeaderLabels(headers)
         self.clear_table()
 
     def update_headers(self, scpi_mode: str):
-        """แปลง SCPI Mode เป็นชื่อแกนแบบย่อ เช่น CPD -> Primary [Cp], Secondary [D]"""
+        """แปลง FUNC เป็นชื่อแกนแบบย่อ เช่น CPD -> Primary [Cp], Secondary [D]"""
         if not scpi_mode:
             return
             
@@ -127,7 +127,7 @@ class RawDataTable(QWidget):
         elif scpi_mode == "GB": sec = "B"
 
         # ตั้งชื่อ Header คอลัมน์ Primary และ Secondary ใหม่
-        # (คอลัมน์ 7/8 หลังจากแทรก Nominal Value/SCPI Mode/AVG/Signal Level)
+        # (คอลัมน์ 7/8 หลังจากแทรก Nominal Value/FUNC/AVG/Signal Level)
         item_pri = self.table.horizontalHeaderItem(7)
         item_sec = self.table.horizontalHeaderItem(8)
         if item_pri: item_pri.setText(f"Primary [{pri}]")
@@ -155,7 +155,7 @@ class RawDataTable(QWidget):
         item_nominal.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setItem(row_idx, 1, item_nominal)
 
-        # 2: SCPI Mode (ค่าที่ใช้จริงตอนวัดแถวนี้ — ย้ายมาจาก Session Info Bar เดิม)
+        # 2: FUNC (ค่าที่ใช้จริงตอนวัดแถวนี้ — ย้ายมาจาก Session Info Bar เดิม)
         item_scpi = QTableWidgetItem(str(data.get('scpi_mode', '-')))
         item_scpi.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.setItem(row_idx, 2, item_scpi)

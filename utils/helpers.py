@@ -48,6 +48,38 @@ def truncate_sci(value: float, decimals: int = 2) -> str:
     return f"{sign}{truncated:.{decimals}f}e{exp_sign}{abs(exponent):02d}"
 
 
+def round_sci(value: float, decimals: int = 9) -> str:
+    """scientific notation แบบ "ปัดเศษ" (round-half-up) — ทำงานเหมือนรูปแบบเซลล์ Excel
+    '0.000000000E+00' ทุกประการ ใช้กับตาราง Statistics เพื่อให้ตัวเลขตรงกับ Excel
+    (Excel เก็บ 15 หลักนัยสำคัญก่อนแล้วจึงปัดเศษตอนแสดงผล เราจำลองขั้นตอนเดียวกัน)"""
+    from decimal import Decimal, ROUND_HALF_UP
+    if value is None or not math.isfinite(value):
+        return "-"
+    if value == 0:
+        return f"{0:.{decimals}f}e+00"
+    sign = "-" if value < 0 else ""
+    d = _to_decimal(value)
+    exponent = d.adjusted()
+    mantissa = d.scaleb(-exponent).quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_HALF_UP)
+    if mantissa >= 10:                      # เช่น 9.9999999996 -> 10.000000000 : เลื่อนเลขชี้กำลัง
+        mantissa = (mantissa / 10).quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_HALF_UP)
+        exponent += 1
+    exp_sign = "+" if exponent >= 0 else "-"
+    return f"{sign}{mantissa:.{decimals}f}e{exp_sign}{abs(exponent):02d}"
+
+
+def round_fixed(value: float, decimals: int = 12, signed: bool = False) -> str:
+    """ทศนิยมคงที่ N ตำแหน่งแบบ "ปัดเศษ" (round-half-up) — เหมือนรูปแบบเซลล์ Excel
+    '0.000000000000' (12 ตำแหน่ง) ทุกประการ ใช้กับ %RSD / PPM Deviation / Type A"""
+    from decimal import Decimal, ROUND_HALF_UP
+    if value is None or not math.isfinite(value):
+        return "-"
+    q = _to_decimal(value).quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_HALF_UP)
+    if value < 0 and q != 0:
+        return f"-{q:.{decimals}f}"
+    return f"{'+' if signed else ''}{q:.{decimals}f}"
+
+
 def truncate_sig(value: float, sig: int = 9, min_decimals: int = 2, signed: bool = False) -> str:
     """แปลงเป็นทศนิยมคงที่โดยกำหนดจำนวน 'หลักนัยสำคัญ' (significant digits) แบบตัดทิ้ง
     ไม่ปัดเศษ — จำนวนตำแหน่งทศนิยมปรับตามขนาดของค่าอัตโนมัติ จึงรองรับทั้งค่า

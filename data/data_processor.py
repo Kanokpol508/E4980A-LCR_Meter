@@ -4,7 +4,7 @@
 import math
 import statistics
 
-from utils.helpers import truncate_sci, truncate_sig
+from utils.helpers import round_sci, round_fixed
 
 
 # ==========================================================
@@ -76,21 +76,28 @@ def _calc_stats_block(values: list, ref=None) -> dict:
 # ฟังก์ชัน format (Private helper)
 # ==========================================================
 
+# จำนวนทศนิยมของตาราง Statistics — ตั้งให้ "ตรงกับรูปแบบเซลล์ใน Excel" เพื่อเทียบผลได้ 0%
+#   Mean/SD/Min/Max : 0.000000000E+00  (9 ตำแหน่งหลังจุดของ mantissa)
+#   %RSD/PPM/Type A : 0.000000000000   (12 ตำแหน่งหลังจุด)
+# และใช้ "ปัดเศษแบบ Excel" (round-half-up) ไม่ใช่ "ตัดทิ้ง" — การตัดทิ้งที่ 9 หลักนัยสำคัญ
+# คือสาเหตุที่หลักท้ายของ %RSD / Type A / PPM Deviation ไม่ตรง Excel (ตัวคำนวณไม่ได้ผิด)
+STAT_SCI_DECIMALS = 9
+STAT_FIXED_DECIMALS = 12
+
+
 def _fmt(val, sci: bool = True) -> str:
-    """Mean/SD/Min/Max -> scientific 9 ตำแหน่ง (ตัดทิ้ง ไม่ปัดเศษ)
-    sci=False (%RSD) -> ทศนิยมคงที่ 9 หลักนัยสำคัญ ขั้นต่ำ 4 ตำแหน่ง
-    (เดิมคงที่ 4 ตำแหน่ง ทำให้ค่าเล็กอย่าง 0.0000527 แสดงเป็น 0.0001 คลาดเคลื่อน ~90%)"""
+    """Mean/SD/Min/Max -> scientific 9 ตำแหน่ง (ปัดเศษแบบ Excel)
+    sci=False (%RSD) -> ทศนิยมคงที่ 12 ตำแหน่ง (ปัดเศษแบบ Excel)"""
     if val is None:
         return "-"
-    return truncate_sci(val, 9) if sci else truncate_sig(val, sig=9, min_decimals=4)
+    return round_sci(val, STAT_SCI_DECIMALS) if sci else round_fixed(val, STAT_FIXED_DECIMALS)
 
 
 def _fmt_ppm(val) -> str:
-    """PPM Dev / Type A -> 9 หลักนัยสำคัญ ขั้นต่ำ 2 ตำแหน่ง พร้อมเครื่องหมาย +/-
-    (ค่าปกติหน้าตาเดิม เช่น -110.20002; ค่าเล็กจะเพิ่มทศนิยมให้เอง)"""
+    """PPM Dev / Type A -> ทศนิยมคงที่ 12 ตำแหน่ง ปัดเศษแบบ Excel พร้อมเครื่องหมาย +/-"""
     if val is None:
         return "-"
-    return truncate_sig(val, sig=9, min_decimals=2, signed=True)
+    return round_fixed(val, STAT_FIXED_DECIMALS, signed=True)
 
 
 # ==========================================================

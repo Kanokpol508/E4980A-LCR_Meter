@@ -1,31 +1,8 @@
-# รายชื่อไลบรารีที่ต้องติดตั้ง (pyvisa, PyQt6, pyqtgraph, pandas, pytest ฯลฯ)
-│
-
-altgraph==0.17.5
-colorama==0.4.6
-contourpy==1.3.3
-cycler==0.12.1
-et_xmlfile==2.0.0
-fonttools==4.63.0
-kiwisolver==1.5.0
-matplotlib==3.10.9
+# Runtime dependencies for LCR_Metrology_Project (Python 3.12)
+# Install with: pip install -r requirements.txt
+ 
+PyQt6==6.11.0
+pyqtgraph==0.14.0
 numpy==2.4.6
 openpyxl==3.1.5
-packaging==26.2
-pandas==3.0.3
-pefile==2024.8.26
-pillow==12.2.0
-pyinstaller==6.20.0
-pyinstaller-hooks-contrib==2026.6
-pyparsing==3.3.2
-PyQt6==6.11.0
-PyQt6-Qt6==6.11.1
-PyQt6_sip==13.11.1
-pyqtgraph==0.14.0
-python-dateutil==2.9.0.post0
 PyVISA==1.16.2
-pywin32-ctypes==0.2.3
-setuptools==82.0.1
-six==1.17.0
-typing_extensions==4.15.0
-tzdata==2026.2
